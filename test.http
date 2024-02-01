@@ -1,0 +1,12 @@
+@endpoint={{$dotenv AZURE_OPENAI_ENDPOINT}}
+@key={{$dotenv AZURE_OPENAI_KEY}}
+@deployment={{$dotenv AZURE_OPENAI_DEPLOYMENT}}
+
+POST {{endpoint}}openai/deployments/{{deployment}}/completions?api-version=2023-05-15
+Content-Type: application/json
+api-key: {{key}}
+
+{
+  "prompt": "Once upon a time"
+}
+
