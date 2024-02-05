@@ -7,6 +7,8 @@ api_key = os.getenv("AZURE_OPENAI_KEY")
 api_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
 
 simulator_mode = os.getenv("SIMULATOR_MODE") or "replay"
+cassette_dir = os.getenv("CASSETTE_DIR") or ".cassettes"
+cassette_format = os.getenv("CASSETTE_FORMAT") or "yaml"
 
 if api_key is None:
     print("AZURE_OPENAI_KEY is not set", flush=True)
@@ -19,6 +21,11 @@ if api_endpoint is None:
 allowed_simulator_modes = ["replay", "record", "generate"]
 if simulator_mode not in allowed_simulator_modes:
     print(f"SIMULATOR_MODE must be one of {allowed_simulator_modes}", flush=True)
+    exit(1)
+
+allowed_cassette_formats = ["yaml", "json"]
+if cassette_format not in allowed_cassette_formats:
+    print(f"CASSETTE_FORMAT must be one of {allowed_cassette_formats}", flush=True)
     exit(1)
 
 vcr_filtered_request_headers = [
@@ -49,6 +56,11 @@ var_filtered_response_headers = [
     "x-request-id",
     "Cache-Control",
     "Content-Length",
+    "Date",
+    "Strict-Transport-Security",
+    "access-control-allow-origin",
+    # "x-ratelimit-remaining-requests",
+    # "x-ratelimit-remaining-tokens",
 ]
 
 
@@ -60,6 +72,10 @@ def before_record_response(response):
     return response
     # response["headers"].clear()
     # return response
+
+
+def get_cassette_name(request: Request):
+    return request.url.path.strip("/").replace("/", "_") + "." + cassette_format
 
 
 async def handle_with_vcr(request: Request) -> Response:
@@ -77,11 +93,10 @@ async def handle_with_vcr(request: Request) -> Response:
         before_record_response=before_record_response,
         filter_headers=vcr_filtered_request_headers,
         record_mode=record_mode,
-        cassette_library_dir="cassettes",  # TODO: enable configuring this from an environment variable
+        cassette_library_dir=cassette_dir,
+        serializer=cassette_format,
     )
-    # can use "test.json", serializer="json" for JSON cassettes
-    # TODO: determine the cassette name from the request
-    with my_vcr.use_cassette("test.yaml"):
+    with my_vcr.use_cassette(get_cassette_name(request)):
         # create new HTTP request to api_endpoint. copy headers, body, etc from request
         url = api_endpoint
         if url.endswith("/"):
