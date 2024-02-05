@@ -62,7 +62,7 @@ def before_record_response(response):
     # return response
 
 
-async def handle_with_vcr(request: Request, response: Response):
+async def handle_with_vcr(request: Request) -> Response:
     # https://vcrpy.readthedocs.io/en/latest/usage.html#record-modes
     if simulator_mode == "record":
         # add new requests but replay existing ones - can delete the file to start over
@@ -106,9 +106,12 @@ async def handle_with_vcr(request: Request, response: Response):
         )
 
         # TODO - what customisation do we want to apply? Overriding tokens remaining etc?
-        for k, v in fwd_response.headers.items():
-            response.headers[k] = v
-        return fwd_response.json()
+        response = Response(
+            fwd_response.text,
+            status_code=fwd_response.status_code,
+            headers={k: v for k, v in fwd_response.headers.items()},
+        )
+        return response
 
 
 app = FastAPI()
@@ -120,11 +123,11 @@ async def root():
 
 
 @app.api_route("/{full_path:path}", methods=["GET", "POST", "PUT", "DELETE"])
-async def catchall(request: Request, response: Response):
+async def catchall(request: Request):
     print("⚠️ handling route: " + request.url.path, flush=True)
 
     if simulator_mode == "generate":
         raise NotImplementedError("generate mode not implemented")
 
     if simulator_mode == "record" or simulator_mode == "replay":
-        return await handle_with_vcr(request, response)
+        return await handle_with_vcr(request)

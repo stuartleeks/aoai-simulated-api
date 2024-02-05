@@ -10,3 +10,15 @@ api-key: {{key}}
   "prompt": "Once upon a time"
 }
 
+
+
+###
+
+POST http://localhost:8000/openai/deployments/{{deployment}}/completions?api-version=2023-05-15
+Content-Type: application/json
+api-key: {{key}}
+
+{
+  "prompt": "Once upon a time"
+}
+
