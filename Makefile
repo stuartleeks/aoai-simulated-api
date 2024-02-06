@@ -10,6 +10,9 @@ install-requirements:
 	pip install -r src/aoai-simulated-api/requirements.txt
 	pip install -r src/test-client/requirements.txt
 
+erase-cassettes:
+	rm -rf src/aoai-simulated-api/.cassettes
+
 run-simulated-api:
 	set -a && \
 	source .env && \
