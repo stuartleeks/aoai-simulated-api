@@ -54,19 +54,16 @@ class VcrHandler:
         self.cassette_format = cassette_format
 
     def _before_record_response(response):
-        print("before_record_response", response, flush=True)
         for header in var_filtered_response_headers:
             if response["headers"].get(header):
                 del response["headers"][header]
         return response
-        # response["headers"].clear()
-        # return response
 
     def _get_cassette_name(self, request: Request):
         return (
             request.url.path.strip("/").replace("/", "_") + "." + self.cassette_format
         )
-
+    
     async def handle_request_with_vcr(self, request: Request) -> Response:
         # https://vcrpy.readthedocs.io/en/latest/usage.html#record-modes
         if self.simulator_mode == "record":
@@ -80,42 +77,49 @@ class VcrHandler:
                 f"simulator mode not implemented: '{self.simulator_mode}'"
             )
 
-        # TODO - explore caching the vcr instance. Does this help as the cassette file gets larger?
-        my_vcr = vcr.VCR(
-            before_record_response=VcrHandler._before_record_response,
-            filter_headers=vcr_filtered_request_headers,
-            record_mode=record_mode,
-            cassette_library_dir=self.cassette_dir,
-            serializer=self.cassette_format,
-        )
-        with my_vcr.use_cassette(self._get_cassette_name(request)):
-            # create new HTTP request to api_endpoint. copy headers, body, etc from request
-            url = self.api_endpoint
-            if url.endswith("/"):
-                url = url[:-1]
-            url += request.url.path + "?" + request.url.query
-
-            # Copy most headers, but override auth
-            fwd_headers = {
-                k: v
-                for k, v in request.headers.items()
-                if k not in ["host", "authorization"]
-            }
-            fwd_headers["api-key"] = self.api_key
-
-            body = await request.body()
-
-            fwd_response = requests.request(
-                request.method,
-                url,
-                headers=fwd_headers,
-                data=body,
+        try:
+            # TODO - explore caching the vcr instance. Does this help as the cassette file gets larger?
+            my_vcr = vcr.VCR(
+                before_record_response=VcrHandler._before_record_response,
+                filter_headers=vcr_filtered_request_headers,
+                record_mode=record_mode,
+                cassette_library_dir=self.cassette_dir,
+                serializer=self.cassette_format,
+                #https://vcrpy.readthedocs.io/en/latest/configuration.html#request-matching
+                match_on=['uri', 'body'],
             )
+            with my_vcr.use_cassette(self._get_cassette_name(request)):
+                # create new HTTP request to api_endpoint. copy headers, body, etc from request
+                url = self.api_endpoint
+                if url.endswith("/"):
+                    url = url[:-1]
+                url += request.url.path + "?" + request.url.query
 
-            # TODO - what customisation do we want to apply? Overriding tokens remaining etc?
-            response = Response(
-                fwd_response.text,
-                status_code=fwd_response.status_code,
-                headers={k: v for k, v in fwd_response.headers.items()},
-            )
-            return response
+                # Copy most headers, but override auth
+                fwd_headers = {
+                    k: v
+                    for k, v in request.headers.items()
+                    if k not in ["host", "authorization"]
+                }
+                fwd_headers["api-key"] = self.api_key
+
+                body = await request.body()
+
+                fwd_response = requests.request(
+                    request.method,
+                    url,
+                    headers=fwd_headers,
+                    data=body,
+                )
+
+                # TODO - what customisation do we want to apply? Overriding tokens remaining etc?
+                response = Response(
+                    fwd_response.text,
+                    status_code=fwd_response.status_code,
+                    headers={k: v for k, v in fwd_response.headers.items()},
+                )
+                return response
+        except vcr.errors.CannotOverwriteExistingCassetteException as e:
+            print(f"Cannot overwrite existing cassette (simulator_mode={self.simulator_mode}): {e}", flush=True)
+            return Response(status_code=500, content=str(e))
+            
