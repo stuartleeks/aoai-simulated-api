@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 import requests
 import vcr
 from fastapi import Request, Response
@@ -82,7 +83,7 @@ class VcrHandler:
                 cassette_library_dir=self.recording_dir,
                 serializer=self.recording_format,
                 # https://vcrpy.readthedocs.io/en/latest/configuration.html#request-matching
-                match_on=["uri", "body"],
+                match_on=["uri", "method", "body"],
             )
             with my_vcr.use_cassette(self._get_cassette_name(request)):
                 # create new HTTP request to api_endpoint. copy headers, body, etc from request
