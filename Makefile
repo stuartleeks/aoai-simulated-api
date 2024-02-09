@@ -13,8 +13,8 @@ install-requirements:
 	pip install -r src/aoai-simulated-api/requirements.txt
 	pip install -r src/test-client/requirements.txt
 
-erase-cassettes:
-	rm -rf src/aoai-simulated-api/.cassettes
+erase-recording:
+	rm -rf src/aoai-simulated-api/.recording
 
 run-simulated-api:
 	set -a && \
@@ -50,8 +50,8 @@ docker-run-simulated-api:
 	set +a && \
 	docker run --rm \
 		-p 8000:8000 \
-		-v /mnt/cassettes:"${makefile_dir}/src/aoai-simulated-api/.cassettes" \
-		-e CASSETTE_DIR=/mnt/cassettes \
+		-v /mnt/recording:"${makefile_dir}/src/aoai-simulated-api/.recording" \
+		-e RECORDING_DIR=/mnt/recording \
 		-e SIMULATOR_MODE \
 		-e AZURE_OPENAI_ENDPOINT \
 		-e AZURE_OPENAI_KEY \

@@ -9,9 +9,9 @@ api_key = os.getenv("AZURE_OPENAI_KEY")
 api_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
 
 simulator_mode = os.getenv("SIMULATOR_MODE") or "replay"
-cassette_dir = os.getenv("CASSETTE_DIR") or ".cassettes"
-cassette_dir = os.path.abspath(cassette_dir)
-cassette_format = os.getenv("CASSETTE_FORMAT") or "yaml"
+recording_dir = os.getenv("RECORDING_DIR") or ".recording"
+recording_dir = os.path.abspath(recording_dir)
+recording_format = os.getenv("RECORDING_FORMAT") or "yaml"
 
 generator_config_path = os.getenv("GENERATOR_CONFIG_PATH") or "generator_config.py"
 
@@ -28,14 +28,14 @@ if simulator_mode not in allowed_simulator_modes:
     print(f"SIMULATOR_MODE must be one of {allowed_simulator_modes}", flush=True)
     exit(1)
 
-allowed_cassette_formats = ["yaml", "json"]
-if cassette_format not in allowed_cassette_formats:
-    print(f"CASSETTE_FORMAT must be one of {allowed_cassette_formats}", flush=True)
+allowed_recording_formats = ["yaml", "json"]
+if recording_format not in allowed_recording_formats:
+    print(f"RECORDING_FORMAT must be one of {allowed_recording_formats}", flush=True)
     exit(1)
 
 print(f"🚀 Starting aoai-simulated-api in {simulator_mode} mode", flush=True)
-print(f"📼 Cassette directory: {cassette_dir}", flush=True)
-print(f"📼 Cassette format: {cassette_format}", flush=True)
+print(f"📼 Recording directory: {recording_dir}", flush=True)
+print(f"📼 Recording format: {recording_format}", flush=True)
 print(f"🔑 API endpoint: {api_endpoint}", flush=True)
 masked_api_key = api_key[:4] + "..." + api_key[-4:]
 print(f"🔑 API key: {masked_api_key}", flush=True)
@@ -51,8 +51,8 @@ else:
         api_endpoint=api_endpoint,
         api_key=api_key,
         simulator_mode=simulator_mode,
-        cassette_dir=cassette_dir,
-        cassette_format=cassette_format,
+        recording_dir=recording_dir,
+        recording_format=recording_format,
     )
 
 

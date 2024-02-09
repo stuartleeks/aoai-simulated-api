@@ -33,8 +33,8 @@ When running the simulated API, there are a number of environment variables to c
 | `SIMULATOR_MODE`        | The mode the simulator should run in. Current options are `record`, `replay`, and `generate`.                                               |
 | `AZURE_OPENAI_ENDPOINT` | The endpoint for the Azure OpenAI service, e.g. `https://mysvc.openai.azure.com/`                                                           |
 | `AZURE_OPENAI_KEY`      | The API key for the Azure OpenAI service.                                                                                                   |
-| `CASSETTE_DIR`          | The directory to store the recorded requests and responses (defaults to `.cassette`).                                                       |
-| `CASSETTE_FORMAT`       | Either `yaml` (default) or `json` to specify the format of the recorded requests/responses.                                                 |
+| `RECORDING_DIR`          | The directory to store the recorded requests and responses (defaults to `.recording`).                                                       |
+| `RECORDING_FORMAT`       | Either `yaml` (default) or `json` to specify the format of the recorded requests/responses.                                                 |
 | `GENERATOR_CONFIG_PATH` | The path to a Python file that contains the generator configuration. See `src/example_generator_config/generator_config.py` for an example. |
 
 To run the simulated API, run `uvicorn main:app --reload --port 8000` from the `src/aoai-simulated-api` directory using the environment variables above to configure.
@@ -68,7 +68,7 @@ To build the image, run `docker build -t aoai-simulated-api .` from the `src/aoa
 Once the image is built, you can run is using `docker run -p 8000:8000 -e SIMULATOR_MODE=record -e AZURE_OPENAI_ENDPOINT=https://mysvc.openai.azure.com/ -e AZURE_OPENAI_KEY=your-api-key aoai-simulated-api`.
 
 Note that you can set any of the environment variable listed in the [Getting Started](#getting-started) section when running the container.
-For example, if you have the recordings on your host (in `/some/path`) , you can mount that directory into the container using the `-v` flag: `docker run -p 8000:8000 -e SIMULATOR_MODE=replay -e CASSETTE_DIR=/cassettes -v /some/path:/cassettes aoai-simulated-api`.
+For example, if you have the recordings on your host (in `/some/path`) , you can mount that directory into the container using the `-v` flag: `docker run -p 8000:8000 -e SIMULATOR_MODE=replay -e RECORDING_DIR=/recording -v /some/path:/recording aoai-simulated-api`.
 
 
 ## Current Status/Notes
