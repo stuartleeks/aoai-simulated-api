@@ -1,0 +1,21 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug AOAI Simulated API",
+            "type": "debugpy",
+            "request": "launch",
+            "envFile": "${workspaceFolder}/.env",
+            "program": "/home/vscode/.local/bin/gunicorn",
+            "args": [
+                "main:app",
+                "--worker-class",
+                "uvicorn.workers.UvicornWorker",
+                "-b",
+                "localhost:8000"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/src/aoai-simulated-api"
+        }
+    ]
+}
