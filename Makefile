@@ -21,7 +21,7 @@ run-simulated-api:
 	[ -f .env ] && echo "sourcing .env values" && source .env || echo "No .env file found, using shell env vars" && \
 	set +a && \
 	cd src/aoai-simulated-api && \
-	uvicorn main:app --reload --port 8000
+	gunicorn main:app --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000
 
 
 run-test-client:
@@ -36,7 +36,7 @@ run-test-client-simulator:
 	source .env && \
 	set +a && \
 	cd src/test-client && \
-	AZURE_OPENAI_ENDPOINT=http://localhost:8000 python app.py
+	AZURE_OPENAI_ENDPOINT=http://localhost:8000 AZURE_FORM_RECOGNIZER_ENDPOINT=http://localhost:8000 python app.py
 
 
 docker-build-simulated-api:
@@ -48,7 +48,7 @@ docker-run-simulated-api:
 	set -a && \
 	[ -f .env ] && echo "sourcing .env values" && source .env || echo "No .env file found, using shell env vars" && \
 	set +a && \
-	docker run --rm \
+	docker run --rm -i -t \
 		-p 8000:8000 \
 		-v /mnt/recording:"${makefile_dir}/src/aoai-simulated-api/.recording" \
 		-e RECORDING_DIR=/mnt/recording \

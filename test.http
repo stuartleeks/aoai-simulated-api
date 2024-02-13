@@ -1,10 +1,13 @@
-@endpoint={{$dotenv AZURE_OPENAI_ENDPOINT}}
-@key={{$dotenv AZURE_OPENAI_KEY}}
-@deployment={{$dotenv AZURE_OPENAI_DEPLOYMENT}}
+@aooai_endpoint={{$dotenv AZURE_OPENAI_ENDPOINT}}
+@aoai_key={{$dotenv AZURE_OPENAI_KEY}}
+@aoai_deployment={{$dotenv AZURE_OPENAI_DEPLOYMENT}}
 
-POST {{endpoint}}openai/deployments/{{deployment}}/completions?api-version=2023-05-15
+@doc_intelligence_endpoint={{$dotenv AZURE_FORM_RECOGNIZER_ENDPOINT}}
+@doc_intelligence_key={{$dotenv AZURE_FORM_RECOGNIZER_KEY}}
+
+POST {{aooai_endpoint}}openai/deployments/{{aoai_deployment}}/completions?api-version=2023-05-15
 Content-Type: application/json
-api-key: {{key}}
+api-key: {{aoai_key}}
 
 {
   "prompt": "Once upon a time"
@@ -14,11 +17,47 @@ api-key: {{key}}
 
 ###
 
-POST http://localhost:8000/openai/deployments/{{deployment}}/completions?api-version=2023-05-15
+POST http://localhost:8000/openai/deployments/{{aoai_deployment}}/completions?api-version=2023-05-15
 Content-Type: application/json
-api-key: {{key}}
+api-key: {{aoai_key}}
 
 {
   "prompt": "Once upon a time"
 }
 
+
+###
+
+# https://learn.microsoft.com/en-gb/azure/ai-services/document-intelligence/quickstarts/get-started-sdks-rest-api?view=doc-intel-3.1.0&viewFallbackFrom=form-recog-3.0.0&preserve-view=true&pivots=programming-language-rest-api
+
+
+# @name doc_intell_receipt
+POST {{doc_intelligence_endpoint}}formrecognizer/documentModels/prebuilt-receipt:analyze?api-version=2023-07-31
+ocp-apim-subscription-key: {{doc_intelligence_key}}
+Content-Type: application/octet-stream
+Accept: application/json
+
+< ./src/test-client/receipt.png
+
+
+###
+
+GET {{doc_intell_receipt.response.headers.operation-location }}
+ocp-apim-subscription-key: {{doc_intelligence_key}}
+
+
+###
+
+# @name doc_intell_receipt_local
+POST http://localhost:8000/formrecognizer/documentModels/prebuilt-receipt:analyze?api-version=2023-07-31
+ocp-apim-subscription-key: {{doc_intelligence_key}}
+Content-Type: application/octet-stream
+Accept: application/json
+
+< ./src/test-client/receipt.png
+
+
+###
+
+GET {{doc_intell_receipt_local.response.headers.operation-location }}
+ocp-apim-subscription-key: {{doc_intelligence_key}}
