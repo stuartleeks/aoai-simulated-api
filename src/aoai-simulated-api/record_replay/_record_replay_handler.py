@@ -11,10 +11,17 @@ class RecordReplayHandler:
 
     _recordings: dict[str, dict[int, RecordedResponse]]
 
-    def __init__(self, simulator_mode: str, persister: YamlRecordingPersister, forwarder: RequestForwarder | None):
+    def __init__(
+        self,
+        simulator_mode: str,
+        persister: YamlRecordingPersister,
+        forwarder: RequestForwarder | None,
+        autosave: bool,
+    ):
         self._simulator_mode = simulator_mode
         self._persister = persister
         self._forwarder = forwarder
+        self._autosave = autosave
 
         # recordings keyed by URL, within a recording, requests are keyed by hash of request values
         self._recordings = {}
@@ -94,16 +101,18 @@ class RecordReplayHandler:
             status_message="n/a",
         )
 
-        if forwarded_response.perist_response:
+        if forwarded_response.persist_response:
             # Save the recording
-            print(f"💾 Saving recording for {request.method} {request.url}")
+            print(f"📝 Storing recording for {request.method} {request.url}")
             recording = self._recordings.get(request.url.path)
             if not recording:
                 recording = {}
                 self._recordings[request.url.path] = recording
             recording[recorded_response.request_hash] = recorded_response
-            # TODO: Add config for whether to auto-save to disk
-            self._persister.save_recording(request.url.path, recording)
+
+            if self._autosave:
+                # Save the recording to disk
+                self._persister.save_recording(request.url.path, recording)
 
         return Response(content=body, status_code=response.status_code, headers=response.headers)
 

@@ -33,6 +33,7 @@ When running the simulated API, there are a number of environment variables to c
 | `SIMULATOR_MODE`        | The mode the simulator should run in. Current options are `record`, `replay`, and `generate`.                               |
 | `RECORDING_DIR`         | The directory to store the recorded requests and responses (defaults to `.recording`).                                      |
 | `RECORDING_FORMAT`      | Currently only `yaml` is supported. Use to specify the format of the recorded requests/responses.                           |
+| `RECORDING_AUTOSAVE`    | If set to `True` (default), the simulator will save the recording after each request.                                       |
 | `GENERATOR_CONFIG_PATH` | The path to a Python file that contains the generator configuration. See `src/examples/generator_config.py` for an example. |
 | `FORWARDER_CONFIG_PATH` | The path to a Python file that contains the forwarder configuration. See `src/examples/forwarder_config.py` for an example. |
 | `AZURE_OPENAI_ENDPOINT` | The endpoint for the Azure OpenAI service, e.g. `https://mysvc.openai.azure.com/`                                           |
@@ -157,6 +158,13 @@ Or via Docker:
 ```bash
 docker run -p 8000:8000 -e SIMULATOR_MODE=record -e FORWARDER_CONFIG_PATH=/aoai/forwarder_config.py -v /path/to/forwarder_config.py:/aoai aoai-simulated-api
 ```
+
+## Large recordings
+
+By default, the simulator saves the recording file after each new recorded request in `record` mode.
+If you need to create a large recording, you may want to turn off the autosave feature to improve performance.
+
+With autosave off, you can save the recording manually by sending a `POST` request to `/++/save-recordings` to save the recordings files once you have made all the requests you want to capture. You can do this using ` curl localhost:8000/++/save-recordings -X POST`. 
 
 ## Current Status/Notes
 

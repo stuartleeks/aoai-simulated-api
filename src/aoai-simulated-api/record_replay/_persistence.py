@@ -28,7 +28,7 @@ class YamlRecordingPersister:
         self.ensure_recording_dir_exists()
         with open(recording_path, "w") as f:
             yaml.dump(recording_data, stream=f, Dumper=yaml.CDumper)
-        print(f"Recording saved to {recording_path}", flush=True)
+        print(f"💾 Recording saved to {recording_path}", flush=True)
 
     def ensure_recording_dir_exists(self):
         if not os.path.exists(self._recording_dir):

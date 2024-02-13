@@ -9,6 +9,7 @@ simulator_mode = os.getenv("SIMULATOR_MODE") or "replay"
 recording_dir = os.getenv("RECORDING_DIR") or ".recording"
 recording_dir = os.path.abspath(recording_dir)
 recording_format = os.getenv("RECORDING_FORMAT") or "yaml"
+recording_autosave = os.getenv("RECORDING_AUTOSAVE", "true").lower() == "true"
 
 generator_config_path = os.getenv("GENERATOR_CONFIG_PATH") or "generator/config.py"
 forwarder_config_path = os.getenv("FORWARDER_CONFIG_PATH") or "record_replay/_request_forwarder_config.py"
@@ -26,8 +27,6 @@ if recording_format not in allowed_recording_formats:
 
 print(f"🚀 Starting aoai-simulated-api in {simulator_mode} mode", flush=True)
 
-# TODO add option to autosave recordings on new request entry for ease of getting started
-
 app = FastAPI()
 
 if simulator_mode == "generate":
@@ -35,7 +34,8 @@ if simulator_mode == "generate":
     generator_manager = GeneratorManager(generator_config_path=generator_config_path)
 else:
     print(f"📼 Recording directory: {recording_dir}", flush=True)
-    print(f"📼 Recording format: {recording_format}", flush=True)
+    print(f"📼 Recording format   : {recording_format}", flush=True)
+    print(f"📼 Recording auto-save: {recording_autosave}", flush=True)
     # TODO - handle JSON loading (or update docs!)
     if recording_format != "yaml":
         raise Exception(f"Unsupported recording format: {recording_format}")
@@ -46,9 +46,7 @@ else:
         forwarder = RequestForwarder(forwarder_config_path)
 
     record_replay_handler = RecordReplayHandler(
-        simulator_mode=simulator_mode,
-        persister=persister,
-        forwarder=forwarder,
+        simulator_mode=simulator_mode, persister=persister, forwarder=forwarder, autosave=recording_autosave
     )
 
 
@@ -57,7 +55,7 @@ async def root():
     return {"message": "👋 aoai-simulated-api is running"}
 
 
-@app.post("/++save++")
+@app.post("/++/save-recordings")
 def save_recordings():
     if simulator_mode == "record":
         print("📼 Saving recordings...", flush=True)
