@@ -28,16 +28,17 @@ After cloning the repo, install dependencies using `make install-requirements`.
 
 When running the simulated API, there are a number of environment variables to configure:
 
-| Variable                | Description                                                                                                                 |
-| ----------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `SIMULATOR_MODE`        | The mode the simulator should run in. Current options are `record`, `replay`, and `generate`.                               |
-| `RECORDING_DIR`         | The directory to store the recorded requests and responses (defaults to `.recording`).                                      |
-| `RECORDING_FORMAT`      | Currently only `yaml` is supported. Use to specify the format of the recorded requests/responses.                           |
-| `RECORDING_AUTOSAVE`    | If set to `True` (default), the simulator will save the recording after each request.                                       |
-| `GENERATOR_CONFIG_PATH` | The path to a Python file that contains the generator configuration. See `src/examples/generator_config.py` for an example. |
-| `FORWARDER_CONFIG_PATH` | The path to a Python file that contains the forwarder configuration. See `src/examples/forwarder_config.py` for an example. |
-| `AZURE_OPENAI_ENDPOINT` | The endpoint for the Azure OpenAI service, e.g. `https://mysvc.openai.azure.com/`                                           |
-| `AZURE_OPENAI_KEY`      | The API key for the Azure OpenAI service.                                                                                   |
+| Variable                  | Description                                                                                                                 |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `SIMULATOR_MODE`          | The mode the simulator should run in. Current options are `record`, `replay`, and `generate`.                               |
+| `RECORDING_DIR`           | The directory to store the recorded requests and responses (defaults to `.recording`).                                      |
+| `RECORDING_FORMAT`        | Currently only `yaml` is supported. Use to specify the format of the recorded requests/responses.                           |
+| `RECORDING_AUTOSAVE`      | If set to `True` (default), the simulator will save the recording after each request.                                       |
+| `GENERATOR_CONFIG_PATH`   | The path to a Python file that contains the generator configuration. See `src/examples/generator_config.py` for an example. |
+| `FORWARDER_CONFIG_PATH`   | The path to a Python file that contains the forwarder configuration. See `src/examples/forwarder_config.py` for an example. |
+| `AZURE_OPENAI_ENDPOINT`   | The endpoint for the Azure OpenAI service, e.g. `https://mysvc.openai.azure.com/`                                           |
+| `AZURE_OPENAI_KEY`        | The API key for the Azure OpenAI service.                                                                                   |
+| `AZURE_OPENAI_DEPLOYMENT` | The custom name of the model in your Azure OpenAI service. Use a gpt-35-turbo-instruct deployment.                          |
 
 To run the simulated API, run `uvicorn main:app --reload --port 8000` from the `src/aoai-simulated-api` directory using the environment variables above to configure.
 
