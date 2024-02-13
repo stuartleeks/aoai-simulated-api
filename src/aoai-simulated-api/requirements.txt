@@ -1,4 +1,6 @@
 fastapi
 uvicorn[standard]
+gunicorn
 vcrpy
 requests
+PyYAML

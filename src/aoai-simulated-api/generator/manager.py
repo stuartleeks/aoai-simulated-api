@@ -4,17 +4,15 @@ from fastapi import Request
 
 
 def _load_generators(generator_config_path: str):
-    module_spec = importlib.util.spec_from_file_location("__module", generator_config_path)
+    module_spec = importlib.util.spec_from_file_location("__generators_module", generator_config_path)
     module = importlib.util.module_from_spec(module_spec)
     module_spec.loader.exec_module(module)
     return module.get_generators()
 
 
 class GeneratorManager:
-    def __init__(self, generator_config_path: str = "generator_config.py"):
-        # self._generators = get_generators()
+    def __init__(self, generator_config_path: str):
         self._generators = _load_generators(generator_config_path)
-        print("***", self._generators, "***")
 
     async def generate(self, request: Request):
         for generator in self._generators:
