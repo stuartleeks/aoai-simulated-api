@@ -1,6 +1,7 @@
 import importlib.util
 import inspect
 from fastapi import Request
+from ._generator_context import GeneratorContext
 
 
 def _load_generators(generator_config_path: str):
@@ -13,10 +14,11 @@ def _load_generators(generator_config_path: str):
 class GeneratorManager:
     def __init__(self, generator_config_path: str):
         self._generators = _load_generators(generator_config_path)
+        self._context = GeneratorContext()
 
     async def generate(self, request: Request):
         for generator in self._generators:
-            response = generator(request)
+            response = generator(context=self._context, request=request)
             if response is not None and inspect.isawaitable(response):
                 response = await response
             if response is not None:

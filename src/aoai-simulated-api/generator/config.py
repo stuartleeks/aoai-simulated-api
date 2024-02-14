@@ -1,6 +1,6 @@
 from asyncio import sleep
 from fastapi import Request, Response
-from starlette.routing import Route, Match
+from starlette.routing import Route
 from typing import Callable
 
 import json
@@ -15,37 +15,21 @@ import time
 # See src/examples/generator_config.py for an example of how to define your own generators
 
 
-count = 0
-
-
-# re-using Starlette's Route class to define a route
-# endpoint to pass to Route
-def endpoint():
-    pass
-
-
-def strip_path_query(path: str) -> str:
-    query_start = path.find("?")
-    if query_start != -1:
-        path = path[:query_start]
-    return path
-
-
 # 0.72 is based on generating a bunch of lorem ipsum and counting the tokens
 # This was for a gpt-3.5 model
 TOKEN_TO_WORD_FACTOR = 0.72
 tiktoken_encoding = tiktoken.encoding_for_model("gpt-3.5")
-completion_route = Route("/openai/deployments/{deployment}/completions", methods=["POST"], endpoint=endpoint)
 
 
-async def azure_open_ai_completion(request: Request) -> Response | None:
-    match, scopes = completion_route.matches(
-        {"type": "http", "method": request.method, "path": strip_path_query(request.url.path)}
+async def azure_open_ai_completion(context, request: Request) -> Response | None:
+    is_match, path_params = context.is_route_match(
+        request=request, path="/openai/deployments/{deployment}/completions", methods=["POST"]
     )
-    if match != Match.FULL:
+    if not is_match:
         return None
 
-    # TODO - look up deployment value from scopes and use name convention to find the tiktoken model
+    # TODO - Use name convention to find the tiktoken model from deployment_name
+    deployment_name = path_params["deployment"]
     request_body = await request.json()
     prompt_tokens = len(tiktoken_encoding.encode(request_body["prompt"]))
     max_tokens = request_body.get("max_tokens", 10)  # TODO - what is the default max tokens?
@@ -82,7 +66,7 @@ def get_generators() -> list[Callable[[Request], Response | None]]:
     # If the function returns None, the next function in the list will be called
     return [
         azure_open_ai_completion,
-        lambda request: Response(
+        lambda context, request: Response(
             content="Default generated response - see src/examples/generator_config.py for example generator code",
             status_code=200,
         ),
