@@ -10,7 +10,9 @@ Content-Type: application/json
 api-key: {{aoai_key}}
 
 {
-  "prompt": "Once upon a time"
+  "model": "gpt-5-turbo-1",
+  "prompt": "Once upon a time",
+  "max_tokens": 10
 }
 
 
@@ -22,8 +24,28 @@ Content-Type: application/json
 api-key: {{aoai_key}}
 
 {
-  "prompt": "Once upon a time"
+  "model": "gpt-5-turbo-1",
+  "prompt": "Once upon a time",
+  "max_tokens": 10
 }
+
+
+
+
+###
+
+POST {{aooai_endpoint}}openai/deployments/gpt-5-turbo-1/chat/completions?api-version=2023-12-01-preview
+Content-Type: application/json
+api-key: {{aoai_key}}
+
+{
+  "messages": [{
+    "role": "user",
+    "content": "What is the meaning of life?"
+    }],
+  "model": "gpt-5-turbo-1"
+}
+
 
 
 ###

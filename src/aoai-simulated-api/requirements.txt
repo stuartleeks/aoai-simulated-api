@@ -4,3 +4,6 @@ gunicorn
 vcrpy
 requests
 PyYAML
+tiktoken
+nanoid
+python-lorem
