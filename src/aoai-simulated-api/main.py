@@ -1,3 +1,4 @@
+import logging
 import os
 import traceback
 from fastapi import FastAPI, Request, Response
@@ -14,28 +15,30 @@ recording_autosave = os.getenv("RECORDING_AUTOSAVE", "true").lower() == "true"
 generator_config_path = os.getenv("GENERATOR_CONFIG_PATH") or "generator/config.py"
 forwarder_config_path = os.getenv("FORWARDER_CONFIG_PATH") or "record_replay/_request_forwarder_config.py"
 
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)  # TODO - make this configurable
 
 allowed_simulator_modes = ["replay", "record", "generate"]
 if simulator_mode not in allowed_simulator_modes:
-    print(f"SIMULATOR_MODE must be one of {allowed_simulator_modes}", flush=True)
+    logger.error(f"SIMULATOR_MODE must be one of %s", allowed_simulator_modes)
     exit(1)
 
 allowed_recording_formats = ["yaml", "json"]
 if recording_format not in allowed_recording_formats:
-    print(f"RECORDING_FORMAT must be one of {allowed_recording_formats}", flush=True)
+    logger.error(f"RECORDING_FORMAT must be one of %s", allowed_recording_formats)
     exit(1)
 
-print(f"🚀 Starting aoai-simulated-api in {simulator_mode} mode", flush=True)
+logger.info("🚀 Starting aoai-simulated-api in %s mode", simulator_mode)
 
 app = FastAPI()
 
 if simulator_mode == "generate":
-    print(f"🔌 Generator config path: {generator_config_path}", flush=True)
+    logger.info(f"🔌 Generator config path: %s", generator_config_path)
     generator_manager = GeneratorManager(generator_config_path=generator_config_path)
 else:
-    print(f"📼 Recording directory: {recording_dir}", flush=True)
-    print(f"📼 Recording format   : {recording_format}", flush=True)
-    print(f"📼 Recording auto-save: {recording_autosave}", flush=True)
+    logger.info(f"📼 Recording directory: %s", recording_dir)
+    logger.info(f"📼 Recording format   : %s", recording_format)
+    logger.info(f"📼 Recording auto-save: %s", recording_autosave)
     # TODO - handle JSON loading (or update docs!)
     if recording_format != "yaml":
         raise Exception(f"Unsupported recording format: {recording_format}")
@@ -58,18 +61,18 @@ async def root():
 @app.post("/++/save-recordings")
 def save_recordings():
     if simulator_mode == "record":
-        print("📼 Saving recordings...", flush=True)
+        logger.info("📼 Saving recordings...")
         record_replay_handler.save_recordings()
-        print("📼 Recordings saved", flush=True)
+        logger.info("📼 Recordings saved")
         return Response(content="📼 Recordings saved", status_code=200)
     else:
-        print("⚠️ Not saving recordings as not in record mode", flush=True)
+        logger.warn("⚠️ Not saving recordings as not in record mode")
         return Response(content="⚠️ Not saving recordings as not in record mode", status_code=400)
 
 
 @app.api_route("/{full_path:path}", methods=["GET", "POST", "PUT", "DELETE"])
 async def catchall(request: Request):
-    print("⚡ handling route: " + request.url.path, flush=True)
+    logger.debug("⚡ handling route: %s", request.url.path)
 
     try:
         response = None
@@ -85,5 +88,5 @@ async def catchall(request: Request):
 
         return response
     except Exception as e:
-        print(f"Error: {e}\n{traceback.format_exc()}", flush=True)
+        logger.error(f"Error: %s\n%s", e, traceback.format_exc())
         return Response(status_code=500)
