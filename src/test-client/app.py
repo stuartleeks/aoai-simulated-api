@@ -44,12 +44,12 @@ if mode == "doc-intelligence":
 def send_test_completion():
     # Send a completion call to generate an answer
     print("Sending a test completion job")
-    response = aoai_client.completions.create(model=deployment_name, prompt="A good DAD joke is ....", max_tokens=10)
+    response = aoai_client.completions.create(model=deployment_name, prompt="A good DAD joke is ....", max_tokens=50)
     print(response)
 
     print("")
     print("Sending another test completion job")
-    response = aoai_client.completions.create(model=deployment_name, prompt="A good story opening is!", max_tokens=10)
+    response = aoai_client.completions.create(model=deployment_name, prompt="A good story opening is!", max_tokens=50)
     print(response)
 
 

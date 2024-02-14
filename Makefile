@@ -12,6 +12,7 @@ help: ## show this help
 install-requirements:
 	pip install -r src/aoai-simulated-api/requirements.txt
 	pip install -r src/test-client/requirements.txt
+	pip install -r src/loadtest/requirements.txt
 
 erase-recording:
 	rm -rf src/aoai-simulated-api/.recording
@@ -21,7 +22,7 @@ run-simulated-api:
 	[ -f .env ] && echo "sourcing .env values" && source .env || echo "No .env file found, using shell env vars" && \
 	set +a && \
 	cd src/aoai-simulated-api && \
-	gunicorn main:app --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000
+	gunicorn main:app --worker-class uvicorn.workers.UvicornWorker --workers 1 --bind 0.0.0.0:8000
 
 
 run-test-client:
