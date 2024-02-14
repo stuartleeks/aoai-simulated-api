@@ -12,7 +12,7 @@ recording_dir = os.path.abspath(recording_dir)
 recording_format = os.getenv("RECORDING_FORMAT") or "yaml"
 recording_autosave = os.getenv("RECORDING_AUTOSAVE", "true").lower() == "true"
 
-generator_config_path = os.getenv("GENERATOR_CONFIG_PATH") or "generator/config.py"
+generator_config_path = os.getenv("GENERATOR_CONFIG_PATH") or "generator/default_config.py"
 forwarder_config_path = os.getenv("FORWARDER_CONFIG_PATH") or "record_replay/_request_forwarder_config.py"
 
 logger = logging.getLogger(__name__)

@@ -60,7 +60,3 @@ async def generate_analyze_receipt_result(context, request: Request) -> Response
 
     # Return the response.
     return Response(status_code=200, content=content, headers=headers)
-
-
-def get_generators() -> list:
-    return [generate_analyze_prebuilt_receipt, generate_analyze_receipt_result]

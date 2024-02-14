@@ -1,7 +1,4 @@
-from asyncio import sleep
 from fastapi import Request, Response
-from starlette.routing import Route
-from typing import Callable
 
 import json
 import lorem
@@ -58,16 +55,3 @@ async def azure_open_ai_completion(context, request: Request) -> Response | None
     }
 
     return Response(content=json.dumps(response_body), headers={"Content-Type": "application/json"}, status_code=200)
-
-
-def get_generators() -> list[Callable[[Request], Response | None]]:
-    # Return a list of functions
-    # If the function returns a Response object, it will be used as the response for the request
-    # If the function returns None, the next function in the list will be called
-    return [
-        azure_open_ai_completion,
-        lambda context, request: Response(
-            content="Default generated response - see src/examples/generator_config.py for example generator code",
-            status_code=200,
-        ),
-    ]
