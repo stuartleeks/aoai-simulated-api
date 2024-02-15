@@ -7,7 +7,7 @@ from fastapi import Request, Response
 operations = {}
 
 
-async def generate_analyze_prebuilt_receipt(context, request: Request) -> Response | None:
+async def doc_intelligence_analyze(context, request: Request) -> Response | None:
     global operations
     is_match, _ = context.is_route_match(
         request=request, path="/formrecognizer/documentModels/prebuilt-receipt:analyze", methods=["POST"]
@@ -29,7 +29,7 @@ async def generate_analyze_prebuilt_receipt(context, request: Request) -> Respon
     return Response(status_code=202, headers=headers)
 
 
-async def generate_analyze_receipt_result(context, request: Request) -> Response | None:
+async def doc_intelligence_analyze_result(context, request: Request) -> Response | None:
     global operations
     is_match, path_params = context.is_route_match(
         request=request,

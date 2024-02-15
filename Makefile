@@ -26,14 +26,14 @@ run-simulated-api:
 
 
 run-test-client:
-	set -a && \
+	@set -a && \
 	source .env && \
 	set +a && \
 	cd src/test-client && \
 	python app.py
 
 run-test-client-simulator:
-	set -a && \
+	@set -a && \
 	source .env && \
 	set +a && \
 	cd src/test-client && \

@@ -49,7 +49,7 @@ class RecordReplayHandler:
                 headers = {k: v[0] for k, v in response_info.headers.items()}
                 return Response(content=response_info.body, status_code=response_info.status_code, headers=headers)
             else:
-                print("No recorded response found for request", flush=True)  # TODO log
+                print(f"No recorded response found for request {request.method} {url}", flush=True)  # TODO log
         else:
             print(f"No recording found for URL: {url}", flush=True)  # TODO log
 

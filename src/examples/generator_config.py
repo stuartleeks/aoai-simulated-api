@@ -10,5 +10,5 @@ async def generate_echo_response(context, request: Request) -> Response | None:
     return Response(content=f"Echo: {request_body.decode("utf-8")}", status_code=200)
 
 
-def get_generators() -> list:
+def get_generators(context) -> list:
     return [generate_echo_response]

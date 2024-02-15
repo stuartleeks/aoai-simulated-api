@@ -1,24 +1,25 @@
 import importlib.util
 import inspect
 from fastapi import Request
-from ._generator_context import GeneratorContext
+from ._generator_context import GeneratorCallContext, GeneratorSetupContext
 
 
-def _load_generators(generator_config_path: str):
+def _load_generators(generator_config_path: str, setup_context: GeneratorSetupContext):
     module_spec = importlib.util.spec_from_file_location("__generators_module", generator_config_path)
     module = importlib.util.module_from_spec(module_spec)
     module_spec.loader.exec_module(module)
-    return module.get_generators()
+    return module.get_generators(setup_context)
 
 
 class GeneratorManager:
     def __init__(self, generator_config_path: str):
-        self._generators = _load_generators(generator_config_path)
-        self._context = GeneratorContext()
+        self._call_context = GeneratorCallContext()
+        setup_context = GeneratorSetupContext()
+        self._generators = _load_generators(generator_config_path, setup_context)
 
     async def generate(self, request: Request):
         for generator in self._generators:
-            response = generator(context=self._context, request=request)
+            response = generator(context=self._call_context, request=request)
             if response is not None and inspect.isawaitable(response):
                 response = await response
             if response is not None:
