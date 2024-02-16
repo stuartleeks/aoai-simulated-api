@@ -1,6 +1,5 @@
 import datetime
-
-# import os
+import random
 import json
 import uuid
 import lorem
@@ -99,6 +98,16 @@ def datetime_handler(x):
 
 
 def build_result(analyze_result_dict):
+    """
+    Builds a response body for the analyze result.
+
+    Args:
+        analyze_result_dict (dict): The dictionary containing the metadata from the original analyze request.
+
+    Returns:
+        dict: The response body containing the analyze result.
+    """
+
     content_length = analyze_result_dict["content_length"]
 
     # TODO: Determine how to handle the response content length.
@@ -114,6 +123,15 @@ def build_result(analyze_result_dict):
     # Based on https://learn.microsoft.com/en-us/rest/api/aiservices/document-models/get-analyze-result?view=rest-aiservices-2023-07-31&tabs=HTTP,
     # Many fields appear to be optional (likely varying by model), so we can just return a minimal response for now.
 
+    # TODO: Make this configurable, based on the desired response size?
+    word_count = 5
+    line_count = 6
+
+    if analyze_result_dict.get("string_index_type") is not None:
+        string_index_type = analyze_result_dict.get("string_index_type")
+    else:
+        string_index_type = "textElements"
+
     response_body = {
         "status": "succeeded",
         "createdDateTime": datetime.datetime.now(),
@@ -121,7 +139,7 @@ def build_result(analyze_result_dict):
         "analyzeResult": {
             "apiVersion": analyze_result_dict["api_version"],
             "modelId": analyze_result_dict["model_id"],
-            "stringIndexType": analyze_result_dict.get("string_index_type", "textElements"),
+            "stringIndexType": string_index_type,
             "content": content,
             "keyValuePairs": [],
             "languages": [],
@@ -133,26 +151,13 @@ def build_result(analyze_result_dict):
                     "barcodes": [],
                     "formulas": [],
                     "height": 3264,
-                    "lines": [
-                        {
-                            "content": "Contoso",
-                            "polygon": [863, 270, 1605, 269, 1605, 412, 863, 416],
-                            "spans": [{"offset": 0, "length": 7}],
-                        }
-                    ],
+                    "lines": get_response_lines(line_count),
                     "pageNumber": 1,
                     "selectionMarks": [],
                     "spans": [{"offset": 0, "length": 188}],
                     "unit": "pixel",
                     "width": 2448,
-                    "words": [
-                        {
-                            "content": "Contoso",
-                            "polygon": [863, 276, 1572, 274, 1581, 409, 868, 416],
-                            "confidence": 0.994,
-                            "span": {"offset": 0, "length": 7},
-                        }
-                    ],
+                    "words": get_response_words(word_count),
                 }
             ],
             "styles": [],
@@ -169,3 +174,69 @@ def build_result(analyze_result_dict):
     }
 
     return response_body
+
+
+def get_response_lines(line_count: int = 1):
+    """
+    Generate a list of response lines.
+
+    Args:
+        line_count (int): The number of lines to generate. Defaults to 1.
+
+    Returns:
+        list: A list of dictionaries containing the lines, along with their associated metadata.
+            Each dictionary has the following keys:
+            - content: The generated word.
+            - polygon: A list of random numbers.
+            - spans: A list of dictionaries with keys 'offset' and 'length' representing the position and length of the word.
+
+    """
+    line_list = []
+
+    numbers = [random.randint(0, 2000) for _ in range(8)]
+
+    for i in range(line_count):
+        word = lorem.get_word()
+        line_list.append(
+            {
+                "content": word,
+                "polygon": numbers,
+                "spans": [{"offset": 0, "length": len(word)}],
+            }
+        )
+
+    return line_list
+
+
+def get_response_words(word_count: int = 1):
+    """
+    Generate a list of response words.
+
+    Args:
+        word_count (int): The number of words to generate. Default is 1.
+
+    Returns:
+        list: A list of dictionaries containing the generated words, along with their associated metadata.
+            Each dictionary has the following keys:
+            - content: The generated word.
+            - polygon: A list of random numbers.
+            - confidence: A random float between 0 and 1.
+            - span: A dictionary with keys 'offset' and 'length' representing the position and length of the word.
+
+    """
+    word_list = []
+
+    numbers = [random.randint(0, 2000) for _ in range(8)]
+
+    for i in range(word_count):
+        word = lorem.get_word()
+        word_list.append(
+            {
+                "content": word,
+                "polygon": numbers,
+                "confidence": round(random.random(), 3),
+                "span": {"offset": 0, "length": len(word)},
+            }
+        )
+
+    return word_list
