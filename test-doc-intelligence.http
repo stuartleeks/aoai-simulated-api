@@ -37,6 +37,41 @@ GET {{doc_intell_receipt_local.response.headers.operation-location }}
 ocp-apim-subscription-key: {{doc_intelligence_key}}
 
 
+### Document Analysis - Read
+# @name doc_intell_read
+POST {{doc_intelligence_endpoint}}formrecognizer/documentModels/prebuilt-read:analyze?api-version=2023-07-31
+ocp-apim-subscription-key: {{doc_intelligence_key}}
+Content-Type: application/octet-stream
+Accept: application/json
+
+< ./src/test-client/sample-layout.pdf
+
+
+###
+
+GET {{doc_intell_read.response.headers.operation-location }}
+ocp-apim-subscription-key: {{doc_intelligence_key}}
+
+
+### Document Analysis - Read - Local
+
+# @name doc_intell_read_local
+POST http://localhost:8000/formrecognizer/documentModels/prebuilt-read:analyze?api-version=2023-07-31
+ocp-apim-subscription-key: {{doc_intelligence_key}}
+Content-Type: application/octet-stream
+Accept: application/json
+
+< ./src/test-client/sample-layout.pdf
+
+
+### 
+
+GET {{doc_intell_read_local.response.headers.operation-location }}
+ocp-apim-subscription-key: {{doc_intelligence_key}}
+
+
+### Local echo test
+
 ###
 POST http://localhost:8000/echo HTTP/1.1
 Content-Type: application/octet-stream
