@@ -12,7 +12,9 @@
                 "--worker-class",
                 "uvicorn.workers.UvicornWorker",
                 "-b",
-                "localhost:8000"
+                "localhost:8000",
+                "--workers=1",
+                "--timeout=0"
             ],
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}/src/aoai-simulated-api"
