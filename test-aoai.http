@@ -31,7 +31,7 @@ api-key: {{aoai_key}}
 
 ###
 
-POST {{aooai_endpoint}}openai/deployments/gpt-5-turbo-1/chat/completions?api-version=2023-12-01-preview
+POST {{aooai_endpoint}}openai/deployments/{{aoai_deployment}}/chat/completions?api-version=2023-12-01-preview
 Content-Type: application/json
 api-key: {{aoai_key}}
 
@@ -45,7 +45,7 @@ api-key: {{aoai_key}}
 
 ###
 
-POST {{aooai_endpoint}}openai/deployments/gpt-5-turbo-1/chat/completions?api-version=2023-12-01-preview
+POST {{aooai_endpoint}}openai/deployments/{{aoai_deployment}}/chat/completions?api-version=2023-12-01-preview
 Content-Type: application/json
 api-key: {{aoai_key}}
 
@@ -64,7 +64,7 @@ api-key: {{aoai_key}}
 }
 ###
 
-POST http://localhost:8000/openai/deployments/gpt-5-turbo-1/chat/completions?api-version=2023-12-01-preview
+POST http://localhost:8000/openai/deployments/{{aoai_deployment}}/chat/completions?api-version=2023-12-01-preview
 Content-Type: application/json
 api-key: {{aoai_key}}
 
