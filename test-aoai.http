@@ -2,11 +2,6 @@
 @aoai_key={{$dotenv AZURE_OPENAI_KEY}}
 @aoai_deployment={{$dotenv AZURE_OPENAI_DEPLOYMENT}}
 
-@doc_intelligence_endpoint={{$dotenv AZURE_FORM_RECOGNIZER_ENDPOINT}}
-@doc_intelligence_key={{$dotenv AZURE_FORM_RECOGNIZER_KEY}}
-
-# TODO - split out the APIs
-
 POST {{aooai_endpoint}}openai/deployments/{{aoai_deployment}}/completions?api-version=2023-05-15
 Content-Type: application/json
 api-key: {{aoai_key}}
@@ -86,49 +81,3 @@ api-key: {{aoai_key}}
   ],
   "model": "gpt-5-turbo-1"
 }
-
-
-
-###
-
-# https://learn.microsoft.com/en-gb/azure/ai-services/document-intelligence/quickstarts/get-started-sdks-rest-api?view=doc-intel-3.1.0&viewFallbackFrom=form-recog-3.0.0&preserve-view=true&pivots=programming-language-rest-api
-
-
-# @name doc_intell_receipt
-POST {{doc_intelligence_endpoint}}formrecognizer/documentModels/prebuilt-receipt:analyze?api-version=2023-07-31
-ocp-apim-subscription-key: {{doc_intelligence_key}}
-Content-Type: application/octet-stream
-Accept: application/json
-
-< ./src/test-client/receipt.png
-
-
-###
-
-GET {{doc_intell_receipt.response.headers.operation-location }}
-ocp-apim-subscription-key: {{doc_intelligence_key}}
-
-
-###
-
-# @name doc_intell_receipt_local
-POST http://localhost:8000/formrecognizer/documentModels/prebuilt-receipt:analyze?api-version=2023-07-31
-ocp-apim-subscription-key: {{doc_intelligence_key}}
-Content-Type: application/octet-stream
-Accept: application/json
-
-< ./src/test-client/receipt.png
-
-
-###
-
-GET {{doc_intell_receipt_local.response.headers.operation-location }}
-ocp-apim-subscription-key: {{doc_intelligence_key}}
-
-
-###
-POST http://localhost:8000/echo HTTP/1.1
-Content-Type: application/octet-stream
-Accept: application/json
-
-{'hello': 'world'}
