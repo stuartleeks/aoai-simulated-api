@@ -2,6 +2,22 @@
 
 This repo is an exploration into creating a simulated API implementation for Azure OpenAI (AOAI). This is a work in progress!
 
+- [aoai-simulated-api](#aoai-simulated-api)
+  - [Rationale](#rationale)
+  - [Overview](#overview)
+  - [Getting Started](#getting-started)
+  - [Running in Docker](#running-in-docker)
+  - [Providing custom forwarders](#providing-custom-forwarders)
+    - [Creating a custom forwarder](#creating-a-custom-forwarder)
+    - [Running with a customer forwarder](#running-with-a-customer-forwarder)
+  - [Large recordings](#large-recordings)
+  - [Rate-limiting](#rate-limiting)
+    - [OpenAI Rate-Limiting](#openai-rate-limiting)
+    - [Document Intelligence Rate-Limiting](#document-intelligence-rate-limiting)
+  - [Current Status/Notes](#current-statusnotes)
+    - [Replay Exploration](#replay-exploration)
+
+
 ## Rationale
 
 When building solutions using Azure OpenAI there are points in the development process where you may want to test your solution against a simulated API.
@@ -28,17 +44,19 @@ After cloning the repo, install dependencies using `make install-requirements`.
 
 When running the simulated API, there are a number of environment variables to configure:
 
-| Variable                  | Description                                                                                                                      |
-| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `SIMULATOR_MODE`          | The mode the simulator should run in. Current options are `record`, `replay`, and `generate`.                                    |
-| `RECORDING_DIR`           | The directory to store the recorded requests and responses (defaults to `.recording`).                                           |
-| `RECORDING_FORMAT`        | Currently only `yaml` is supported. Use to specify the format of the recorded requests/responses.                                |
-| `RECORDING_AUTOSAVE`      | If set to `True` (default), the simulator will save the recording after each request.                                            |
-| `GENERATOR_CONFIG_PATH`   | The path to a Python file that contains the generator configuration. See `src/examples/generator_config.py` for an example.      |
-| `FORWARDER_CONFIG_PATH`   | The path to a Python file that contains the forwarder configuration. See `src/examples/forwarder_config.py` for an example.      |
-| `AZURE_OPENAI_ENDPOINT`   | The endpoint for the Azure OpenAI service, e.g. `https://mysvc.openai.azure.com/`                                                |
-| `AZURE_OPENAI_KEY`        | The API key for the Azure OpenAI service.                                                                                        |
-| `AZURE_OPENAI_DEPLOYMENT` | Used by the test app to set the name of the deployed model in your Azure OpenAI service. Use a gpt-35-turbo-instruct deployment. |
+| Variable                        | Description                                                                                                                                          |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SIMULATOR_MODE`                | The mode the simulator should run in. Current options are `record`, `replay`, and `generate`.                                                        |
+| `RECORDING_DIR`                 | The directory to store the recorded requests and responses (defaults to `.recording`).                                                               |
+| `RECORDING_FORMAT`              | Currently only `yaml` is supported. Use to specify the format of the recorded requests/responses.                                                    |
+| `RECORDING_AUTOSAVE`            | If set to `True` (default), the simulator will save the recording after each request.                                                                |
+| `GENERATOR_CONFIG_PATH`         | The path to a Python file that contains the generator configuration. See `src/examples/generator_config.py` for an example.                          |
+| `FORWARDER_CONFIG_PATH`         | The path to a Python file that contains the forwarder configuration. See `src/examples/forwarder_config.py` for an example.                          |
+| `AZURE_OPENAI_ENDPOINT`         | The endpoint for the Azure OpenAI service, e.g. `https://mysvc.openai.azure.com/`                                                                    |
+| `AZURE_OPENAI_KEY`              | The API key for the Azure OpenAI service.                                                                                                            |
+| `DOC_INTELLIGENCE_RPS`          | The rate limit for the Document Intelligence service. Defaults to 15 RPS. See [Doc Intelligence Rate-Limiting](#document-intelligence-rate-limiting) |
+| `OPENAI_DEPLOYMENT_CONFIG_PATH` | The path to a JSON file that contains the deployment configuration. See [OpenAI Rate-Limiting](#openai-rate-limiting)                                |
+| `AZURE_OPENAI_DEPLOYMENT`       | Used by the test app to set the name of the deployed model in your Azure OpenAI service. Use a gpt-35-turbo-instruct deployment.                     |
 
 To run the simulated API, run `uvicorn main:app --reload --port 8000` from the `src/aoai-simulated-api` directory using the environment variables above to configure.
 
@@ -166,6 +184,43 @@ By default, the simulator saves the recording file after each new recorded reque
 If you need to create a large recording, you may want to turn off the autosave feature to improve performance.
 
 With autosave off, you can save the recording manually by sending a `POST` request to `/++/save-recordings` to save the recordings files once you have made all the requests you want to capture. You can do this using ` curl localhost:8000/++/save-recordings -X POST`. 
+
+## Rate-limiting
+
+The rate-limiting implementation is configured differently depending on the type of request being handled.
+
+Rate-limiting is applied regardless of the mode the simulator is running in.
+
+### OpenAI Rate-Limiting
+
+Rate-limiting for OpenAI endpoints is still being implemented/tested. The current implementation is a combination of token- and request-based rate-limiting.
+
+To control the rate-limiting, set the `OPENAI_DEPLOYMENT_CONFIG_PATH` environment variable to the path to a JSON config file that defines the deployments and associated models and token limits. An example config file is shown below.
+
+```json
+{
+	"deployment1" : {
+		"model": "gpt-3.5-turbo",
+		"tokensPerMinute" : 60000
+	},
+	"gpt-35-turbo-2k-token" : {
+		"model": "gpt-3.5-turbo",
+		"tokensPerMinute" : 2000
+	},
+	"gpt-35-turbo-1k-token" : {
+		"model": "gpt-3.5-turbo",
+		"tokensPerMinute" : 1000
+	}
+}
+```
+
+### Document Intelligence Rate-Limiting
+
+Rate-limiting for Document Intelligence endpoints is a standard requests per second (RPS) limit. The default limit for the simulator is 15 RPS based on the default for an S0 tier service (see https://learn.microsoft.com/en-us/azure/ai-services/document-intelligence/service-limits?view=doc-intel-4.0.0).
+
+This rate-limit only applies to the request submission endpoint and not to the results endpoint.
+
+To control the rate-limiting, set the `DOC_INTELLIGENCE_RPS` environment variable to the desired RPS limit.
 
 ## Current Status/Notes
 

@@ -1,7 +1,9 @@
+import json
 import os
 from typing import Callable
 import fastapi
 import requests
+from constants import SIMULATOR_HEADER_OPENAI_TOKENS, SIMULATOR_HEADER_LIMITER, SIMULATOR_HEADER_LIMITER_KEY
 
 # This file contains a default implementation of the get_forwarders function
 # for handling forwarded requests
@@ -53,7 +55,27 @@ aoai_response_headers_to_remove = [
 ]
 
 
-async def forward_to_azure_openai(request: fastapi.Request) -> fastapi.Response | requests.Response | dict | None:
+def _get_deployment_name_from_url(url: str) -> str | None:
+    # Extract deployment name from /openai/deployments/{deployment_name}/operation
+    if url.startswith("/openai/deployments/"):
+        url = url[len("/openai/deployments/") :]
+        deployment_name = url.split("/")[0]
+        return deployment_name
+    return None
+
+
+def _get_token_usage_from_response(body: str) -> int | None:
+    try:
+        response_json = json.loads(body)
+        if "usage" in response_json and "total_tokens" in response_json["usage"]:
+            return response_json["usage"]["total_tokens"]
+    except json.JSONDecodeError as e:
+        print("**ERR", e, flush=True)
+        pass
+    return None
+
+
+async def forward_to_azure_openai(request: fastapi.Request) -> dict:
     if not request.url.path.startswith("/openai/"):
         # assume not an OpenAI request
         return None
@@ -89,7 +111,17 @@ async def forward_to_azure_openai(request: fastapi.Request) -> fastapi.Response 
         if response.headers.get(header):
             del response.headers[header]
 
-    return response
+    if response.status_code >= 300:
+        # Likely an error or rate-limit
+        # no further processing - indicate not to persist this response
+        return {"response": response, "persist_response": False}
+
+    # inject headers into the response for use by the rate-limiter
+    response.headers[SIMULATOR_HEADER_LIMITER] = "openai"
+    response.headers[SIMULATOR_HEADER_LIMITER_KEY] = _get_deployment_name_from_url(request.url.path)
+    response.headers[SIMULATOR_HEADER_OPENAI_TOKENS] = str(_get_token_usage_from_response(response.text))
+
+    return {"response": response, "persist_response": True}
 
 
 def get_forwarders() -> list[Callable[[fastapi.Request], fastapi.Response | requests.Response | None]]:

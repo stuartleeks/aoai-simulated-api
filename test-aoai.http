@@ -2,6 +2,8 @@
 @aoai_key={{$dotenv AZURE_OPENAI_KEY}}
 @aoai_deployment={{$dotenv AZURE_OPENAI_DEPLOYMENT}}
 
+# https://learn.microsoft.com/en-us/azure/ai-services/openai/reference
+
 POST {{aooai_endpoint}}openai/deployments/{{aoai_deployment}}/completions?api-version=2023-05-15
 Content-Type: application/json
 api-key: {{aoai_key}}
@@ -12,7 +14,16 @@ api-key: {{aoai_key}}
   "max_tokens": 10
 }
 
+###
 
+POST {{aooai_endpoint}}openai/deployments/{{aoai_deployment}}/completions?api-version=2023-05-15
+Content-Type: application/json
+api-key: {{aoai_key}}
+
+{
+  "model": "gpt-5-turbo-1",
+  "prompt": "Once upon a time"
+}
 
 ###
 
@@ -27,6 +38,19 @@ api-key: {{aoai_key}}
 }
 
 
+###
+
+POST {{aooai_endpoint}}openai/deployments/{{aoai_deployment}}/chat/completions?api-version=2023-12-01-preview
+Content-Type: application/json
+api-key: {{aoai_key}}
+
+{
+  "messages": [{
+    "role": "user",
+    "content": "What is the meaning of life?"
+    }],
+  "model": "gpt-5-turbo-1"
+}
 
 
 ###
@@ -39,6 +63,46 @@ api-key: {{aoai_key}}
   "messages": [{
     "role": "user",
     "content": "What is the meaning of life?"
+    }, {
+      "role": "assistant",
+      "content": "blank"
+    }, {
+      "role": "user",
+      "content": "What is the meaning of life?"
+    }],
+  "model": "gpt-5-turbo-1"
+}
+
+###
+
+POST http://localhost:8000/openai/deployments/{{aoai_deployment}}/chat/completions?api-version=2023-12-01-preview
+Content-Type: application/json
+api-key: {{aoai_key}}
+
+{
+  "messages": [{
+    "role": "user",
+    "content": "What is the meaning of life?"
+    }],
+  "model": "gpt-5-turbo-1"
+}
+
+###
+
+POST http://localhost:8000/openai/deployments/{{aoai_deployment}}/chat/completions?api-version=2023-12-01-preview
+Content-Type: application/json
+api-key: {{aoai_key}}
+
+{
+  "messages": [{
+    "role": "user",
+    "content": "What is the meaning of life?"
+    }, {
+      "role": "assistant",
+      "content": "blank"
+    }, {
+      "role": "user",
+      "content": "What is the meaning of life?"
     }],
   "model": "gpt-5-turbo-1"
 }

@@ -5,6 +5,8 @@ import uuid
 import lorem
 from fastapi import Request, Response
 
+from constants import SIMULATOR_HEADER_LIMITER
+
 # dictionary of submitted operations keyed on operation ID
 # operations = {}
 
@@ -38,7 +40,10 @@ async def doc_intelligence_analyze(context, request: Request) -> Response | None
     document_analysis_result_location = f"http://localhost:8000/formrecognizer/documentModels/{model_id}/analyzeResults/{result_id}?api-version={api_version}"
 
     # Set the HTTP response headers.
-    headers = {"Operation-Location": document_analysis_result_location}
+    headers = {
+        "Operation-Location": document_analysis_result_location,
+        SIMULATOR_HEADER_LIMITER: "docintelligence",
+    }
 
     # Build a dictionary of values related to the original document analysis request.
     document_analysis_config[result_id] = {

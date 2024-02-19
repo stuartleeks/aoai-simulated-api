@@ -86,11 +86,15 @@ async def forward_to_azure_document_intelligence(
         if response.headers.get(header):
             del response.headers[header]
 
-    if response.status_code == 200 and "analyzeResults" in request.url.path:
-        # only persist the response if it contains the result
-        result = json.loads(response.text)
-        print("###", result)
-        persist = result.get("status") != "running"
+    if "analyzeResults" in request.url.path:
+        if response.status_code == 200:
+            # only persist the response if it contains the result
+            result = json.loads(response.text)
+            persist = result.get("status") != "running"
+    else:
+        # Set header to indicate which limiter to use
+        # Only set on analyze request, not on querying results
+        response.headers["X-Simulator-Limiter"] = "docintelligence"
 
     if "operation-location" in response.headers:
         operation_location = URL(response.headers["operation-location"])

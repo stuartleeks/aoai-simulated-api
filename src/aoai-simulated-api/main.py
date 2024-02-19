@@ -1,9 +1,14 @@
 import logging
 import os
 import traceback
+from typing import Callable
 from fastapi import FastAPI, Request, Response
+from limits import storage
 
+import constants
+from config import load_openai_deployments, load_doc_intelligence_limit
 from generator import GeneratorManager
+from limiters import create_openai_limiter, create_doc_intelligence_limiter
 from record_replay import RecordReplayHandler, YamlRecordingPersister, RequestForwarder
 
 simulator_mode = os.getenv("SIMULATOR_MODE") or "replay"
@@ -14,6 +19,7 @@ recording_autosave = os.getenv("RECORDING_AUTOSAVE", "true").lower() == "true"
 
 generator_config_path = os.getenv("GENERATOR_CONFIG_PATH") or "generator/default_config.py"
 forwarder_config_path = os.getenv("FORWARDER_CONFIG_PATH") or "record_replay/_request_forwarder_config.py"
+
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)  # TODO - make this configurable
@@ -33,7 +39,7 @@ logger.info("🚀 Starting aoai-simulated-api in %s mode", simulator_mode)
 app = FastAPI()
 
 if simulator_mode == "generate":
-    logger.info(f"🔌 Generator config path: %s", generator_config_path)
+    logger.info(f"📝 Generator config path: %s", generator_config_path)
     generator_manager = GeneratorManager(generator_config_path=generator_config_path)
 else:
     logger.info(f"📼 Recording directory: %s", recording_dir)
@@ -70,6 +76,29 @@ def save_recordings():
         return Response(content="⚠️ Not saving recordings as not in record mode", status_code=400)
 
 
+memory_storage = storage.MemoryStorage()
+
+doc_intelligence_rps = load_doc_intelligence_limit()
+logger.info(f"📝 Using Doc Intelligence RPS: %s", doc_intelligence_rps)
+
+openai_deployments = load_openai_deployments()
+logger.info(f"📝 Using OpenAI deployments: %s", openai_deployments)
+
+
+openai_deployment_limits = (
+    {name: deployment.tokens_per_minute for name, deployment in openai_deployments.items()}
+    if openai_deployments
+    else {}
+)
+# Dictionary of limiters keyed by name
+# Each limiter is a function that takes a response and returns a boolean indicating whether the request should be allowed
+# Limiter returns Response object if request should be blocked or None otherwise
+limiters: dict[str, Callable[[Response], Response | None]] = {
+    "openai": create_openai_limiter(memory_storage, openai_deployment_limits),
+    "docintelligence": create_doc_intelligence_limiter(memory_storage, requests_per_second=doc_intelligence_rps),
+}
+
+
 @app.api_route("/{full_path:path}", methods=["GET", "POST", "PUT", "DELETE"])
 async def catchall(request: Request):
     logger.debug("⚡ handling route: %s", request.url.path)
@@ -85,6 +114,23 @@ async def catchall(request: Request):
 
         if not response:
             raise Exception("response not set")
+
+        # Want limits here so that that they apply to record/replay as well as generate
+        # TODO work out mapping request to limiter(s)
+        #  - AOAI specifies rate limits by deployment and uses RPM + TPM
+        #  - Doc Intelligence uses flat RPM limit
+
+        limiter_name = response.headers.get(constants.SIMULATOR_HEADER_LIMITER)
+        limiter = limiters.get(limiter_name) if limiter_name else None
+        if limiter:
+            limit_response = limiter(response)
+            if limit_response:
+                return limit_response
+
+        # Strip out any simulator headers from the response
+        for key, _ in request.headers.items():
+            if key.startswith(constants.SIMULATOR_HEADER_PREFIX):
+                del response.headers[key]
 
         return response
     except Exception as e:

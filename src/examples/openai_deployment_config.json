@@ -1,0 +1,14 @@
+{
+	"deployment1" : {
+		"model": "gpt-3.5-turbo",
+		"tokensPerMinute" : 60000
+	},
+	"gpt-35-turbo-2k-token" : {
+		"model": "gpt-3.5-turbo",
+		"tokensPerMinute" : 2000
+	},
+	"gpt-35-turbo-1k-token" : {
+		"model": "gpt-3.5-turbo",
+		"tokensPerMinute" : 1000
+	}
+}
