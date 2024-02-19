@@ -54,6 +54,7 @@ async def doc_intelligence_analyze(context, request: Request) -> Response | None
         "pages": pages,
         "features": features,
         "content_length": int(content_length),
+        "submitted_at": datetime.datetime.now(),
     }
 
     # Return the response
@@ -80,7 +81,28 @@ async def doc_intelligence_analyze_result(context, request: Request) -> Response
     doc_config = document_analysis_config.get(result_id)
     if not doc_config:
         return Response(status_code=404)
-    del document_analysis_config[result_id]  # TODO - should we delete or leave to allow multiple queries of the result?
+
+    # Simulate latency between submission and generating a response
+    now = datetime.datetime.now()
+    duration_s = doc_config["content_length"] / 100000  # allow 1s per 100kb
+    ready_at = doc_config["submitted_at"] + datetime.timedelta(seconds=duration_s)
+    if now < ready_at:
+        return Response(
+            status_code=200,
+            content=json.dumps(
+                {
+                    "status": "running",
+                    "createdDateTime": doc_config["submitted_at"],
+                    "lastUpdatedDateTime": now,
+                },
+                default=datetime_handler,
+            ),
+            headers={"Content-Type": "application/json"},
+        )
+
+    del document_analysis_config[
+        result_id
+    ]  # TODO - should we delete or leave to allow multiple queries of the result? If we leave, when do we clean up (and should we also store the generated result)?
 
     # Pass the dictionary of operation values to the get_response function to build the response body.
     response_content = json.dumps(build_result(doc_config), default=datetime_handler)
@@ -93,6 +115,9 @@ async def doc_intelligence_analyze_result(context, request: Request) -> Response
 
     # Return the response.
     return Response(status_code=200, content=response_content, headers=headers)
+
+
+lorem.get_paragraph()
 
 
 def datetime_handler(x):
@@ -117,7 +142,7 @@ def build_result(analyze_result_dict):
 
     # TODO: Determine how to handle the response content length.
     #       For now, just use a fraction of the original content length.
-    response_content_length = round(content_length * 0.001)
+    response_content_length = round(content_length * 0.1)
 
     content = "".join(lorem.get_word(count=response_content_length))
 
@@ -131,6 +156,7 @@ def build_result(analyze_result_dict):
     # TODO: Make this configurable, based on the desired response size?
     word_count = 5
     line_count = 6
+    # TODO - link the spans for words/lines etc back to the content property and add line breaks to content
 
     if analyze_result_dict.get("string_index_type") is not None:
         string_index_type = analyze_result_dict.get("string_index_type")
