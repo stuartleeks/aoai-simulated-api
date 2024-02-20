@@ -13,6 +13,7 @@ def get_generators(setup_context) -> list[Callable[[Request], Response | None]]:
     # If the function returns a Response object, it will be used as the response for the request
     # If the function returns None, the next function in the list will be called
     return [
+        setup_context.built_in_generators["azure_openai_embedding"],
         setup_context.built_in_generators["azure_openai_completion"],
         setup_context.built_in_generators["azure_openai_chat_completion"],
         setup_context.built_in_generators["doc_intelligence_analyze"],

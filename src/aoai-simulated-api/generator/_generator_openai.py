@@ -3,6 +3,7 @@ from fastapi import Request, Response
 import json
 import lorem
 import nanoid
+import random
 import tiktoken
 import time
 
@@ -83,6 +84,53 @@ def num_tokens_from_messages(messages, model):
     return num_tokens
 
 
+def _generate_embedding(index: int):
+    """Generates a random embedding"""
+    return {"object": "embedding", "index": index, "embedding": [(random.random() - 0.5) * 4 for _ in range(1536)]}
+
+
+async def azure_openai_embedding(context, request: Request) -> Response | None:
+    is_match, path_params = context.is_route_match(
+        request=request, path="/openai/deployments/{deployment}/embeddings", methods=["POST"]
+    )
+    if not is_match:
+        return None
+
+    deployment_name = path_params["deployment"]
+    encoding_name = get_encoding_name_from_deployment_name(deployment_name)
+    request_body = await request.json()
+    encoding_name = get_encoding_name_from_deployment_name(deployment_name)
+    input = request_body["input"]
+    embeddings = []
+    if type(input) == str:
+        tokens = num_tokens_from_string(input, encoding_name)
+        embeddings.append(_generate_embedding(0))
+    else:
+        tokens = 0
+        index = 0
+        for i in input:
+            tokens += num_tokens_from_string(i, encoding_name)
+            embeddings.append(_generate_embedding(index))
+            index += 1
+
+    response_data = {
+        "object": "list",
+        "data": embeddings,
+        "model": "ada",
+        "usage": {"prompt_tokens": tokens, "total_tokens": tokens},
+    }
+    return Response(
+        status_code=200,
+        content=json.dumps(response_data),
+        headers={
+            "Content-Type": "application/json",
+            SIMULATOR_HEADER_OPENAI_TOKENS: str(tokens),
+            SIMULATOR_HEADER_LIMITER: "openai",
+            SIMULATOR_HEADER_LIMITER_KEY: deployment_name,
+        },
+    )
+
+
 async def azure_openai_completion(context, request: Request) -> Response | None:
     is_match, path_params = context.is_route_match(
         request=request, path="/openai/deployments/{deployment}/completions", methods=["POST"]
@@ -90,7 +138,7 @@ async def azure_openai_completion(context, request: Request) -> Response | None:
     if not is_match:
         return None
 
-    # TODO - Use name convention to find the tiktoken model from deployment_name
+    # TODO - use JSON config to look up model from the deployment name
     deployment_name = path_params["deployment"]
     encoding_name = get_encoding_name_from_deployment_name(deployment_name)
     request_body = await request.json()

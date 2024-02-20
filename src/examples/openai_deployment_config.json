@@ -10,5 +10,9 @@
 	"gpt-35-turbo-1k-token" : {
 		"model": "gpt-3.5-turbo",
 		"tokensPerMinute" : 1000
+	},
+	"embedding" : {
+		"model": "text-embedding-ada-002",
+		"tokensPerMinute" : 10000
 	}
 }
