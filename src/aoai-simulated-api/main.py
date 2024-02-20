@@ -126,6 +126,8 @@ async def catchall(request: Request):
             limit_response = limiter(response)
             if limit_response:
                 return limit_response
+        else:
+            logger.debug("No limiter found for response: %s", request.url.path)
 
         # Strip out any simulator headers from the response
         for key, _ in request.headers.items():

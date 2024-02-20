@@ -44,7 +44,10 @@ def create_openai_limiter(
         token_cost = int(response.headers[constants.SIMULATOR_HEADER_OPENAI_TOKENS])
         deployment_name = response.headers[constants.SIMULATOR_HEADER_LIMITER_KEY]
 
-        limits = deployment_limits[deployment_name]
+        limits = deployment_limits.get(deployment_name)
+        if not limits:
+            # TODO: log
+            return None
 
         # TODO: revisit limiting logic: also track per minute limits? Allow burst?
 
