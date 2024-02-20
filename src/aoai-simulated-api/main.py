@@ -20,9 +20,11 @@ recording_autosave = os.getenv("RECORDING_AUTOSAVE", "true").lower() == "true"
 generator_config_path = os.getenv("GENERATOR_CONFIG_PATH") or "generator/default_config.py"
 forwarder_config_path = os.getenv("FORWARDER_CONFIG_PATH") or "record_replay/_request_forwarder_config.py"
 
+log_level = os.getenv("LOG_LEVEL") or "INFO"
+
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)  # TODO - make this configurable
+logging.basicConfig(level=log_level)
 
 allowed_simulator_modes = ["replay", "record", "generate"]
 if simulator_mode not in allowed_simulator_modes:

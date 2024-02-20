@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 from typing import Callable
 import fastapi
@@ -12,6 +13,8 @@ doc_intelligence_api_key: str | None = None
 doc_intelligence_api_endpoint: str | None = None
 doc_intelligence_initialized: bool = False
 
+logger = logging.getLogger(__name__)
+
 
 def initialize_document_intelligence():
     global doc_intelligence_api_key, doc_intelligence_api_endpoint, doc_intelligence_initialized
@@ -21,13 +24,13 @@ def initialize_document_intelligence():
     doc_intelligence_initialized = True
 
     if doc_intelligence_api_key and doc_intelligence_api_endpoint:
-        print(f"🚀 Initialized Azure Document Intelligence forwarder with the following settings:", flush=True)
-        print(f"🔑 API endpoint: {doc_intelligence_api_endpoint}", flush=True)
+        logger.info(f"🚀 Initialized Azure Document Intelligence forwarder with the following settings:", flush=True)
+        logger.info(f"🔑 API endpoint: {doc_intelligence_api_endpoint}", flush=True)
         masked_api_key = doc_intelligence_api_key[:4] + "..." + doc_intelligence_api_key[-4:]
-        print(f"🔑 API key: {masked_api_key}", flush=True)
+        logger.info(f"🔑 API key: {masked_api_key}", flush=True)
 
     else:
-        print(
+        logger.warn(
             f"Got a request that looked like a Document Intelligence request, but missing some or all of the required environment variables for forwarding: AZURE_FORM_RECOGNIZER_ENDPOINT, AZURE_FORM_RECOGNIZER_KEY",
             flush=True,
         )
@@ -51,7 +54,7 @@ async def forward_to_azure_document_intelligence(
         # assume not an Doc Intelligence request
         return None
 
-    print("Forwarding Document Intelligence request:" + request.url.path)
+    logger.debug("Forwarding Document Intelligence request:" + request.url.path)
 
     if not doc_intelligence_initialized:
         # Only initialize once, and only if we need to

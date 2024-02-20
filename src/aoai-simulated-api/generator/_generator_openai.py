@@ -2,12 +2,13 @@ from fastapi import Request, Response
 
 import json
 import lorem
+import logging
 import nanoid
 import random
 import tiktoken
 import time
 
-
+from config import load_openai_deployments
 from constants import SIMULATOR_HEADER_OPENAI_TOKENS, SIMULATOR_HEADER_LIMITER, SIMULATOR_HEADER_LIMITER_KEY
 
 # This file contains a default implementation of the get_generators function
@@ -15,6 +16,7 @@ from constants import SIMULATOR_HEADER_OPENAI_TOKENS, SIMULATOR_HEADER_LIMITER, 
 # GENERATOR_CONFIG_PATH environment variable to the path of the file when running the API
 # See src/examples/generator_config.py for an example of how to define your own generators
 
+logger = logging.getLogger(__name__)
 
 # 0.72 is based on generating a bunch of lorem ipsum and counting the tokens
 # This was for a gpt-3.5 model
@@ -22,23 +24,43 @@ TOKEN_TO_WORD_FACTOR = 0.72
 
 # API docs: https://learn.microsoft.com/en-gb/azure/ai-services/openai/reference
 
+deployments_loaded = False
+deployments = None
 
-def get_encoding_name_from_deployment_name(deployment_name: str) -> str:
-    # TODO - Add config to map deployment name to the model name
-    return "cl100k_base"
+
+def _load_deployments():
+    global deployments, deployments_loaded
+    if not deployments_loaded:
+        deployments = load_openai_deployments()
+        deployments_loaded = True
+        if not deployments:
+            logger.warning("No OpenAI deployments found in config")
 
 
 def get_model_name_from_deployment_name(deployment_name: str) -> str:
-    # TODO - Add config to map deployment name to the model name
-    return "gpt-3.5-turbo-0613"
+    global deployments
+    _load_deployments()
+
+    if deployments:
+        deployment = deployments.get(deployment_name)
+        if deployment:
+            return deployment.model
+
+    default_model = "gpt-3.5-turbo-0613"
+    logger.warning(f"Deployment {deployment_name} not found in config, using default model {default_model}")
+    return default_model
 
 
 # For details on the token counting, see https://cookbook.openai.com/examples/how_to_count_tokens_with_tiktoken
 
 
-def num_tokens_from_string(string: str, encoding_name: str) -> int:
+def num_tokens_from_string(string: str, model: str) -> int:
     """Returns the number of tokens in a text string."""
-    encoding = tiktoken.get_encoding(encoding_name)
+    try:
+        encoding = tiktoken.encoding_for_model(model)
+    except KeyError:
+        logger.warning("Warning: model not found. Using cl100k_base encoding.")
+        encoding = tiktoken.get_encoding("cl100k_base")
     num_tokens = len(encoding.encode(string))
     return num_tokens
 
@@ -48,7 +70,7 @@ def num_tokens_from_messages(messages, model):
     try:
         encoding = tiktoken.encoding_for_model(model)
     except KeyError:
-        print("Warning: model not found. Using cl100k_base encoding.")
+        logger.warning("Warning: model not found. Using cl100k_base encoding.")
         encoding = tiktoken.get_encoding("cl100k_base")
     if model in {
         "gpt-3.5-turbo-0613",
@@ -64,10 +86,10 @@ def num_tokens_from_messages(messages, model):
         tokens_per_message = 4  # every message follows <|start|>{role/name}\n{content}<|end|>\n
         tokens_per_name = -1  # if there's a name, the role is omitted
     elif "gpt-3.5-turbo" in model:
-        print("Warning: gpt-3.5-turbo may update over time. Returning num tokens assuming gpt-3.5-turbo-0613.")
+        logger.warning("Warning: gpt-3.5-turbo may update over time. Returning num tokens assuming gpt-3.5-turbo-0613.")
         return num_tokens_from_messages(messages, model="gpt-3.5-turbo-0613")
     elif "gpt-4" in model:
-        print("Warning: gpt-4 may update over time. Returning num tokens assuming gpt-4-0613.")
+        logger.warning("Warning: gpt-4 may update over time. Returning num tokens assuming gpt-4-0613.")
         return num_tokens_from_messages(messages, model="gpt-4-0613")
     else:
         raise NotImplementedError(
@@ -97,19 +119,18 @@ async def azure_openai_embedding(context, request: Request) -> Response | None:
         return None
 
     deployment_name = path_params["deployment"]
-    encoding_name = get_encoding_name_from_deployment_name(deployment_name)
     request_body = await request.json()
-    encoding_name = get_encoding_name_from_deployment_name(deployment_name)
+    model_name = get_model_name_from_deployment_name(deployment_name)
     input = request_body["input"]
     embeddings = []
     if type(input) == str:
-        tokens = num_tokens_from_string(input, encoding_name)
+        tokens = num_tokens_from_string(input, model_name)
         embeddings.append(_generate_embedding(0))
     else:
         tokens = 0
         index = 0
         for i in input:
-            tokens += num_tokens_from_string(i, encoding_name)
+            tokens += num_tokens_from_string(i, model_name)
             embeddings.append(_generate_embedding(index))
             index += 1
 
@@ -138,17 +159,16 @@ async def azure_openai_completion(context, request: Request) -> Response | None:
     if not is_match:
         return None
 
-    # TODO - use JSON config to look up model from the deployment name
     deployment_name = path_params["deployment"]
-    encoding_name = get_encoding_name_from_deployment_name(deployment_name)
+    model_name = get_model_name_from_deployment_name(deployment_name)
     request_body = await request.json()
-    prompt_tokens = num_tokens_from_string(request_body["prompt"], encoding_name)
+    prompt_tokens = num_tokens_from_string(request_body["prompt"], model_name)
     max_tokens = request_body.get("max_tokens", 10)  # TODO - what is the default max tokens?
 
     words_to_generate = int(TOKEN_TO_WORD_FACTOR * max_tokens)
     text = "".join(lorem.get_word(count=words_to_generate))
 
-    completion_tokens = num_tokens_from_string(text, encoding_name)
+    completion_tokens = num_tokens_from_string(text, model_name)
     total_tokens = prompt_tokens + completion_tokens
 
     response_body = {
@@ -192,7 +212,6 @@ async def azure_openai_chat_completion(context, request: Request) -> Response | 
 
     request_body = await request.json()
     deployment_name = path_params["deployment"]
-    encoding_name = get_encoding_name_from_deployment_name(deployment_name)
     model_name = get_model_name_from_deployment_name(deployment_name)
     prompt_tokens = num_tokens_from_messages(request_body["messages"], model_name)
 
@@ -200,7 +219,7 @@ async def azure_openai_chat_completion(context, request: Request) -> Response | 
     max_tokens = 250
     words_to_generate = int(TOKEN_TO_WORD_FACTOR * max_tokens)
     text = "".join(lorem.get_word(count=words_to_generate))
-    completion_tokens = num_tokens_from_string(text, encoding_name)
+    completion_tokens = num_tokens_from_string(text, model_name)
     total_tokens = prompt_tokens + completion_tokens
 
     response_body = {

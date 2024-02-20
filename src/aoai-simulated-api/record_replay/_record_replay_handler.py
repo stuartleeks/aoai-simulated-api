@@ -1,3 +1,4 @@
+import logging
 from fastapi import Request, Response
 
 
@@ -5,6 +6,8 @@ from ._hashing import get_request_hash, hash_request_parts
 from ._models import RecordedResponse
 from ._persistence import YamlRecordingPersister
 from ._request_forwarder import RequestForwarder
+
+logger = logging.getLogger(__name__)
 
 
 class RecordReplayHandler:
@@ -49,9 +52,9 @@ class RecordReplayHandler:
                 headers = {k: v[0] for k, v in response_info.headers.items()}
                 return Response(content=response_info.body, status_code=response_info.status_code, headers=headers)
             else:
-                print(f"No recorded response found for request {request.method} {url}", flush=True)  # TODO log
+                logger.debug(f"No recorded response found for request {request.method} {url}", flush=True)
         else:
-            print(f"No recording found for URL: {url}", flush=True)  # TODO log
+            logger.debug(f"No recording found for URL: {url}", flush=True)
 
         if self._simulator_mode == "record":
             return await self._record_request(request)
@@ -103,7 +106,7 @@ class RecordReplayHandler:
 
         if forwarded_response.persist_response:
             # Save the recording
-            print(f"📝 Storing recording for {request.method} {request.url}")
+            logger.info(f"📝 Storing recording for {request.method} {request.url}")
             recording = self._recordings.get(request.url.path)
             if not recording:
                 recording = {}

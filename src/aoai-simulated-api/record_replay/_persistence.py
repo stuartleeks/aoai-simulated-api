@@ -1,9 +1,12 @@
+import logging
 import os
 from fastapi.datastructures import URL
 import yaml
 
 from ._hashing import hash_request_parts
 from ._models import RecordedResponse
+
+logger = logging.getLogger(__name__)
 
 
 class YamlRecordingPersister:
@@ -28,7 +31,7 @@ class YamlRecordingPersister:
         self.ensure_recording_dir_exists()
         with open(recording_path, "w") as f:
             yaml.dump(recording_data, stream=f, Dumper=yaml.CDumper)
-        print(f"💾 Recording saved to {recording_path}", flush=True)
+        logger.info(f"💾 Recording saved to {recording_path}", flush=True)
 
     def ensure_recording_dir_exists(self):
         if not os.path.exists(self._recording_dir):
@@ -45,7 +48,7 @@ class YamlRecordingPersister:
     def load_recording_for_url(self, url: str):
         recording_file_path = self.get_recording_file_path(url)
         if not os.path.exists(recording_file_path):
-            print(f"No recording file found at {recording_file_path}", flush=True)  # TODO log
+            logger.warning(f"No recording file found at {recording_file_path}", flush=True)  # TODO log
             return None
 
         with open(recording_file_path, "r") as f:
