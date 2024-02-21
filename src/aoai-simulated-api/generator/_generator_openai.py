@@ -1,6 +1,8 @@
 from fastapi import Request, Response
 
+import asyncio
 import json
+from fastapi.responses import StreamingResponse
 import lorem
 import logging
 import nanoid
@@ -218,7 +220,52 @@ async def azure_openai_chat_completion(context, request: Request) -> Response | 
     # TODO - determine the token size to use
     max_tokens = 250
     words_to_generate = int(TOKEN_TO_WORD_FACTOR * max_tokens)
-    text = "".join(lorem.get_word(count=words_to_generate))
+    words = lorem.get_word(count=words_to_generate)
+
+    if request_body.get("stream", False):
+
+        async def send_words():
+            space = ""
+            for word in words.split(" "):
+                chunk_string = json.dumps(
+                    {
+                        "id": "chatcmpl-" + nanoid.non_secure_generate(size=29),
+                        "object": "chat.completion.chunk",
+                        "created": int(time.time()),
+                        "model_name": model_name,
+                        "system_fingerprint": None,
+                        "choices": [
+                            {
+                                "delta": {
+                                    "content": space + word,
+                                    "function_call": None,
+                                    "role": None,
+                                    "tool_calls": None,
+                                    "finish_reason": None,
+                                    "index": 0,
+                                    "logprobs": None,
+                                    "content_filter_results": {
+                                        "hate": {"filtered": False, "severity": "safe"},
+                                        "self_harm": {"filtered": False, "severity": "safe"},
+                                        "sexual": {"filtered": False, "severity": "safe"},
+                                        "violence": {"filtered": False, "severity": "safe"},
+                                    },
+                                },
+                                "message": {"role": "assistant", "content": word},
+                            },
+                        ],
+                    }
+                )
+
+                yield "data: " + chunk_string + "\n"
+                yield "\n"
+                await asyncio.sleep(0.05)
+                space = " "
+            yield "[DONE]"
+
+        return StreamingResponse(content=send_words())
+
+    text = "".join(words)
     completion_tokens = num_tokens_from_string(text, model_name)
     total_tokens = prompt_tokens + completion_tokens
 
@@ -226,7 +273,7 @@ async def azure_openai_chat_completion(context, request: Request) -> Response | 
         "id": "chatcmpl-" + nanoid.non_secure_generate(size=29),
         "object": "chat.completion",
         "created": int(time.time()),
-        "model": "gpt-35-turbo",  # TODO - parameterise
+        "model": model_name,
         "prompt_filter_results": [
             {
                 "prompt_index": 0,
