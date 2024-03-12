@@ -27,15 +27,14 @@ def initialize_azure_openai():
     aoai_initialized = True
 
     if aoai_api_key and aoai_api_endpoint:
-        logger.info(f"🚀 Initialized Azure OpenAI forwarder with the following settings:", flush=True)
-        logger.info(f"🔑 API endpoint: {aoai_api_endpoint}", flush=True)
+        logger.info(f"🚀 Initialized Azure OpenAI forwarder with the following settings:")
+        logger.info(f"🔑 API endpoint: {aoai_api_endpoint}")
         masked_api_key = aoai_api_key[:4] + "..." + aoai_api_key[-4:]
-        logger.info(f"🔑 API key: {masked_api_key}", flush=True)
+        logger.info(f"🔑 API key: {masked_api_key}")
 
     else:
         logger.warn(
-            f"Got a request that looked like an openai request, but missing some or all of the required environment variables for forwarding: AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_KEY",
-            flush=True,
+            f"Got a request that looked like an openai request, but missing some or all of the required environment variables for forwarding: AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_KEY"
         )
 
 
@@ -73,7 +72,7 @@ def _get_token_usage_from_response(body: str) -> int | None:
         if "usage" in response_json and "total_tokens" in response_json["usage"]:
             return response_json["usage"]["total_tokens"]
     except json.JSONDecodeError as e:
-        logger.error("Error getting token usage", e, flush=True)
+        logger.error("Error getting token usage", e)
         pass
     return None
 

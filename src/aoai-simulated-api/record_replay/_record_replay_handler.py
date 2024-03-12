@@ -52,9 +52,9 @@ class RecordReplayHandler:
                 headers = {k: v[0] for k, v in response_info.headers.items()}
                 return Response(content=response_info.body, status_code=response_info.status_code, headers=headers)
             else:
-                logger.debug(f"No recorded response found for request {request.method} {url}", flush=True)
+                logger.debug(f"No recorded response found for request {request.method} {url}")
         else:
-            logger.debug(f"No recording found for URL: {url}", flush=True)
+            logger.debug(f"No recording found for URL: {url}")
 
         if self._simulator_mode == "record":
             return await self._record_request(request)

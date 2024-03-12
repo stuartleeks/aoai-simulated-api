@@ -24,15 +24,14 @@ def initialize_document_intelligence():
     doc_intelligence_initialized = True
 
     if doc_intelligence_api_key and doc_intelligence_api_endpoint:
-        logger.info(f"🚀 Initialized Azure Document Intelligence forwarder with the following settings:", flush=True)
-        logger.info(f"🔑 API endpoint: {doc_intelligence_api_endpoint}", flush=True)
+        logger.info(f"🚀 Initialized Azure Document Intelligence forwarder with the following settings:")
+        logger.info(f"🔑 API endpoint: {doc_intelligence_api_endpoint}")
         masked_api_key = doc_intelligence_api_key[:4] + "..." + doc_intelligence_api_key[-4:]
-        logger.info(f"🔑 API key: {masked_api_key}", flush=True)
+        logger.info(f"🔑 API key: {masked_api_key}")
 
     else:
         logger.warn(
             f"Got a request that looked like a Document Intelligence request, but missing some or all of the required environment variables for forwarding: AZURE_FORM_RECOGNIZER_ENDPOINT, AZURE_FORM_RECOGNIZER_KEY",
-            flush=True,
         )
 
 
