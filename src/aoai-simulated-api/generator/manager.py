@@ -2,6 +2,7 @@ import importlib.util
 import inspect
 from fastapi import Request
 from ._generator_context import GeneratorCallContext, GeneratorSetupContext
+from pipeline import RequestContext
 
 
 def _load_generators(generator_config_path: str, setup_context: GeneratorSetupContext):
@@ -17,7 +18,8 @@ class GeneratorManager:
         setup_context = GeneratorSetupContext()
         self._generators = _load_generators(generator_config_path, setup_context)
 
-    async def generate(self, request: Request):
+    async def generate(self, context: RequestContext):
+        request = context.request
         for generator in self._generators:
             response = generator(context=self._call_context, request=request)
             if response is not None and inspect.isawaitable(response):

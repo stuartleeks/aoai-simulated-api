@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import os
 import traceback
@@ -9,6 +10,7 @@ import constants
 from config import load_openai_deployments, load_doc_intelligence_limit
 from generator import GeneratorManager
 from limiters import create_openai_limiter, create_doc_intelligence_limiter
+from pipeline import RequestContext
 from record_replay import RecordReplayHandler, YamlRecordingPersister, RequestForwarder
 
 simulator_mode = os.getenv("SIMULATOR_MODE") or "replay"
@@ -107,12 +109,13 @@ async def catchall(request: Request):
 
     try:
         response = None
+        context = RequestContext(request)
 
         if simulator_mode == "generate":
-            response = await generator_manager.generate(request)
+            response = await generator_manager.generate(context)
 
         if simulator_mode in ["record", "replay"]:
-            response = await record_replay_handler.handle_request(request)
+            response = await record_replay_handler.handle_request(context)
 
         if not response:
             raise Exception("response not set")
@@ -131,7 +134,12 @@ async def catchall(request: Request):
         else:
             logger.debug("No limiter found for response: %s", request.url.path)
 
+        recorded_duration_ms = context.values.get(constants.RECORDED_DURATION_MS, 0)
+        if recorded_duration_ms > 0:
+            await asyncio.sleep(recorded_duration_ms / 1000)
+
         # Strip out any simulator headers from the response
+        # TODO - move these header values to RequestContext to share (then they don't need removing here!)
         for key, _ in request.headers.items():
             if key.startswith(constants.SIMULATOR_HEADER_PREFIX):
                 del response.headers[key]

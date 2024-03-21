@@ -22,6 +22,7 @@ class YamlRecordingPersister:
                     "status": {"code": recorded_response.status_code, "message": recorded_response.status_message},
                     "headers": recorded_response.headers,
                     "body": {"string": recorded_response.body},
+                    "duration_ms": recorded_response.duration_ms,
                 },
             }
             interactions.append(interaction)
@@ -72,5 +73,6 @@ class YamlRecordingPersister:
                     headers=response["headers"],
                     body=response["body"]["string"],
                     full_request=request,
+                    duration_ms=response.get("duration_ms", 0),  # didn't exist in earlier recordings so default to 0
                 )
             return recording
