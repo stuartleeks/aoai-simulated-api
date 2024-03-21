@@ -1,4 +1,5 @@
 import logging
+import time
 from fastapi import Request, Response
 
 
@@ -65,11 +66,15 @@ class RecordReplayHandler:
         if not self._forwarder:
             raise Exception("No forwarder available to record request")
 
+        start_time = time.time()
         forwarded_response = await self._forwarder.forward_request(request)
+        end_time = time.time()
         if not forwarded_response:
             raise Exception(
                 f"Failed to forward request - no configured forwarders returned a response for {request.method} {request.url}"
             )
+        elapsed_time = end_time - start_time
+        elapsed_time_ms = int(elapsed_time * 1000)
 
         response = forwarded_response.response
         request_body = await request.body()
@@ -102,6 +107,7 @@ class RecordReplayHandler:
                 "body": request_body,
             },
             status_message="n/a",
+            duration_ms=elapsed_time_ms,
         )
 
         if forwarded_response.persist_response:
