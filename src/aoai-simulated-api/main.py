@@ -9,6 +9,7 @@ import constants
 from config import load_openai_deployments, load_doc_intelligence_limit
 from generator import GeneratorManager
 from limiters import create_openai_limiter, create_doc_intelligence_limiter
+from pipeline import RequestContext
 from record_replay import RecordReplayHandler, YamlRecordingPersister, RequestForwarder
 
 simulator_mode = os.getenv("SIMULATOR_MODE") or "replay"
@@ -107,12 +108,13 @@ async def catchall(request: Request):
 
     try:
         response = None
+        context = RequestContext(request)
 
         if simulator_mode == "generate":
-            response = await generator_manager.generate(request)
+            response = await generator_manager.generate(context)
 
         if simulator_mode in ["record", "replay"]:
-            response = await record_replay_handler.handle_request(request)
+            response = await record_replay_handler.handle_request(context)
 
         if not response:
             raise Exception("response not set")

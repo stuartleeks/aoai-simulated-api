@@ -7,6 +7,7 @@ from ._hashing import get_request_hash, hash_request_parts
 from ._models import RecordedResponse
 from ._persistence import YamlRecordingPersister
 from ._request_forwarder import RequestForwarder
+from pipeline import RequestContext
 
 logger = logging.getLogger(__name__)
 
@@ -42,8 +43,9 @@ class RecordReplayHandler:
         self._recordings[url] = recording
         return recording
 
-    async def handle_request(self, request: Request) -> Response | None:
+    async def handle_request(self, context: RequestContext) -> Response | None:
 
+        request = context.request
         url = request.url.path
         recording = await self._get_recording_for_url(url)
         if recording:
