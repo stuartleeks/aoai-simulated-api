@@ -7,6 +7,7 @@ class RequestContext:
 
     def __init__(self, request: Request):
         self._request = request
+        self._values = {}
 
     @property
     def request(self) -> Request:

@@ -1,12 +1,13 @@
 import logging
 import time
-from fastapi import Request, Response
+from fastapi import Response
 
 
 from ._hashing import get_request_hash, hash_request_parts
 from ._models import RecordedResponse
 from ._persistence import YamlRecordingPersister
 from ._request_forwarder import RequestForwarder
+import constants
 from pipeline import RequestContext
 
 logger = logging.getLogger(__name__)
@@ -44,7 +45,6 @@ class RecordReplayHandler:
         return recording
 
     async def handle_request(self, context: RequestContext) -> Response | None:
-
         request = context.request
         url = request.url.path
         recording = await self._get_recording_for_url(url)
@@ -53,6 +53,7 @@ class RecordReplayHandler:
             response_info = recording.get(request_hash)
             if response_info:
                 headers = {k: v[0] for k, v in response_info.headers.items()}
+                context.values[constants.RECORDED_DURATION_MS] = response_info.duration_ms
                 return Response(content=response_info.body, status_code=response_info.status_code, headers=headers)
             else:
                 logger.debug(f"No recorded response found for request {request.method} {url}")
@@ -64,9 +65,11 @@ class RecordReplayHandler:
 
         return None
 
-    async def _record_request(self, request: Request) -> Response:
+    async def _record_request(self, context: RequestContext) -> Response:
         if not self._forwarder:
             raise Exception("No forwarder available to record request")
+
+        request = context.request
 
         start_time = time.time()
         forwarded_response = await self._forwarder.forward_request(request)
@@ -125,6 +128,7 @@ class RecordReplayHandler:
                 # Save the recording to disk
                 self._persister.save_recording(request.url.path, recording)
 
+        context.values[constants.RECORDED_DURATION_MS] = elapsed_time_ms
         return Response(content=body, status_code=response.status_code, headers=response.headers)
 
     def save_recordings(self):

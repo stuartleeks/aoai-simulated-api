@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import os
 import traceback
@@ -133,7 +134,12 @@ async def catchall(request: Request):
         else:
             logger.debug("No limiter found for response: %s", request.url.path)
 
+        recorded_duration_ms = context.values.get(constants.RECORDED_DURATION_MS, 0)
+        if recorded_duration_ms > 0:
+            await asyncio.sleep(recorded_duration_ms / 1000)
+
         # Strip out any simulator headers from the response
+        # TODO - move these header values to RequestContext to share (then they don't need removing here!)
         for key, _ in request.headers.items():
             if key.startswith(constants.SIMULATOR_HEADER_PREFIX):
                 del response.headers[key]
