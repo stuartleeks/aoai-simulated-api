@@ -12,6 +12,7 @@ install-requirements:
 	pip install -r src/aoai-simulated-api/requirements.txt
 	pip install -r src/test-client/requirements.txt
 	pip install -r src/loadtest/requirements.txt
+	pip install -r src/test-client-web/requirements.txt
 
 erase-recording:
 	rm -rf src/aoai-simulated-api/.recording
@@ -37,6 +38,13 @@ run-test-client-simulator:
 	cd src/test-client && \
 	AZURE_OPENAI_ENDPOINT=http://localhost:8000 AZURE_FORM_RECOGNIZER_ENDPOINT=http://localhost:8000 python app.py
 
+
+run-test-client-web:
+	@set -a && \
+	source .env && \
+	set +a && \
+	cd src/test-client-web && \
+	flask run --host 0.0.0.0
 
 docker-build-simulated-api:
 	# TODO should set a tag!
