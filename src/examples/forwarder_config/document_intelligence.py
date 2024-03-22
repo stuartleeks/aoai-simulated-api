@@ -1,7 +1,7 @@
 import json
 import logging
 import os
-from typing import Callable
+from aoai_simulated_api.pipeline import RequestContext
 import fastapi
 from fastapi.datastructures import URL
 import requests
@@ -47,8 +47,9 @@ doc_intelligence_response_headers_to_remove = [
 
 
 async def forward_to_azure_document_intelligence(
-    request: fastapi.Request,
+    context: RequestContext,
 ) -> fastapi.Response | requests.Response | dict | None:
+    request = context.request
     if not request.url.path.startswith("/formrecognizer/"):
         # assume not an Doc Intelligence request
         return None
@@ -104,13 +105,3 @@ async def forward_to_azure_document_intelligence(
         response.headers["operation-location"] = new_operation_location
 
     return {"response": response, "persist": persist}
-
-
-def get_forwarders() -> list[Callable[[fastapi.Request], fastapi.Response | requests.Response | dict | None]]:
-    # Return a list of functions to call when recording and no matching saved request is found
-    # If the function returns a Response object (from FastAPI or requests package), it will be used as the response for the request
-    # If the function returns a dict then it should have a "response" property with the response and a "persist" property that is True/False to indicate whether to persist the response
-    # If the function returns None, the next function in the list will be called
-    return [
-        forward_to_azure_document_intelligence,
-    ]

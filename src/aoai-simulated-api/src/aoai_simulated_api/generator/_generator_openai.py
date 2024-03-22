@@ -10,8 +10,12 @@ import random
 import tiktoken
 import time
 
-from config import load_openai_deployments
-from constants import SIMULATOR_HEADER_OPENAI_TOKENS, SIMULATOR_HEADER_LIMITER, SIMULATOR_HEADER_LIMITER_KEY
+from aoai_simulated_api.config import load_openai_deployments
+from aoai_simulated_api.constants import (
+    SIMULATOR_HEADER_OPENAI_TOKENS,
+    SIMULATOR_HEADER_LIMITER,
+    SIMULATOR_HEADER_LIMITER_KEY,
+)
 
 # This file contains a default implementation of the get_generators function
 # You can configure your own generators by creating a generator_config.py file and setting the

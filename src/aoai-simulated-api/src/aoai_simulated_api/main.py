@@ -6,12 +6,12 @@ from typing import Callable
 from fastapi import FastAPI, Request, Response
 from limits import storage
 
-import constants
-from config import load_openai_deployments, load_doc_intelligence_limit
-from generator import GeneratorManager
-from limiters import create_openai_limiter, create_doc_intelligence_limiter
-from pipeline import RequestContext
-from record_replay import RecordReplayHandler, YamlRecordingPersister, RequestForwarder
+import aoai_simulated_api.constants as constants
+from aoai_simulated_api.config import load_openai_deployments, load_doc_intelligence_limit
+from aoai_simulated_api.generator import GeneratorManager
+from aoai_simulated_api.limiters import create_openai_limiter, create_doc_intelligence_limiter
+from aoai_simulated_api.pipeline import RequestContext
+from aoai_simulated_api.record_replay import RecordReplayHandler, YamlRecordingPersister, RequestForwarder
 
 simulator_mode = os.getenv("SIMULATOR_MODE") or "replay"
 recording_dir = os.getenv("RECORDING_DIR") or ".recording"
@@ -19,8 +19,12 @@ recording_dir = os.path.abspath(recording_dir)
 recording_format = os.getenv("RECORDING_FORMAT") or "yaml"
 recording_autosave = os.getenv("RECORDING_AUTOSAVE", "true").lower() == "true"
 
-generator_config_path = os.getenv("GENERATOR_CONFIG_PATH") or "generator/default_config.py"
-forwarder_config_path = os.getenv("FORWARDER_CONFIG_PATH") or "record_replay/_request_forwarder_config.py"
+module_path = os.path.dirname(os.path.realpath(__file__))
+
+generator_config_path = os.getenv("GENERATOR_CONFIG_PATH") or os.path.join(module_path, "generator/default_config.py")
+forwarder_config_path = os.getenv("FORWARDER_CONFIG_PATH") or os.path.join(
+    module_path, "record_replay/_request_forwarder_config.py"
+)
 
 log_level = os.getenv("LOG_LEVEL") or "INFO"
 
@@ -46,9 +50,9 @@ if simulator_mode == "generate":
     logger.info(f"📝 Generator config path: %s", generator_config_path)
     generator_manager = GeneratorManager(generator_config_path=generator_config_path)
 else:
-    logger.info(f"📼 Recording directory: %s", recording_dir)
-    logger.info(f"📼 Recording format   : %s", recording_format)
-    logger.info(f"📼 Recording auto-save: %s", recording_autosave)
+    logger.info(f"📼 Recording directory      : %s", recording_dir)
+    logger.info(f"📼 Recording format         : %s", recording_format)
+    logger.info(f"📼 Recording auto-save      : %s", recording_autosave)
     # TODO - handle JSON loading (or update docs!)
     if recording_format != "yaml":
         raise Exception(f"Unsupported recording format: {recording_format}")
@@ -56,6 +60,7 @@ else:
 
     forwarder = None
     if simulator_mode == "record":
+        logger.info(f"📼 Forwarder config path: %s", forwarder_config_path)
         forwarder = RequestForwarder(forwarder_config_path)
 
     record_replay_handler = RecordReplayHandler(

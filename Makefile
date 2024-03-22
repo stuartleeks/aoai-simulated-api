@@ -1,7 +1,6 @@
 SHELL=/bin/bash
 
-makefile_path := $(abspath $(lastword $(MAKEFILE_LIST)))
-makefile_dir := $(dir $(mkfile_path))
+makefile_dir := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
 help: ## show this help
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -21,8 +20,7 @@ run-simulated-api:
 	set -a && \
 	[ -f .env ] && echo "sourcing .env values" && source .env || echo "No .env file found, using shell env vars" && \
 	set +a && \
-	cd src/aoai-simulated-api && \
-	gunicorn main:app --worker-class uvicorn.workers.UvicornWorker --workers 1 --bind 0.0.0.0:8000
+	gunicorn aoai_simulated_api.main:app --worker-class uvicorn.workers.UvicornWorker --workers 1 --bind 0.0.0.0:8000
 
 
 run-test-client:
@@ -46,12 +44,15 @@ docker-build-simulated-api:
 	docker build -t aoai-simulated-api .
 
 docker-run-simulated-api:
+	echo "foo: ${foo}"
+	echo "makefile_dir: ${makefile_dir}"
+	echo "makefile_path: ${makefile_path}"
 	set -a && \
 	[ -f .env ] && echo "sourcing .env values" && source .env || echo "No .env file found, using shell env vars" && \
 	set +a && \
 	docker run --rm -i -t \
 		-p 8000:8000 \
-		-v /mnt/recording:"${makefile_dir}/src/aoai-simulated-api/.recording" \
+		-v "${makefile_dir}.recording":/mnt/recording \
 		-e RECORDING_DIR=/mnt/recording \
 		-e SIMULATOR_MODE \
 		-e AZURE_OPENAI_ENDPOINT \

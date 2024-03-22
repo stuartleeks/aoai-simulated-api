@@ -50,8 +50,8 @@ When running the simulated API, there are a number of environment variables to c
 | `RECORDING_DIR`                 | The directory to store the recorded requests and responses (defaults to `.recording`).                                                               |
 | `RECORDING_FORMAT`              | Currently only `yaml` is supported. Use to specify the format of the recorded requests/responses.                                                    |
 | `RECORDING_AUTOSAVE`            | If set to `True` (default), the simulator will save the recording after each request.                                                                |
-| `GENERATOR_CONFIG_PATH`         | The path to a Python file that contains the generator configuration. See `src/examples/generator_config.py` for an example.                          |
-| `FORWARDER_CONFIG_PATH`         | The path to a Python file that contains the forwarder configuration. See `src/examples/forwarder_config.py` for an example.                          |
+| `GENERATOR_CONFIG_PATH`         | The path to a Python file that contains the generator configuration. See `src/examples/generator_config` for an example.                          |
+| `FORWARDER_CONFIG_PATH`         | The path to a Python file that contains the forwarder configuration. See `src/examples/forwarder_config` for an example.                          |
 | `AZURE_OPENAI_ENDPOINT`         | The endpoint for the Azure OpenAI service, e.g. `https://mysvc.openai.azure.com/`                                                                    |
 | `AZURE_OPENAI_KEY`              | The API key for the Azure OpenAI service.                                                                                                            |
 | `DOC_INTELLIGENCE_RPS`          | The rate limit for the Document Intelligence service. Defaults to 15 RPS. See [Doc Intelligence Rate-Limiting](#document-intelligence-rate-limiting) |
@@ -105,6 +105,8 @@ To provide a custom forwarder you need to:
 
 
 ### Creating a custom forwarder
+
+>  NOTE: This example uses a single file implementation for the forwarder. The forwarder can be split into multiple files if needed (see `src/examples/forwarder_config` for an example)
 
 A custom forwarder file needs to have a `get_forwarders` method as shown below:
 

@@ -7,8 +7,8 @@ from ._hashing import get_request_hash, hash_request_parts
 from ._models import RecordedResponse
 from ._persistence import YamlRecordingPersister
 from ._request_forwarder import RequestForwarder
-import constants
-from pipeline import RequestContext
+import aoai_simulated_api.constants as constants
+from aoai_simulated_api.pipeline import RequestContext
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +61,7 @@ class RecordReplayHandler:
             logger.debug(f"No recording found for URL: {url}")
 
         if self._simulator_mode == "record":
-            return await self._record_request(request)
+            return await self._record_request(context)
 
         return None
 
@@ -72,7 +72,7 @@ class RecordReplayHandler:
         request = context.request
 
         start_time = time.time()
-        forwarded_response = await self._forwarder.forward_request(request)
+        forwarded_response = await self._forwarder.forward_request(context)
         end_time = time.time()
         if not forwarded_response:
             raise Exception(

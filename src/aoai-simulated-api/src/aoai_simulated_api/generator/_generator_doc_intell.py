@@ -5,7 +5,7 @@ import uuid
 import lorem
 from fastapi import Request, Response
 
-from constants import SIMULATOR_HEADER_LIMITER
+from aoai_simulated_api.constants import SIMULATOR_HEADER_LIMITER
 
 # dictionary of submitted operations keyed on operation ID
 # operations = {}
