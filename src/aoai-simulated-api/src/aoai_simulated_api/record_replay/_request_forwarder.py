@@ -1,5 +1,8 @@
 import importlib.util
 import inspect
+import os
+import sys
+from aoai_simulated_api.pipeline import RequestContext
 from fastapi import Request, Response
 from requests import Response as requests_Response
 
@@ -10,9 +13,21 @@ class ForwardedResponse:
         self.persist_response = persist_response
 
 
-def _load_forwarders(generator_config_path: str):
-    module_spec = importlib.util.spec_from_file_location("__forwarders_module", generator_config_path)
+def _load_forwarders(forwarder_config_path: str):
+    # forwarder_config_path is the path to a folder with a __init__.py
+    # use the last folder name as the module name as that is intuitive when the __init__.py
+    # references other files in the same folder
+    config_is_dir = os.path.isdir(forwarder_config_path)
+    if config_is_dir:
+        module_name = os.path.basename(forwarder_config_path)
+        path_to_load = os.path.join(forwarder_config_path, "__init__.py")
+    else:
+        module_name = "__forwarder_config"
+        path_to_load = forwarder_config_path
+
+    module_spec = importlib.util.spec_from_file_location(module_name, path_to_load)
     module = importlib.util.module_from_spec(module_spec)
+    sys.modules[module_spec.name] = module
     module_spec.loader.exec_module(module)
     return module.get_forwarders()
 
@@ -21,9 +36,9 @@ class RequestForwarder:
     def __init__(self, forwarder_config_path: str):
         self._forwarders = _load_forwarders(forwarder_config_path)
 
-    async def forward_request(self, request: Request) -> ForwardedResponse:
-        for generator in self._forwarders:
-            response = generator(request)
+    async def forward_request(self, context: RequestContext) -> ForwardedResponse:
+        for forwarder in self._forwarders:
+            response = forwarder(context)
             if response is not None and inspect.isawaitable(response):
                 response = await response
             if response is not None:

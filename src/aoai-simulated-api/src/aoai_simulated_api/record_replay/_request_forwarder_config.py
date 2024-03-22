@@ -2,9 +2,14 @@ import json
 import logging
 import os
 from typing import Callable
+from aoai_simulated_api.pipeline import RequestContext
 import fastapi
 import requests
-from constants import SIMULATOR_HEADER_OPENAI_TOKENS, SIMULATOR_HEADER_LIMITER, SIMULATOR_HEADER_LIMITER_KEY
+from aoai_simulated_api.constants import (
+    SIMULATOR_HEADER_OPENAI_TOKENS,
+    SIMULATOR_HEADER_LIMITER,
+    SIMULATOR_HEADER_LIMITER_KEY,
+)
 
 # This file contains a default implementation of the get_forwarders function
 # for handling forwarded requests
@@ -77,7 +82,8 @@ def _get_token_usage_from_response(body: str) -> int | None:
     return None
 
 
-async def forward_to_azure_openai(request: fastapi.Request) -> dict:
+async def forward_to_azure_openai(context: RequestContext) -> dict:
+    request = context.request
     if not request.url.path.startswith("/openai/"):
         # assume not an OpenAI request
         return None
@@ -126,7 +132,7 @@ async def forward_to_azure_openai(request: fastapi.Request) -> dict:
     return {"response": response, "persist_response": True}
 
 
-def get_forwarders() -> list[Callable[[fastapi.Request], fastapi.Response | requests.Response | None]]:
+def get_forwarders() -> list[Callable[[RequestContext], fastapi.Response | requests.Response | None]]:
     # Return a list of functions to call when recording and no matching saved request is found
     # If the function returns a Response object (from FastAPI or requests package), it will be used as the response for the request
     # If the function returns a dict then it should have a "response" property with the response and a "persist" property that is True/False to indicate whether to persist the response

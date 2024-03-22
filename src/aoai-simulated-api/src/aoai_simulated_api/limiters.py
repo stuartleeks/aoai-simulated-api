@@ -8,7 +8,7 @@ from fastapi import Response
 from limits import storage, strategies, RateLimitItemPerSecond
 
 
-import constants
+import aoai_simulated_api.constants as constants
 
 
 @dataclass
