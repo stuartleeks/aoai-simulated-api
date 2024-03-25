@@ -7,7 +7,7 @@ from fastapi import FastAPI, Request, Response
 from limits import storage
 
 import constants
-from config import load_openai_deployments, load_doc_intelligence_limit
+from config import load_openai_deployments, load_doc_intelligence_limit, setup_tiktoken_cache
 from generator import GeneratorManager
 from limiters import create_openai_limiter, create_doc_intelligence_limiter
 from pipeline import RequestContext
@@ -18,12 +18,15 @@ recording_dir = os.getenv("RECORDING_DIR") or ".recording"
 recording_dir = os.path.abspath(recording_dir)
 recording_format = os.getenv("RECORDING_FORMAT") or "yaml"
 recording_autosave = os.getenv("RECORDING_AUTOSAVE", "true").lower() == "true"
+use_tiktoken_cache = os.getenv("USE_TIKTOKEN_CACHE", "false").lower() == "true"
 
 generator_config_path = os.getenv("GENERATOR_CONFIG_PATH") or "generator/default_config.py"
 forwarder_config_path = os.getenv("FORWARDER_CONFIG_PATH") or "record_replay/_request_forwarder_config.py"
 
 log_level = os.getenv("LOG_LEVEL") or "INFO"
 
+if use_tiktoken_cache:
+    setup_tiktoken_cache()
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=log_level)
