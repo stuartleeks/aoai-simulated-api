@@ -64,12 +64,13 @@ def _get_replay_config(recording_path: str) -> Config:
 
 
 @pytest.mark.asyncio
-async def test_openai_record_completion(httpserver: HTTPServer):
+async def test_openai_record_replay_completion(httpserver: HTTPServer):
     """
     Ensure we can call the completion endpoint using the record mode
     """
 
-    # Set up pytest-httpserver to provide a
+    # Set up pytest-httpserver to provide an endpoint for the simulator
+    # to call in record mode
     httpserver.expect_request(
         uri="/openai/deployments/deployment1/completions",
         query_string="api-version=2023-12-01-preview",
@@ -79,36 +80,30 @@ async def test_openai_record_completion(httpserver: HTTPServer):
     )
     httpserver.expect_request("/hello").respond_with_data("Hello, world!")
 
-    with TempDirectory() as temp_dir:
+    def test_completion_call(config):
+        server = UvicornTestServer(config)
+        with server.run_in_thread():
+            aoai_client = AzureOpenAI(
+                api_key="123456789",
+                api_version="2023-12-01-preview",
+                azure_endpoint="http://localhost:8001",
+                max_retries=0,
+            )
+            prompt = "This is a test prompt"
+            response = aoai_client.completions.create(model="deployment1", prompt=prompt, max_tokens=50)
 
+            assert len(response.choices) == 1
+            assert response.choices[0].text == "This is a test"
+
+    with TempDirectory() as temp_dir:
         # set up simulated API in record mode
         config = _get_record_config(httpserver, temp_dir.path)
-        server = UvicornTestServer(config)
-        with server.run_in_thread():
-            aoai_client = AzureOpenAI(
-                api_key="123456789",
-                api_version="2023-12-01-preview",
-                azure_endpoint="http://localhost:8001",
-                max_retries=0,
-            )
-            prompt = "This is a test prompt"
-            response = aoai_client.completions.create(model="deployment1", prompt=prompt, max_tokens=50)
+        test_completion_call(config)
 
-            assert len(response.choices) == 1
-            assert response.choices[0].text == "This is a test"
+        # Undo httpserver config to ensure there isn't an endpoint to forward to
+        # when testing in replay mode
+        httpserver.clear_all_handlers()
 
-        # set up simulated API in replay mode
+        # set up simulated API in replay mode (using the recording from above)
         config = _get_replay_config(temp_dir.path)
-        server = UvicornTestServer(config)
-        with server.run_in_thread():
-            aoai_client = AzureOpenAI(
-                api_key="123456789",
-                api_version="2023-12-01-preview",
-                azure_endpoint="http://localhost:8001",
-                max_retries=0,
-            )
-            prompt = "This is a test prompt"
-            response = aoai_client.completions.create(model="deployment1", prompt=prompt, max_tokens=50)
-
-            assert len(response.choices) == 1
-            assert response.choices[0].text == "This is a test"
+        test_completion_call(config)
