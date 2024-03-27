@@ -1,14 +1,15 @@
-from fastapi import Request, Response
-
 import asyncio
 import json
-from fastapi.responses import StreamingResponse
-import lorem
 import logging
-import nanoid
-import random
-import tiktoken
 import time
+import random
+
+import lorem
+import nanoid
+import tiktoken
+
+from fastapi import Request, Response
+from fastapi.responses import StreamingResponse
 
 from aoai_simulated_api.config import load_openai_deployments
 from aoai_simulated_api.constants import (

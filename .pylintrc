@@ -1,0 +1,9 @@
+[FORMAT]
+# Maximum number of characters on a single line.
+max-line-length=120
+
+
+[BASIC]
+# Regular expression which should only match function or class names that do
+# not require a docstring.
+no-docstring-rgx=^_?(test)?

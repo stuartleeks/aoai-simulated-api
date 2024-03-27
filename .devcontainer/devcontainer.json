@@ -13,7 +13,8 @@
 			"extensions": [
 				"humao.rest-client",
 				"ms-python.black-formatter",
-				"yzhang.markdown-all-in-one"
+				"yzhang.markdown-all-in-one",
+				"ms-python.pylint"
 			]
 		}
 	},
