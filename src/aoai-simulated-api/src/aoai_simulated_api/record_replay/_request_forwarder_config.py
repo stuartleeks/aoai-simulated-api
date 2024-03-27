@@ -17,29 +17,29 @@ from aoai_simulated_api.constants import (
 # FORWWARDER_CONFIG_PATH environment variable to the path of the file when running the API
 # See src/example_forwarder_config/forwarder_config.py for an example of how to define your own forwarders
 
-aoai_api_key: str | None = None
-aoai_api_endpoint: str | None = None
-aoai_initialized: bool = False
+config_validated: bool = False
 
 logger = logging.getLogger(__name__)
 
 
-def initialize_azure_openai():
-    global aoai_api_key, aoai_api_endpoint, aoai_initialized
-    aoai_api_key = os.getenv("AZURE_OPENAI_KEY")
-    aoai_api_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
+def _validate_endpoint_config(context: RequestContext):
+    # pylint: disable-next=global-statement
+    global config_validated
 
-    aoai_initialized = True
+    aoai_api_endpoint = context.config.recording.aoai_api_endpoint
+    aoai_api_key = context.config.recording.aoai_api_key
+
+    config_validated = True  # only show the message once
 
     if aoai_api_key and aoai_api_endpoint:
-        logger.info(f"🚀 Initialized Azure OpenAI forwarder with the following settings:")
-        logger.info(f"🔑 API endpoint: {aoai_api_endpoint}")
+        logger.info("🚀 Initialized Azure OpenAI forwarder with the following settings:")
+        logger.info("🔑 API endpoint: %s", aoai_api_endpoint)
         masked_api_key = aoai_api_key[:4] + "..." + aoai_api_key[-4:]
-        logger.info(f"🔑 API key: {masked_api_key}")
+        logger.info("🔑 API key: %s", masked_api_key)
 
     else:
-        logger.warn(
-            f"Got a request that looked like an openai request, but missing some or all of the required environment variables for forwarding: AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_KEY"
+        logger.warning(
+            "Got a request that looked like an openai request, but missing some or all of the required environment variables for forwarding: AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_KEY"
         )
 
 
@@ -77,8 +77,7 @@ def _get_token_usage_from_response(body: str) -> int | None:
         if "usage" in response_json and "total_tokens" in response_json["usage"]:
             return response_json["usage"]["total_tokens"]
     except json.JSONDecodeError as e:
-        logger.error("Error getting token usage", e)
-        pass
+        logger.error("Error getting token usage: %s", e)
     return None
 
 
@@ -88,9 +87,12 @@ async def forward_to_azure_openai(context: RequestContext) -> dict:
         # assume not an OpenAI request
         return None
 
-    if not aoai_initialized:
+    if not config_validated:
         # Only initialize once, and only if we need to
-        initialize_azure_openai()
+        _validate_endpoint_config(context)
+
+    aoai_api_endpoint = context.config.recording.aoai_api_endpoint
+    aoai_api_key = context.config.recording.aoai_api_key
 
     if aoai_api_key is None or aoai_api_endpoint is None:
         return None
@@ -113,6 +115,7 @@ async def forward_to_azure_openai(context: RequestContext) -> dict:
         url,
         headers=fwd_headers,
         data=body,
+        timeout=30,
     )
 
     for header in aoai_response_headers_to_remove:

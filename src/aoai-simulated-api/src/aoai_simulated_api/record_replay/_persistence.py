@@ -30,9 +30,9 @@ class YamlRecordingPersister:
 
         recording_path = self.get_recording_file_path(url)
         self.ensure_recording_dir_exists()
-        with open(recording_path, "w") as f:
+        with open(recording_path, "w", encoding="utf-8") as f:
             yaml.dump(recording_data, stream=f, Dumper=yaml.CDumper)
-        logger.info(f"💾 Recording saved to {recording_path}")
+        logger.info("💾 Recording saved to %s", recording_path)
 
     def ensure_recording_dir_exists(self):
         if not os.path.exists(self._recording_dir):
@@ -46,13 +46,14 @@ class YamlRecordingPersister:
         recording_file_path = os.path.join(self._recording_dir, recording_file_name)
         return recording_file_path
 
-    def load_recording_for_url(self, url: str):
+    def load_recording_for_url(self, url: str, expect_recording_file: bool):
         recording_file_path = self.get_recording_file_path(url)
         if not os.path.exists(recording_file_path):
-            logger.warning(f"No recording file found at {recording_file_path}")
+            if expect_recording_file:
+                logger.warning("No recording file found at %s", recording_file_path)
             return None
 
-        with open(recording_file_path, "r") as f:
+        with open(recording_file_path, "r", encoding="utf-8") as f:
             recording_data = yaml.load(f, Loader=yaml.CLoader)
             interactions = recording_data["interactions"]
             recording = {}

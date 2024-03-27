@@ -11,6 +11,8 @@ class RecordingConfig:
     format: str
     autosave: bool
     forwarder_config_path: str | None
+    aoai_api_key: str | None = None
+    aoai_api_endpoint: str | None = None
 
 
 @dataclass
@@ -38,6 +40,9 @@ def get_config_from_env_vars(logger: logging.Logger) -> Config:
     recording_format = os.getenv("RECORDING_FORMAT") or "yaml"
     recording_autosave = os.getenv("RECORDING_AUTOSAVE", "true").lower() == "true"
 
+    aoai_api_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
+    aoai_api_key = os.getenv("AZURE_OPENAI_KEY")
+
     generator_config_path = os.getenv("GENERATOR_CONFIG_PATH")
     forwarder_config_path = os.getenv("FORWARDER_CONFIG_PATH")
 
@@ -58,6 +63,8 @@ def get_config_from_env_vars(logger: logging.Logger) -> Config:
             format=recording_format,
             autosave=recording_autosave,
             forwarder_config_path=forwarder_config_path,
+            aoai_api_endpoint=aoai_api_endpoint,
+            aoai_api_key=aoai_api_key,
         ),
         generator_config_path=generator_config_path,
         openai_deployments=_load_openai_deployments(),
