@@ -10,7 +10,8 @@ import pytest
 import requests
 import uvicorn
 
-from aoai_simulated_api.app_builder import Config, get_simulator
+from aoai_simulated_api.app_builder import get_simulator
+from aoai_simulated_api.config import Config, RecordingConfig
 
 logger = logging.getLogger("tests")
 
@@ -52,11 +53,14 @@ async def test_root_message():
 
     config = Config(
         simulator_mode="generate",
-        recording_autosave=False,
-        recording_dir="",
-        recording_format="",
-        forwarder_config_path="",
+        recording=RecordingConfig(
+            autosave=False,
+            dir="",
+            format="",
+            forwarder_config_path="",
+        ),
         generator_config_path="",
+        openai_deployments=None,
     )
     server = UvicornTestServer(config)
     with server.run_in_thread():

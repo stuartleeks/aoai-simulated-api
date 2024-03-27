@@ -1,5 +1,4 @@
 import asyncio
-from dataclasses import dataclass
 import logging
 import os
 import traceback
@@ -8,7 +7,7 @@ from fastapi import FastAPI, Request, Response
 from limits import storage
 
 import aoai_simulated_api.constants as constants
-from aoai_simulated_api.config import load_openai_deployments, load_doc_intelligence_limit
+from aoai_simulated_api.config import Config, load_doc_intelligence_limit
 from aoai_simulated_api.generator import GeneratorManager
 from aoai_simulated_api.limiters import create_openai_limiter, create_doc_intelligence_limiter
 from aoai_simulated_api.pipeline import RequestContext
@@ -17,57 +16,6 @@ from aoai_simulated_api.record_replay import (
     YamlRecordingPersister,
     RequestForwarder,
 )
-
-
-@dataclass
-class Config:
-    """
-    Configuration for the simulator
-    """
-
-    # TODO: move into config.py
-    # TODO: restructure, e.g. group recording settings together
-    # TODO: combine OpenAI deployment configuration
-    simulator_mode: str
-    recording_dir: str
-    recording_format: str
-    recording_autosave: bool
-    generator_config_path: str | None
-    forwarder_config_path: str | None
-    recording_format: str
-
-
-def get_config_from_env_vars(logger: logging.Logger) -> Config:
-    """
-    Load configuration from environment variables
-    """
-    simulator_mode = os.getenv("SIMULATOR_MODE") or "replay"
-    recording_dir = os.getenv("RECORDING_DIR") or ".recording"
-    recording_dir = os.path.abspath(recording_dir)
-    recording_format = os.getenv("RECORDING_FORMAT") or "yaml"
-    recording_autosave = os.getenv("RECORDING_AUTOSAVE", "true").lower() == "true"
-
-    generator_config_path = os.getenv("GENERATOR_CONFIG_PATH")
-    forwarder_config_path = os.getenv("FORWARDER_CONFIG_PATH")
-
-    allowed_simulator_modes = ["replay", "record", "generate"]
-    if simulator_mode not in allowed_simulator_modes:
-        logger.error("SIMULATOR_MODE must be one of %s", allowed_simulator_modes)
-        exit(1)
-
-    allowed_recording_formats = ["yaml", "json"]
-    if recording_format not in allowed_recording_formats:
-        logger.error("RECORDING_FORMAT must be one of %s", allowed_recording_formats)
-        exit(1)
-
-    return Config(
-        simulator_mode=simulator_mode,
-        recording_dir=recording_dir,
-        recording_format=recording_format,
-        recording_autosave=recording_autosave,
-        generator_config_path=generator_config_path,
-        forwarder_config_path=forwarder_config_path,
-    )
 
 
 def get_simulator(logger: logging.Logger, config: Config) -> FastAPI:
@@ -84,16 +32,16 @@ def get_simulator(logger: logging.Logger, config: Config) -> FastAPI:
 
         generator_manager = GeneratorManager(generator_config_path=generator_config_path)
     else:
-        logger.info("📼 Recording directory      : %s", config.recording_dir)
-        logger.info("📼 Recording format         : %s", config.recording_format)
-        logger.info("📼 Recording auto-save      : %s", config.recording_autosave)
+        logger.info("📼 Recording directory      : %s", config.recording.dir)
+        logger.info("📼 Recording format         : %s", config.recording.format)
+        logger.info("📼 Recording auto-save      : %s", config.recording.autosave)
         # TODO - handle JSON loading (or update docs!)
-        if config.recording_format != "yaml":
-            raise ValueError(f"Unsupported recording format: {config.recording_format}")
-        persister = YamlRecordingPersister(config.recording_dir)
+        if config.recording.format != "yaml":
+            raise ValueError(f"Unsupported recording format: {config.recording.format}")
+        persister = YamlRecordingPersister(config.recording.dir)
 
         forwarder = None
-        forwarder_config_path = config.forwarder_config_path or os.path.join(
+        forwarder_config_path = config.recording.forwarder_config_path or os.path.join(
             module_path, "record_replay/_request_forwarder_config.py"
         )
         if config.simulator_mode == "record":
@@ -104,7 +52,7 @@ def get_simulator(logger: logging.Logger, config: Config) -> FastAPI:
             simulator_mode=config.simulator_mode,
             persister=persister,
             forwarder=forwarder,
-            autosave=config.recording_autosave,
+            autosave=config.recording.autosave,
         )
 
     @app.get("/")
@@ -127,12 +75,11 @@ def get_simulator(logger: logging.Logger, config: Config) -> FastAPI:
     doc_intelligence_rps = load_doc_intelligence_limit()
     logger.info("📝 Using Doc Intelligence RPS: %s", doc_intelligence_rps)
 
-    openai_deployments = load_openai_deployments()
-    logger.info("📝 Using OpenAI deployments: %s", openai_deployments)
+    logger.info("📝 Using OpenAI deployments: %s", config.openai_deployments)
 
     openai_deployment_limits = (
-        {name: deployment.tokens_per_minute for name, deployment in openai_deployments.items()}
-        if openai_deployments
+        {name: deployment.tokens_per_minute for name, deployment in config.openai_deployments.items()}
+        if config.openai_deployments
         else {}
     )
     # Dictionary of limiters keyed by name
@@ -150,7 +97,7 @@ def get_simulator(logger: logging.Logger, config: Config) -> FastAPI:
 
         try:
             response = None
-            context = RequestContext(request)
+            context = RequestContext(config=config, request=request)
 
             if config.simulator_mode == "generate":
                 response = await generator_manager.generate(context)
