@@ -46,6 +46,8 @@ def get_config_from_env_vars(logger: logging.Logger) -> Config:
     generator_config_path = os.getenv("GENERATOR_CONFIG_PATH")
     forwarder_config_path = os.getenv("FORWARDER_CONFIG_PATH")
 
+    use_tiktoken_cache = os.getenv("USE_TIKTOKEN_CACHE", "false").lower() == "true"
+
     allowed_simulator_modes = ["replay", "record", "generate"]
     if simulator_mode not in allowed_simulator_modes:
         logger.error("SIMULATOR_MODE must be one of %s", allowed_simulator_modes)
@@ -55,6 +57,9 @@ def get_config_from_env_vars(logger: logging.Logger) -> Config:
     if recording_format not in allowed_recording_formats:
         logger.error("RECORDING_FORMAT must be one of %s", allowed_recording_formats)
         raise ValueError(f"Invalid RECORDING_FORMAT: {recording_format}")
+
+    if use_tiktoken_cache:
+        setup_tiktoken_cache()
 
     return Config(
         simulator_mode=simulator_mode,
@@ -100,3 +105,17 @@ def _load_openai_deployments() -> dict[str, OpenAIDeployment]:
 def load_doc_intelligence_limit() -> int:
     # Default is 20 RPM based on https://learn.microsoft.com/en-us/azure/ai-services/document-intelligence/service-limits?view=doc-intel-4.0.0
     return int(os.getenv("DOC_INTELLIGENCE_RPS", "15"))
+
+
+def setup_tiktoken_cache() -> None:
+    tiktoken_cache_dir = os.path.join(os.path.dirname(__file__), "tiktoken_cache")
+
+    if not os.path.exists(
+        os.path.join(
+            tiktoken_cache_dir,
+            "9b5ad71b2ce5302211f9c61530b329a4922fc6a4",
+        )
+    ):
+        raise Exception(f"Could not find tiktoken encoding file in {tiktoken_cache_dir}.")
+
+    os.environ["TIKTOKEN_CACHE_DIR"] = tiktoken_cache_dir
