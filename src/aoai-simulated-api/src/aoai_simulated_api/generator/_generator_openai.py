@@ -1,16 +1,17 @@
-from fastapi import Request, Response
-
 import asyncio
 import json
-from fastapi.responses import StreamingResponse
-import lorem
 import logging
-import nanoid
-import random
-import tiktoken
 import time
+import random
 
-from aoai_simulated_api.config import load_openai_deployments
+from aoai_simulated_api.pipeline import RequestContext
+import lorem
+import nanoid
+import tiktoken
+
+from fastapi import Request, Response
+from fastapi.responses import StreamingResponse
+
 from aoai_simulated_api.constants import (
     SIMULATOR_HEADER_OPENAI_TOKENS,
     SIMULATOR_HEADER_LIMITER,
@@ -30,30 +31,16 @@ TOKEN_TO_WORD_FACTOR = 0.72
 
 # API docs: https://learn.microsoft.com/en-gb/azure/ai-services/openai/reference
 
-deployments_loaded = False
-deployments = None
 
-
-def _load_deployments():
-    global deployments, deployments_loaded
-    if not deployments_loaded:
-        deployments = load_openai_deployments()
-        deployments_loaded = True
-        if not deployments:
-            logger.warning("No OpenAI deployments found in config")
-
-
-def get_model_name_from_deployment_name(deployment_name: str) -> str:
-    global deployments
-    _load_deployments()
-
+def get_model_name_from_deployment_name(context: RequestContext, deployment_name: str) -> str:
+    deployments = context.config.openai_deployments
     if deployments:
         deployment = deployments.get(deployment_name)
         if deployment:
             return deployment.model
 
     default_model = "gpt-3.5-turbo-0613"
-    logger.warning(f"Deployment {deployment_name} not found in config, using default model {default_model}")
+    logger.warning("Deployment %s not found in config, using default model %s", deployment_name, default_model)
     return default_model
 
 
@@ -117,7 +104,7 @@ def _generate_embedding(index: int):
     return {"object": "embedding", "index": index, "embedding": [(random.random() - 0.5) * 4 for _ in range(1536)]}
 
 
-async def azure_openai_embedding(context, request: Request) -> Response | None:
+async def azure_openai_embedding(context: RequestContext, request: Request) -> Response | None:
     is_match, path_params = context.is_route_match(
         request=request, path="/openai/deployments/{deployment}/embeddings", methods=["POST"]
     )
@@ -126,7 +113,7 @@ async def azure_openai_embedding(context, request: Request) -> Response | None:
 
     deployment_name = path_params["deployment"]
     request_body = await request.json()
-    model_name = get_model_name_from_deployment_name(deployment_name)
+    model_name = get_model_name_from_deployment_name(context, deployment_name)
     input = request_body["input"]
     embeddings = []
     if type(input) == str:
@@ -158,7 +145,7 @@ async def azure_openai_embedding(context, request: Request) -> Response | None:
     )
 
 
-async def azure_openai_completion(context, request: Request) -> Response | None:
+async def azure_openai_completion(context: RequestContext, request: Request) -> Response | None:
     is_match, path_params = context.is_route_match(
         request=request, path="/openai/deployments/{deployment}/completions", methods=["POST"]
     )
@@ -166,7 +153,7 @@ async def azure_openai_completion(context, request: Request) -> Response | None:
         return None
 
     deployment_name = path_params["deployment"]
-    model_name = get_model_name_from_deployment_name(deployment_name)
+    model_name = get_model_name_from_deployment_name(context, deployment_name)
     request_body = await request.json()
     prompt_tokens = num_tokens_from_string(request_body["prompt"], model_name)
     max_tokens = request_body.get("max_tokens", 10)  # TODO - what is the default max tokens?
@@ -209,7 +196,7 @@ async def azure_openai_completion(context, request: Request) -> Response | None:
     )
 
 
-async def azure_openai_chat_completion(context, request: Request) -> Response | None:
+async def azure_openai_chat_completion(context: RequestContext, request: Request) -> Response | None:
     is_match, path_params = context.is_route_match(
         request=request, path="/openai/deployments/{deployment}/chat/completions", methods=["POST"]
     )
@@ -218,7 +205,7 @@ async def azure_openai_chat_completion(context, request: Request) -> Response | 
 
     request_body = await request.json()
     deployment_name = path_params["deployment"]
-    model_name = get_model_name_from_deployment_name(deployment_name)
+    model_name = get_model_name_from_deployment_name(context, deployment_name)
     prompt_tokens = num_tokens_from_messages(request_body["messages"], model_name)
 
     # TODO - determine the token size to use

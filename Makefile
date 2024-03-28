@@ -10,6 +10,7 @@ help: ## show this help
 
 install-requirements:
 	pip install -r src/aoai-simulated-api/requirements.txt
+	pip install -r src/tests/requirements.txt
 	pip install -r src/test-client/requirements.txt
 	pip install -r src/loadtest/requirements.txt
 	pip install -r src/test-client-web/requirements.txt
@@ -67,3 +68,9 @@ docker-run-simulated-api:
 		-e AZURE_OPENAI_KEY \
 		-e AZURE_OPENAI_DEPLOYMENT \
 		aoai-simulated-api
+
+test:
+	pytest .
+	
+test-watch:
+	ptw --clear

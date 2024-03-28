@@ -1,0 +1,5 @@
+openai
+pytest
+pytest-asyncio
+pytest-watch
+pytest-httpserver

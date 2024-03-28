@@ -2,9 +2,9 @@ import importlib.util
 import inspect
 import os
 import sys
-from fastapi import Request
-from ._generator_context import GeneratorCallContext, GeneratorSetupContext
+
 from aoai_simulated_api.pipeline import RequestContext
+from ._generator_context import GeneratorSetupContext
 
 
 def _load_generators(generator_config_path: str, setup_context: GeneratorSetupContext):
@@ -28,14 +28,13 @@ def _load_generators(generator_config_path: str, setup_context: GeneratorSetupCo
 
 class GeneratorManager:
     def __init__(self, generator_config_path: str):
-        self._call_context = GeneratorCallContext()
         setup_context = GeneratorSetupContext()
         self._generators = _load_generators(generator_config_path, setup_context)
 
     async def generate(self, context: RequestContext):
         request = context.request
         for generator in self._generators:
-            response = generator(context=self._call_context, request=request)
+            response = generator(context=context, request=request)
             if response is not None and inspect.isawaitable(response):
                 response = await response
             if response is not None:

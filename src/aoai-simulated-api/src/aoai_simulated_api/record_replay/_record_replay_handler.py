@@ -2,13 +2,13 @@ import logging
 import time
 from fastapi import Response
 
+import aoai_simulated_api.constants as constants
+from aoai_simulated_api.pipeline import RequestContext
 
 from ._hashing import get_request_hash, hash_request_parts
 from ._models import RecordedResponse
 from ._persistence import YamlRecordingPersister
 from ._request_forwarder import RequestForwarder
-import aoai_simulated_api.constants as constants
-from aoai_simulated_api.pipeline import RequestContext
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +37,8 @@ class RecordReplayHandler:
         if recording:
             return recording
 
-        recording = self._persister.load_recording_for_url(url)
+        expect_recording_file = self._simulator_mode == "replay"
+        recording = self._persister.load_recording_for_url(url, expect_recording_file)
         if not recording:
             return None
 
@@ -56,9 +57,9 @@ class RecordReplayHandler:
                 context.values[constants.RECORDED_DURATION_MS] = response_info.duration_ms
                 return Response(content=response_info.body, status_code=response_info.status_code, headers=headers)
             else:
-                logger.debug(f"No recorded response found for request {request.method} {url}")
+                logger.debug("No recorded response found for request %s %s", request.method, url)
         else:
-            logger.debug(f"No recording found for URL: {url}")
+            logger.debug("No recording found for URL: %s", url)
 
         if self._simulator_mode == "record":
             return await self._record_request(context)
@@ -117,7 +118,7 @@ class RecordReplayHandler:
 
         if forwarded_response.persist_response:
             # Save the recording
-            logger.info(f"📝 Storing recording for {request.method} {request.url}")
+            logger.info("📝 Storing recording for %s %s", request.method, request.url)
             recording = self._recordings.get(request.url.path)
             if not recording:
                 recording = {}
@@ -132,5 +133,5 @@ class RecordReplayHandler:
         return Response(content=body, status_code=response.status_code, headers=response.headers)
 
     def save_recordings(self):
-        for url in self._recordings.keys():
-            self._persister.save_recording(url, self._recordings[url])
+        for url, recording in self._recordings.items():
+            self._persister.save_recording(url, recording)

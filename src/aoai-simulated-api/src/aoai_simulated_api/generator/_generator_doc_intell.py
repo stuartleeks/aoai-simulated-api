@@ -7,14 +7,10 @@ from fastapi import Request, Response
 
 from aoai_simulated_api.constants import SIMULATOR_HEADER_LIMITER
 
-# dictionary of submitted operations keyed on operation ID
-# operations = {}
-
 document_analysis_config = {}
 
 
 async def doc_intelligence_analyze(context, request: Request) -> Response | None:
-    global operations
     is_match, path_params = context.is_route_match(
         request=request, path="/formrecognizer/documentModels/{modelId}:analyze", methods=["POST"]
     )
@@ -62,7 +58,6 @@ async def doc_intelligence_analyze(context, request: Request) -> Response | None
 
 
 async def doc_intelligence_analyze_result(context, request: Request) -> Response | None:
-    global operations
     is_match, path_params = context.is_route_match(
         request=request,
         path="/formrecognizer/documentModels/{model_id}/analyzeResults/{result_id}",
@@ -70,12 +65,6 @@ async def doc_intelligence_analyze_result(context, request: Request) -> Response
     )
     if not is_match:
         return None
-
-    # Get the model ID from the request path
-    model_id = path_params["model_id"]
-
-    # Get the api version from the request query parameters
-    api_version = request.query_params.get("api-version")
 
     result_id = path_params["result_id"]
     doc_config = document_analysis_config.get(result_id)
@@ -226,7 +215,7 @@ def get_response_lines(line_count: int = 1):
 
     numbers = [random.randint(0, 2000) for _ in range(8)]
 
-    for i in range(line_count):
+    for _ in range(line_count):
         word = lorem.get_word()
         line_list.append(
             {
@@ -259,7 +248,7 @@ def get_response_words(word_count: int = 1):
 
     numbers = [random.randint(0, 2000) for _ in range(8)]
 
-    for i in range(word_count):
+    for _ in range(word_count):
         word = lorem.get_word()
         word_list.append(
             {
