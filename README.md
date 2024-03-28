@@ -16,6 +16,7 @@ This repo is an exploration into creating a simulated API implementation for Azu
     - [Document Intelligence Rate-Limiting](#document-intelligence-rate-limiting)
   - [Current Status/Notes](#current-statusnotes)
     - [Replay Exploration](#replay-exploration)
+    - [Using the simulator with restricted network access](#using-the-simulator-with-restricted-network-access)
 
 
 ## Rationale
@@ -58,6 +59,7 @@ When running the simulated API, there are a number of environment variables to c
 | `OPENAI_DEPLOYMENT_CONFIG_PATH` | The path to a JSON file that contains the deployment configuration. See [OpenAI Rate-Limiting](#openai-rate-limiting)                                |
 | `AZURE_OPENAI_DEPLOYMENT`       | Used by the test app to set the name of the deployed model in your Azure OpenAI service. Use a gpt-35-turbo-instruct deployment.                     |
 | `LOG_LEVEL`                    | The log level for the simulator. Defaults to `INFO`.                                                                                                 |
+| `USE_TIKTOKEN_CACHE` | If set to `True`, the simulator will use a cached TikToken encoding file instead of retrieving it through public internet. See [Using the simulator with restricted network access](#using-the-simulator-with-restricted-network-access) for setup instructions. Defaults to false. |
 
 To run the simulated API, run `uvicorn main:app --reload --port 8000` from the `src/aoai-simulated-api` directory using the environment variables above to configure.
 
@@ -245,4 +247,11 @@ Timings for replay exploration are below. Results are in the format `initial tim
 | 10,000         | 14 MB     | 4s (4s)               | 25s (0.6s)               | 4s (0.6s)                               |
 | 100,000        | 140 MB    | 44s (44s)             | 4m26s (0.7s)             | 44s (0.7s)                              |
 
+### Using the simulator with restricted network access
+During initialization, tiktoken attempts to download an OpenAI encoding file from a public blob storage account managed by OpenAI. When running the simulator in an environment with restricted network access, this can cause the simulator to fail to start.
+
+The simulator can still however be used in an environment with restricted network access by caching the encoding file. This can be done by running the [setup_tiktoken.py](./scripts/setup_tiktoken.py) script. 
+Alternatively, you can download the [encoding file](https://openaipublic.blob.core.windows.net/encodings/cl100k_base.tiktoken) from the public blob storage account and place it in the `src/aoai-simulated-api/src/aoai_simulated_api/tiktoken_cache` directory. Then rename the file to `9b5ad71b2ce5302211f9c61530b329a4922fc6a4`.
+
+Then set the `USE_TIKTOKEN_CACHE` environment variable to `True`. This will let TikToken use the cached TikToken encoding file instead of retrieving it through the public internet.
 
