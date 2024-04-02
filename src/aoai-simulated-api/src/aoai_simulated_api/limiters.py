@@ -20,9 +20,9 @@ class OpenAILimits:
 
 
 def create_openai_limiter(
-    storage: storage.Storage, deployments: dict[str, int]
+    limit_storage: storage.Storage, deployments: dict[str, int]
 ) -> Callable[[Response], Response | None]:
-    moving_window = strategies.MovingWindowRateLimiter(storage)
+    moving_window = strategies.MovingWindowRateLimiter(limit_storage)
     deployment_limits = {}
 
     for deployment, tokens_per_minute in deployments.items():
@@ -88,12 +88,12 @@ def create_openai_limiter(
 
 
 def create_doc_intelligence_limiter(
-    storage: storage.Storage, requests_per_second: int
+    limit_storage: storage.Storage, requests_per_second: int
 ) -> Callable[[Response], Response | None]:
-    moving_window = strategies.MovingWindowRateLimiter(storage)
+    moving_window = strategies.MovingWindowRateLimiter(limit_storage)
     limit = RateLimitItemPerSecond(requests_per_second, 1)
 
-    def limiter(response: Response) -> Response | None:
+    def limiter(_: Response) -> Response | None:
         # TODO: add logging on rate limiting
         if not moving_window.hit(limit):
             stats = moving_window.get_window_stats(limit)
