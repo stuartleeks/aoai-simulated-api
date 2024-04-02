@@ -1,10 +1,10 @@
 import json
 import logging
-import os
 from typing import Callable
-from aoai_simulated_api.pipeline import RequestContext
 import fastapi
 import requests
+
+from aoai_simulated_api.pipeline import RequestContext
 from aoai_simulated_api.constants import (
     SIMULATOR_HEADER_OPENAI_TOKENS,
     SIMULATOR_HEADER_LIMITER,

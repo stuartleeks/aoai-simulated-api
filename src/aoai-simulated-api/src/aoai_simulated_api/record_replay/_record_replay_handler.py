@@ -1,14 +1,15 @@
 import logging
 import time
+from typing import Callable
 from fastapi import Response
 
-import aoai_simulated_api.constants as constants
+from aoai_simulated_api import constants
 from aoai_simulated_api.pipeline import RequestContext
 
-from ._hashing import get_request_hash, hash_request_parts
-from ._models import RecordedResponse
-from ._persistence import YamlRecordingPersister
-from ._request_forwarder import RequestForwarder
+from aoai_simulated_api.record_replay._hashing import get_request_hash, hash_request_parts
+from aoai_simulated_api.record_replay._models import RecordedResponse
+from aoai_simulated_api.record_replay._persistence import YamlRecordingPersister
+from aoai_simulated_api.record_replay._request_forwarder import ForwardedResponse
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +22,7 @@ class RecordReplayHandler:
         self,
         simulator_mode: str,
         persister: YamlRecordingPersister,
-        forwarder: RequestForwarder | None,
+        forwarder: Callable[[RequestContext], ForwardedResponse] | None,
         autosave: bool,
     ):
         self._simulator_mode = simulator_mode
@@ -73,7 +74,7 @@ class RecordReplayHandler:
         request = context.request
 
         start_time = time.time()
-        forwarded_response = await self._forwarder.forward_request(context)
+        forwarded_response = await self._forwarder(context)
         end_time = time.time()
         if not forwarded_response:
             raise Exception(

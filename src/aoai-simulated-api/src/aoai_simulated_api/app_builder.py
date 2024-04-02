@@ -6,7 +6,7 @@ from typing import Callable
 from fastapi import FastAPI, Request, Response
 from limits import storage
 
-import aoai_simulated_api.constants as constants
+from aoai_simulated_api import constants
 from aoai_simulated_api.config import Config, load_doc_intelligence_limit
 from aoai_simulated_api.generator import GeneratorManager
 from aoai_simulated_api.limiters import create_openai_limiter, create_doc_intelligence_limiter
@@ -14,7 +14,7 @@ from aoai_simulated_api.pipeline import RequestContext
 from aoai_simulated_api.record_replay import (
     RecordReplayHandler,
     YamlRecordingPersister,
-    RequestForwarder,
+    create_forwarder,
 )
 
 
@@ -46,7 +46,7 @@ def get_simulator(logger: logging.Logger, config: Config) -> FastAPI:
         )
         if config.simulator_mode == "record":
             logger.info("📼 Forwarder config path: %s", forwarder_config_path)
-            forwarder = RequestForwarder(forwarder_config_path)
+            forwarder = create_forwarder(forwarder_config_path)
 
         record_replay_handler = RecordReplayHandler(
             simulator_mode=config.simulator_mode,
@@ -66,9 +66,9 @@ def get_simulator(logger: logging.Logger, config: Config) -> FastAPI:
             record_replay_handler.save_recordings()
             logger.info("📼 Recordings saved")
             return Response(content="📼 Recordings saved", status_code=200)
-        else:
-            logger.warn("⚠️ Not saving recordings as not in record mode")
-            return Response(content="⚠️ Not saving recordings as not in record mode", status_code=400)
+
+        logger.warn("⚠️ Not saving recordings as not in record mode")
+        return Response(content="⚠️ Not saving recordings as not in record mode", status_code=400)
 
     memory_storage = storage.MemoryStorage()
 
