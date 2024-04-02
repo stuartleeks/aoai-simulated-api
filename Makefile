@@ -74,3 +74,6 @@ test:
 	
 test-watch:
 	ptw --clear
+
+lint:
+	pylint ./src/aoai-simulated-api/
