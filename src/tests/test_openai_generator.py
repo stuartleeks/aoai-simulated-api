@@ -8,10 +8,12 @@ import pytest
 
 from .test_uvicorn_server import UvicornTestServer
 
+API_KEY = "123456789"
 
 def _get_generator_config() -> Config:
     return Config(
         simulator_mode="generate",
+        simulator_api_key=API_KEY,
         recording=RecordingConfig(
             autosave=False,
             dir="",
@@ -32,7 +34,7 @@ async def test_openai_generator_completion():
     server = UvicornTestServer(config)
     with server.run_in_thread():
         aoai_client = AzureOpenAI(
-            api_key="123456789",
+            api_key=API_KEY,
             api_version="2023-12-01-preview",
             azure_endpoint="http://localhost:8001",
             max_retries=0,
@@ -53,7 +55,7 @@ async def test_openai_generator_chat_completion():
     server = UvicornTestServer(config)
     with server.run_in_thread():
         aoai_client = AzureOpenAI(
-            api_key="123456789",
+            api_key=API_KEY,
             api_version="2023-12-01-preview",
             azure_endpoint="http://localhost:8001",
             max_retries=0,
@@ -75,7 +77,7 @@ async def test_openai_generator_embeddings():
     server = UvicornTestServer(config)
     with server.run_in_thread():
         aoai_client = AzureOpenAI(
-            api_key="123456789",
+            api_key=API_KEY,
             api_version="2023-12-01-preview",
             azure_endpoint="http://localhost:8001",
             max_retries=0,

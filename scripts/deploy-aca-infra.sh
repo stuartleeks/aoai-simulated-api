@@ -39,6 +39,9 @@ cat << EOF > "$script_dir/../infra/azuredeploy.parameters.json"
     },
 	"simulatorMode": {
 	  "value": "${SIMULATOR_MODE}"
+	},
+	"simulatorApiKey": {
+	  "value": "${SIMULATOR_API_KEY}"
 	}
   }
 }

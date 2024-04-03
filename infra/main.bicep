@@ -1,13 +1,17 @@
 targetScope = 'resourceGroup'
 
-@description('Specifies the base name for the deployment')
+@description('The base name for the deployment')
 param baseName string
 
-@description('Specifies the supported Azure location (region) where the resources will be deployed')
+@description('The supported Azure location (region) where the resources will be deployed')
 param location string
 
-@description('Specifies the mode of the simulator')
+@description('The mode the simulator should run in')
 param simulatorMode string
+
+@description('The API key the simulator will use to authenticate requests')
+@secure()
+param simulatorApiKey string
 
 var containerRegistryName = replace('aoaisim-${baseName}', '-', '')
 var containerAppEnvName = 'aoaisim-${baseName}'
@@ -83,22 +87,15 @@ resource containerAppEnv 'Microsoft.App/managedEnvironments@2022-03-01' = {
 
 
 
-// TODO - OPEN AI key goes here
-// resource secretIndustrySolutionsAccessToken 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if (azdoPATIs != '') {
-//   parent: vault
-//   name: 'indsol-access-token'
-//   properties: {
-//     value: azdoPATIs
-//   }
-// }
+// TODO - OPEN AI key etc go here
+resource simulatorApiKeySecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' =  {
+  parent: vault
+  name: 'simulator-api-key'
+  properties: {
+    value: simulatorApiKey
+  }
+}
 
-// resource secretTeamsWebHookUrl 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if (teamsWebHookUrl != '') {
-//   parent: vault
-//   name: 'teams-webhook-url'
-//   properties: {
-//     value: teamsWebHookUrl
-//   }
-// }
 
 
 resource apiSim 'Microsoft.App/containerApps@2023-05-01' = {
@@ -121,13 +118,13 @@ resource apiSim 'Microsoft.App/containerApps@2023-05-01' = {
         external: true
         targetPort: 8000
       }
-      // secrets: [
-      //   {
-      //     name: 'app-insights-connection-string'
-      //     keyVaultUrl: '${keyVaultUri}secrets/app-insights-connection-string'
-      //     identity: managedIdentity.id
-      //   }
-      // ]
+      secrets: [
+        {
+          name: 'simulator-api-key'
+          keyVaultUrl: '${keyVaultUri}secrets/simulator-api-key'
+          identity: managedIdentity.id
+        }
+      ]
       registries: [
         {
           identity: managedIdentity.id
@@ -145,14 +142,10 @@ resource apiSim 'Microsoft.App/containerApps@2023-05-01' = {
             memory: '1Gi'
           }
           env: [
-            // {
-            //   name: 'APPLICATIONINSIGHTS_VERSION'
-            //   value: '3.4.7'
-            // }
-            // {
-            //   name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
-            //   secretRef: 'app-insights-connection-string'
-            // }
+            {
+              name: 'SIMULATOR_API_KEY'
+              secretRef: 'simulator-api-key'
+            }
             {
               name: 'SIMULATOR_MODE'
               value: simulatorMode

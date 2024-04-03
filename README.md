@@ -47,6 +47,7 @@ When running the simulated API, there are a number of environment variables to c
 | Variable                        | Description                                                                                                                                          |
 | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `SIMULATOR_MODE`                | The mode the simulator should run in. Current options are `record`, `replay`, and `generate`.                                                        |
+| `SIMULATOR_API_KEY` | The API key used by the simulator to authenticate requests. If not specified a key is auto-generated (see the logs). It is recommended to set a deterministic key value in `.env` |
 | `RECORDING_DIR`                 | The directory to store the recorded requests and responses (defaults to `.recording`).                                                               |
 | `RECORDING_FORMAT`              | Currently only `yaml` is supported. Use to specify the format of the recorded requests/responses.                                                    |
 | `RECORDING_AUTOSAVE`            | If set to `True` (default), the simulator will save the recording after each request.                                                                |

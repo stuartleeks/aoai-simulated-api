@@ -4,6 +4,8 @@ import os
 
 from dataclasses import dataclass
 
+import nanoid
+
 
 @dataclass
 class RecordingConfig:
@@ -25,6 +27,7 @@ class Config:
     # TODO: restructure, e.g. group recording settings together
     # TODO: combine OpenAI deployment configuration
     simulator_mode: str
+    simulator_api_key: str
     recording: RecordingConfig
     generator_config_path: str | None
     openai_deployments: dict[str, "OpenAIDeployment"] | None
@@ -40,8 +43,12 @@ def get_config_from_env_vars(logger: logging.Logger) -> Config:
     recording_format = os.getenv("RECORDING_FORMAT") or "yaml"
     recording_autosave = os.getenv("RECORDING_AUTOSAVE", "true").lower() == "true"
 
-    aoai_api_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
-    aoai_api_key = os.getenv("AZURE_OPENAI_KEY")
+    forwarding_aoai_api_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
+    forwarding_aoai_api_key = os.getenv("AZURE_OPENAI_KEY")
+
+    simulator_api_key = os.getenv("SIMULATOR_API_KEY")
+    if not simulator_api_key:
+        simulator_api_key = nanoid.generate(size=30)
 
     generator_config_path = os.getenv("GENERATOR_CONFIG_PATH")
     forwarder_config_path = os.getenv("FORWARDER_CONFIG_PATH")
@@ -58,13 +65,14 @@ def get_config_from_env_vars(logger: logging.Logger) -> Config:
 
     return Config(
         simulator_mode=simulator_mode,
+        simulator_api_key=simulator_api_key,
         recording=RecordingConfig(
             dir=recording_dir,
             format=recording_format,
             autosave=recording_autosave,
             forwarder_config_path=forwarder_config_path,
-            aoai_api_endpoint=aoai_api_endpoint,
-            aoai_api_key=aoai_api_key,
+            aoai_api_endpoint=forwarding_aoai_api_endpoint,
+            aoai_api_key=forwarding_aoai_api_key,
         ),
         generator_config_path=generator_config_path,
         openai_deployments=_load_openai_deployments(),

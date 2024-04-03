@@ -14,19 +14,24 @@ if [[ ! -f "$script_dir/../infra/output.json" ]]; then
   exit 1
 fi
 
-acr_name=$(cat $script_dir/../infra/output.json  | jq -r .containerRegistryLoginServer)
+acr_login_server=$(cat $script_dir/../infra/output.json  | jq -r .containerRegistryLoginServer)
+if [[ -z "$acr_login_server" ]]; then
+  echo "Container registry login server not found in output.json"
+  exit 1
+fi
+acr_name=$(cat $script_dir/../infra/output.json  | jq -r .containerRegistryName)
 if [[ -z "$acr_name" ]]; then
-  echo "Container registry not found in output.json"
+  echo "Container registry name not found in output.json"
   exit 1
 fi
 
 echo "=="
-echo "== Building and pushing aoai-simulated-api image to $acr_name"
+echo "== Building and pushing aoai-simulated-api image to $acr_login_server"
 echo "=="
 
 src_path=$(realpath "$script_dir/../src/aoai-simulated-api")
 
-docker build -t ${acr_name}/aoai-simulated-api:latest "$src_path" -f "$src_path/Dockerfile"
+docker build -t ${acr_login_server}/aoai-simulated-api:latest "$src_path" -f "$src_path/Dockerfile"
 
 az acr login --name $acr_name
-docker push ${acr_name}/aoai-simulated-api:latest
+docker push ${acr_login_server}/aoai-simulated-api:latest
