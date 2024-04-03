@@ -77,3 +77,14 @@ test-watch:
 
 lint:
 	pylint ./src/aoai-simulated-api/
+
+deploy-aca-base:
+	./scripts/deploy-aca-base.sh
+
+docker-build-and-push:
+	./scripts/docker-build-and-push.sh
+
+deploy-aca-infra:
+	./scripts/deploy-aca-infra.sh
+
+deploy-aca: deploy-aca-base docker-build-and-push deploy-aca-infra

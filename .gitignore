@@ -7,3 +7,7 @@ __pycache__
 
 
 *.egg-info
+
+
+azuredeploy.parameters.json
+infra/output.json
