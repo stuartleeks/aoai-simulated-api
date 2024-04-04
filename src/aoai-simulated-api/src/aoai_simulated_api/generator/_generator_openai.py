@@ -295,7 +295,7 @@ async def azure_openai_chat_completion(context: RequestContext, request: Request
             },
         ],
         "usage": {
-            "prompt_tokens": prompt_tokens,  # TODO - calculate and fill out token usage
+            "prompt_tokens": prompt_tokens,
             "completion_tokens": completion_tokens,
             "total_tokens": total_tokens,
         },
