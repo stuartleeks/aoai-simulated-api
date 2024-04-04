@@ -170,7 +170,7 @@ async def azure_openai_completion(context: RequestContext, request: Request) -> 
         "id": "cmpl-" + nanoid.non_secure_generate(size=29),
         "object": "text_completion",
         "created": int(time.time()),
-        "model": "gpt-35-turbo",  # TODO - parameterise
+        "model": model_name,
         "choices": [
             {
                 "text": text,
