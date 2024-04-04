@@ -20,9 +20,6 @@ if [[ -z "$api_fqdn" ]]; then
   exit 1
 fi
 
-echo "=="
-echo "== Testing API is up and running at https://$api_fqdn"
-echo "=="
-
-curl -s -w "\nGot response: %{http_code}" https://$api_fqdn/
-echo -e "\n\n"
+echo "== Running test-client against simulator at https://$api_fqdn"
+cd src/test-client
+AZURE_OPENAI_KEY=${SIMULATOR_API_KEY} AZURE_OPENAI_ENDPOINT=https://$api_fqdn AZURE_FORM_RECOGNIZER_ENDPOINT=https://$api_fqdn python app.py

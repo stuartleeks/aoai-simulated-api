@@ -24,6 +24,11 @@ if [[ ${#SIMULATOR_MODE} -eq 0 ]]; then
 fi
 
 
+if [[ ${#RECORDING_DIR} -eq 0 ]]; then
+  echo 'Defaulting to /mnt/simulator/recording for RECORDING_DIR' 1>&2
+  RECORDING_DIR="/mnt/simulator/recording"
+fi
+
 RESOURCE_GROUP_NAME="aoaisim"
 
 cat << EOF > "$script_dir/../infra/azuredeploy.parameters.json"
@@ -42,6 +47,33 @@ cat << EOF > "$script_dir/../infra/azuredeploy.parameters.json"
 	},
 	"simulatorApiKey": {
 	  "value": "${SIMULATOR_API_KEY}"
+	},
+	"recordingDir": {
+	  "value": "${RECORDING_DIR}"
+	},
+	"recordingFormat": {
+	  "value": "${RECORDING_FORMAT}"
+	},
+	"recordingAutoSave": {
+	  "value": "${RECORDING_AUTO_SAVE}"
+	},
+	"generatorConfigPath": {
+	  "value": "${GENERATOR_CONFIG_PATH}"
+	},
+	"forwardingConfigPath" : {
+	  "value": "${FORWARDING_CONFIG_PATH}"
+	},
+	"azureOpenAIEndpoint": {
+	  "value": "${AZURE_OPENAI_ENDPOINT}"
+	},
+	"azureOpenAIKey": {
+	  "value": "${AZURE_OPENAI_KEY}"
+	},
+	"openAIDeploymentConfigPath": {
+	  "value": "${OPENAI_DEPLOYMENT_CONFIG_PATH}"
+	},
+	"logLevel": {
+	  "value": "${LOG_LEVEL}"
 	}
   }
 }
@@ -59,3 +91,4 @@ output=$(az deployment group create \
   --parameters azuredeploy.parameters.json \
   --output json)
 echo "$output" | jq "[.properties.outputs | to_entries | .[] | {key:.key, value: .value.value}] | from_entries" > "$script_dir/../infra/output.json"
+echo -e "\n"

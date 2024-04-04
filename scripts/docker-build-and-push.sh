@@ -35,3 +35,5 @@ docker build -t ${acr_login_server}/aoai-simulated-api:latest "$src_path" -f "$s
 
 az acr login --name $acr_name
 docker push ${acr_login_server}/aoai-simulated-api:latest
+
+echo -e "\n"

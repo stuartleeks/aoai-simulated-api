@@ -23,6 +23,7 @@ RESOURCE_GROUP_NAME="aoaisim"
 echo "creating RG ($RESOURCE_GROUP_NAME, location $LOCATION)"
 az group create --name "$RESOURCE_GROUP_NAME" --location "$LOCATION"
 echo "done creating RG"
+echo ""
 
 cat << EOF > "$script_dir/../infra/azuredeploy.parameters.json"
 {
@@ -51,3 +52,4 @@ output=$(az deployment group create \
   --parameters azuredeploy.parameters.json \
   --output json)
 echo "$output" | jq "[.properties.outputs | to_entries | .[] | {key:.key, value: .value.value}] | from_entries" > "$script_dir/../infra/output.json"
+echo -e "\n"

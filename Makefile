@@ -31,10 +31,12 @@ run-test-client:
 	cd src/test-client && \
 	python app.py
 
-run-test-client-simulator:
+run-test-client-simulator-local:
 	cd src/test-client && \
 	AZURE_OPENAI_KEY=${SIMULATOR_API_KEY} AZURE_OPENAI_ENDPOINT=http://localhost:8000 AZURE_FORM_RECOGNIZER_ENDPOINT=http://localhost:8000 python app.py
 
+run-test-client-simulator-aca:
+	./scripts/run-test-client-aca.sh
 
 run-test-client-web:
 	cd src/test-client-web && \
@@ -68,13 +70,5 @@ test-watch:
 lint:
 	pylint ./src/aoai-simulated-api/
 
-deploy-aca-base:
-	./scripts/deploy-aca-base.sh
-
-docker-build-and-push:
-	./scripts/docker-build-and-push.sh
-
-deploy-aca-infra:
-	./scripts/deploy-aca-infra.sh
-
-deploy-aca: deploy-aca-base docker-build-and-push deploy-aca-infra
+deploy-aca: 
+	./scripts/deploy-aca.sh

@@ -13,10 +13,31 @@ param simulatorMode string
 @secure()
 param simulatorApiKey string
 
+param recordingDir string
+
+param recordingFormat string = 'yaml'
+
+param recordingAutoSave string
+
+param generatorConfigPath string
+
+param forwardingConfigPath string
+
+param azureOpenAIEndpoint string
+
+@secure()
+param azureOpenAIKey string
+
+param openAIDeploymentConfigPath string
+
+param logLevel string
+
+// extract these to a common module to have a single, shared place for these across base/infra?
 var containerRegistryName = replace('aoaisim-${baseName}', '-', '')
 var containerAppEnvName = 'aoaisim-${baseName}'
 var logAnalyticsName = 'aoaisim-${baseName}'
 var keyVaultName = replace('aoaisim-${baseName}', '-', '')
+var storageAccountName = replace('aoaisim${baseName}', '-', '')
 
 resource containerRegistry 'Microsoft.ContainerRegistry/registries@2021-12-01-preview' existing = {
   name: containerRegistryName
@@ -26,6 +47,18 @@ resource vault 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
   name: keyVaultName
 }
 var keyVaultUri = vault.properties.vaultUri
+
+resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' existing = {
+  name: storageAccountName
+}
+resource fileService 'Microsoft.Storage/storageAccounts/fileServices@2023-01-01' existing = {
+  parent: storageAccount
+  name: 'default'
+}
+resource simulatorFileShare 'Microsoft.Storage/storageAccounts/fileServices/shares@2023-01-01' existing = {
+  parent: fileService
+  name: 'simulator'
+}
 
 resource acrPullRoleDefinition 'Microsoft.Authorization/roleDefinitions@2018-01-01-preview' existing = {
   scope: subscription()
@@ -84,19 +117,33 @@ resource containerAppEnv 'Microsoft.App/managedEnvironments@2022-03-01' = {
     }
   }
 }
+resource containerAppStorage 'Microsoft.App/managedEnvironments/storages@2023-05-01' = {
+  parent: containerAppEnv
+  name: 'simulator-storage'
+  properties: {
+    azureFile: {
+      shareName: simulatorFileShare.name
+      accountName: storageAccount.name
+      accountKey: storageAccount.listKeys().keys[0].value
+      accessMode: 'ReadWrite'
+    }
+  }
+}
 
-
-
-// TODO - OPEN AI key etc go here
-resource simulatorApiKeySecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' =  {
+resource simulatorApiKeySecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
   parent: vault
   name: 'simulator-api-key'
   properties: {
     value: simulatorApiKey
   }
 }
-
-
+resource azureOpenAIKeySecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
+  parent: vault
+  name: 'azure-openai-key'
+  properties: {
+    value: azureOpenAIKey
+  }
+}
 
 resource apiSim 'Microsoft.App/containerApps@2023-05-01' = {
   name: 'aoai-simulated-api'
@@ -124,6 +171,11 @@ resource apiSim 'Microsoft.App/containerApps@2023-05-01' = {
           keyVaultUrl: '${keyVaultUri}secrets/simulator-api-key'
           identity: managedIdentity.id
         }
+        {
+          name: 'azure-openai-key'
+          keyVaultUrl: '${keyVaultUri}secrets/azure-openai-key'
+          identity: managedIdentity.id
+        }
       ]
       registries: [
         {
@@ -142,15 +194,32 @@ resource apiSim 'Microsoft.App/containerApps@2023-05-01' = {
             memory: '1Gi'
           }
           env: [
+            { name: 'SIMULATOR_API_KEY', secretRef: 'simulator-api-key' }
+            { name: 'SIMULATOR_MODE', value: simulatorMode }
+            { name: 'RECORDING_DIR', value: recordingDir }
+            { name: 'RECORDING_FORMAT', value: recordingFormat }
+            { name: 'RECORDING_AUTO_SAVE', value: recordingAutoSave }
+            { name: 'GENERATOR_CONFIG_PATH', value: generatorConfigPath }
+            { name: 'FORWARDING_CONFIG_PATH', value: forwardingConfigPath }
+            { name: 'AZURE_OPENAI_ENDPOINT', value: azureOpenAIEndpoint }
+            { name: 'AZURE_OPENAI_KEY', secretRef: 'azure-openai-key' }
+            { name: 'OPENAI_DEPLOYMENT_CONFIG_PATH', value: openAIDeploymentConfigPath }
+            { name: 'LOG_LEVEL', value: logLevel }
+          ]
+          volumeMounts: [
             {
-              name: 'SIMULATOR_API_KEY'
-              secretRef: 'simulator-api-key'
-            }
-            {
-              name: 'SIMULATOR_MODE'
-              value: simulatorMode
+              volumeName: 'simulator-storage'
+              mountPath: '/mnt/simulator'
             }
           ]
+        }
+      ]
+      volumes: [
+        {
+          name: 'simulator-storage'
+          storageName: containerAppStorage.name
+          storageType: 'AzureFile'
+          mountOptions: 'uid=1000,gid=1000,nobrl,mfsymlinks,cache=none'
         }
       ]
       scale: {
@@ -161,8 +230,11 @@ resource apiSim 'Microsoft.App/containerApps@2023-05-01' = {
   }
 }
 
-
-
+output rgName string = resourceGroup().name
 output containerRegistryLoginServer string = containerRegistry.properties.loginServer
 output containerRegistryName string = containerRegistry.name
+output storageAccountName string = storageAccount.name
+output fileShareName string = simulatorFileShare.name
+
+output acaName string = apiSim.name
 output apiSimFqdn string = apiSim.properties.configuration.ingress.fqdn

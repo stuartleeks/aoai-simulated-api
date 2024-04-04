@@ -11,6 +11,7 @@ param location string
 
 var containerRegistryName = replace('aoaisim-${baseName}', '-', '')
 var keyVaultName = replace('aoaisim-${baseName}', '-', '')
+var storageAccountName = replace('aoaisim${baseName}', '-', '')
 
 resource containerRegistry 'Microsoft.ContainerRegistry/registries@2021-12-01-preview' = {
   name: containerRegistryName
@@ -46,6 +47,27 @@ resource vault 'Microsoft.KeyVault/vaults@2023-07-01' = {
   }
 }
 
+resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
+  name: storageAccountName
+  location: location
+  sku: {
+    name: 'Standard_LRS'
+  }
+  kind: 'StorageV2'
 
+}
+resource fileService 'Microsoft.Storage/storageAccounts/fileServices@2023-01-01' = {
+  parent:storageAccount
+  name: 'default'
+
+}
+resource simulatorFileShare 'Microsoft.Storage/storageAccounts/fileServices/shares@2023-01-01' = {
+  parent: fileService
+  name: 'simulator'
+}
+
+output rgName string = resourceGroup().name
 output containerRegistryLoginServer string = containerRegistry.properties.loginServer
 output containerRegistryName string = containerRegistry.name
+output storageAccountName string = storageAccount.name
+output fileShareName string = simulatorFileShare.name
