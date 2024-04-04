@@ -23,7 +23,6 @@ class Config:
     Configuration for the simulator
     """
 
-    # TODO: move into config.py
     simulator_mode: str
     simulator_api_key: str
     recording: RecordingConfig
