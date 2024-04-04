@@ -16,6 +16,9 @@ aoai_api_deployment = os.getenv("AZURE_OPENAI_DEPLOYMENT")
 if not aoai_api_deployment:
     raise Exception("AZURE_OPENAI_DEPLOYMENT environment variable is required")
 
+simulator_api_key = os.getenv("SIMULATOR_API_KEY")
+if not simulator_api_key:
+    raise Exception("SIMULATOR_API_KEY environment variable is required")
 
 app = Flask(__name__)
 app.config["TEMPLATES_AUTO_RELOAD"] = True
@@ -44,7 +47,7 @@ def api_chat():
     else:
         print("Sending request to simulated API...", flush=True)
         aoai_client = AzureOpenAI(
-            api_key="no-key", api_version="2023-12-01-preview", azure_endpoint="http://localhost:8000", max_retries=0
+            api_key=simulator_api_key, api_version="2023-12-01-preview", azure_endpoint="http://localhost:8000", max_retries=0
         )
 
     messages = body["messages"]

@@ -7,6 +7,7 @@ This repo is an exploration into creating a simulated API implementation for Azu
   - [Overview](#overview)
   - [Getting Started](#getting-started)
   - [Running in Docker](#running-in-docker)
+  - [Deploying to Azure Container Apps](#deploying-to-azure-container-apps)
   - [Providing custom forwarders](#providing-custom-forwarders)
     - [Creating a custom forwarder](#creating-a-custom-forwarder)
     - [Running with a customer forwarder](#running-with-a-customer-forwarder)
@@ -47,6 +48,7 @@ When running the simulated API, there are a number of environment variables to c
 | Variable                        | Description                                                                                                                                          |
 | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `SIMULATOR_MODE`                | The mode the simulator should run in. Current options are `record`, `replay`, and `generate`.                                                        |
+| `SIMULATOR_API_KEY` | The API key used by the simulator to authenticate requests. If not specified a key is auto-generated (see the logs). It is recommended to set a deterministic key value in `.env` |
 | `RECORDING_DIR`                 | The directory to store the recorded requests and responses (defaults to `.recording`).                                                               |
 | `RECORDING_FORMAT`              | Currently only `yaml` is supported. Use to specify the format of the recorded requests/responses.                                                    |
 | `RECORDING_AUTOSAVE`            | If set to `True` (default), the simulator will save the recording after each request.                                                                |
@@ -92,6 +94,18 @@ Once the image is built, you can run is using `docker run -p 8000:8000 -e SIMULA
 
 Note that you can set any of the environment variable listed in the [Getting Started](#getting-started) section when running the container.
 For example, if you have the recordings on your host (in `/some/path`) , you can mount that directory into the container using the `-v` flag: `docker run -p 8000:8000 -e SIMULATOR_MODE=replay -e RECORDING_DIR=/recording -v /some/path:/recording aoai-simulated-api`.
+
+## Deploying to Azure Container Apps
+
+The simulated API can be deployed to Azure Container Apps (ACA) to provide a publicly accessible endpoint for testing with the rest of your system:
+
+Before deploying, set up a `.env` file. See the `sample.env` file for a starting point and add any configuration variables.
+Once you have your `.env` file, run `make deploy-aca`. This will deploy a container registry, build and push the simulator image to it, and deploy an Azure Container App running the simulator with the settings from `.env`.
+
+The ACA deployment also creates an Azure Storage account with a file share. This file share is mounted into the simulator container as `/mnt/simulator`.
+If no value is specified for `RECORDING_DIR`, the simulator will use `/mnt/simulator/recording` as the recording directory.
+
+The file share can also be used for setting the OpenAI deployment configuration or for any forwarder/generator config.
 
 ## Providing custom forwarders
 
