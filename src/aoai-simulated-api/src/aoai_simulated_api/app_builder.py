@@ -7,6 +7,8 @@ from typing import Annotated, Callable
 from fastapi import Depends, FastAPI, Request, Response, HTTPException, status
 from fastapi.security import APIKeyHeader
 from limits import storage
+from opentelemetry import trace
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 
 from aoai_simulated_api import constants
 from aoai_simulated_api.config import Config, load_doc_intelligence_limit
@@ -148,10 +150,11 @@ def get_simulator(logger: logging.Logger, config: Config) -> FastAPI:
 
             recorded_duration_ms = context.values.get(constants.RECORDED_DURATION_MS, 0)
             if recorded_duration_ms > 0:
+                trace.get_current_span().set_attribute("simulator.added_latency", recorded_duration_ms)
                 await asyncio.sleep(recorded_duration_ms / 1000)
 
             # Strip out any simulator headers from the response
-            # TODO - move these header values to RequestContext to share
+            # TODO - move these header values to RequestContext to share (note telemetry also uses them!)
             #        (then they don't need removing here!)
             for key, _ in request.headers.items():
                 if key.startswith(constants.SIMULATOR_HEADER_PREFIX):
@@ -162,5 +165,38 @@ def get_simulator(logger: logging.Logger, config: Config) -> FastAPI:
         except Exception as e:
             logger.error("Error: %s\n%s", e, traceback.format_exc())
             return Response(status_code=500)
+
+    # https://opentelemetry-python-contrib.readthedocs.io/en/latest/instrumentation/fastapi/fastapi.html#request-response-hooks
+    def server_request_hook(span: trace.Span, scope: dict):
+        if span and span.is_recording():
+            path = scope.get("path")
+            if path:
+                # update name as catch-all shows "<method> /{full_path:path}"
+                span.update_name(f"{scope['method']} {path}")
+                span.set_attribute("simulator.path", path)
+
+    def client_request_hook(span: trace.Span, scope: dict):
+        # print("clireq", scope)
+        if span and span.is_recording():
+            path = scope.get("path")
+            if path:
+                span.set_attribute("simulator.path", path)
+
+    def client_response_hook(span: trace.Span, message: dict):
+        print("clires-span", span)
+        print("clires-message", message)
+        if span and span.is_recording():
+            headers = message.get("headers") or []  # only set for type=http.response.start
+            for key, value in headers:
+                if key == b"x-simulator-openai-tokens":
+                    span.set_attribute("simulator.openai.tokens", value)
+
+    FastAPIInstrumentor.instrument_app(
+        app,
+        server_request_hook=server_request_hook,
+        client_request_hook=client_request_hook,
+        client_response_hook=client_response_hook,
+    )
+    # FastAPIInstrumentor.instrument_app(app)
 
     return app
