@@ -72,3 +72,6 @@ lint:
 
 deploy-aca: 
 	./scripts/deploy-aca.sh
+
+locust:
+	LOCUST_WEB_PORT=8090 locust -f ./src/loadtest/test-completions.py -H http://localhost:8000/ --users 1 --spawn-rate 1 --autostart

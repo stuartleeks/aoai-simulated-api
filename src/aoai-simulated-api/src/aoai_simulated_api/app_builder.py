@@ -2,12 +2,13 @@ import asyncio
 import logging
 import os
 import secrets
+import time
 import traceback
 from typing import Annotated, Callable
 from fastapi import Depends, FastAPI, Request, Response, HTTPException, status
 from fastapi.security import APIKeyHeader
 from limits import storage
-from opentelemetry import trace
+from opentelemetry import trace, metrics
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 
 from aoai_simulated_api import constants
@@ -27,6 +28,18 @@ def get_simulator(logger: logging.Logger, config: Config) -> FastAPI:
     Create the FastAPI app for the simulator based on provided configuration
     """
     app = FastAPI()
+
+    meter = metrics.get_meter(__name__)
+    histogram_latency_base = meter.create_histogram(
+        name="aoai-simulator.latency.base",
+        description="Latency of handling the request (before adding simulated latency)",
+        unit="milliseconds",
+    )
+    histogram_latency_full = meter.create_histogram(
+        name="aoai-simulator.latency.full",
+        description="Full latency of handling the request (including simulated latency)",
+        unit="milliseconds",
+    )
 
     # api-key header for OpenAI
     # ocp-apim-subscription-key header for doc intelligence
@@ -119,6 +132,10 @@ def get_simulator(logger: logging.Logger, config: Config) -> FastAPI:
     @app.api_route("/{full_path:path}", methods=["GET", "POST", "PUT", "DELETE"])
     async def catchall(request: Request, _: Annotated[bool, Depends(validate_api_key)]):
         logger.debug("⚡ handling route: %s", request.url.path)
+        # TODO check for traceparent in inbound request and propagate
+        #      to allow for correlating load test with back-end data
+
+        start_time = time.perf_counter()  # N.B. this doesn't accound for the validate_api_key time
 
         try:
             response = None
@@ -148,17 +165,30 @@ def get_simulator(logger: logging.Logger, config: Config) -> FastAPI:
             else:
                 logger.debug("No limiter found for response: %s", request.url.path)
 
-            recorded_duration_ms = context.values.get(constants.RECORDED_DURATION_MS, 0)
-            if recorded_duration_ms > 0:
-                trace.get_current_span().set_attribute("simulator.added_latency", recorded_duration_ms)
-                await asyncio.sleep(recorded_duration_ms / 1000)
-
             # Strip out any simulator headers from the response
             # TODO - move these header values to RequestContext to share (note telemetry also uses them!)
             #        (then they don't need removing here!)
             for key, _ in request.headers.items():
                 if key.startswith(constants.SIMULATOR_HEADER_PREFIX):
                     del response.headers[key]
+
+            base_end_time = time.perf_counter()
+
+            recorded_duration_ms = context.values.get(constants.RECORDED_DURATION_MS, 0)
+            if recorded_duration_ms > 0:
+                current_span = trace.get_current_span()
+                current_span.set_attribute("simulator.added_latency", recorded_duration_ms)
+                await asyncio.sleep(recorded_duration_ms / 1000)
+
+            full_end_time = time.perf_counter()
+            histogram_latency_base.record(
+                (base_end_time - start_time) * 1000,
+                attributes={"path": request.url.path},  # TODO - what attributes are useful?
+            )
+            histogram_latency_full.record(
+                (full_end_time - start_time) * 1000,
+                attributes={"path": request.url.path},  # TODO - what attributes are useful?
+            )
 
             return response
         # pylint: disable-next=broad-exception-caught
@@ -176,15 +206,12 @@ def get_simulator(logger: logging.Logger, config: Config) -> FastAPI:
                 span.set_attribute("simulator.path", path)
 
     def client_request_hook(span: trace.Span, scope: dict):
-        # print("clireq", scope)
         if span and span.is_recording():
             path = scope.get("path")
             if path:
                 span.set_attribute("simulator.path", path)
 
     def client_response_hook(span: trace.Span, message: dict):
-        print("clires-span", span)
-        print("clires-message", message)
         if span and span.is_recording():
             headers = message.get("headers") or []  # only set for type=http.response.start
             for key, value in headers:
