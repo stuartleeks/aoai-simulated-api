@@ -36,6 +36,7 @@ param logLevel string
 var containerRegistryName = replace('aoaisim-${baseName}', '-', '')
 var containerAppEnvName = 'aoaisim-${baseName}'
 var logAnalyticsName = 'aoaisim-${baseName}'
+var appInsightsName = 'aoaisim-${baseName}'
 var keyVaultName = replace('aoaisim-${baseName}', '-', '')
 var storageAccountName = replace('aoaisim${baseName}', '-', '')
 
@@ -83,6 +84,16 @@ resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2021-12-01-previ
     }
   }
 }
+resource appInsights 'Microsoft.Insights/components@2020-02-02' = {
+  name: appInsightsName
+  location: location
+  kind: 'web'
+  properties: {
+    Application_Type: 'web'
+    WorkspaceResourceId: logAnalytics.id
+  }
+}
+
 
 resource managedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
   name: '${containerAppEnvName}-identity'
@@ -144,6 +155,13 @@ resource azureOpenAIKeySecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
     value: azureOpenAIKey
   }
 }
+resource appInsightsConnectionStringSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
+  parent: vault
+  name: 'app-insights-connection-string'
+  properties: {
+    value: appInsights.properties.ConnectionString
+  }
+}
 
 resource apiSim 'Microsoft.App/containerApps@2023-05-01' = {
   name: 'aoai-simulated-api'
@@ -176,6 +194,11 @@ resource apiSim 'Microsoft.App/containerApps@2023-05-01' = {
           keyVaultUrl: '${keyVaultUri}secrets/azure-openai-key'
           identity: managedIdentity.id
         }
+        {
+          name: 'app-insights-connection-string'
+          keyVaultUrl: '${keyVaultUri}secrets/app-insights-connection-string'
+          identity: managedIdentity.id
+        }
       ]
       registries: [
         {
@@ -205,6 +228,7 @@ resource apiSim 'Microsoft.App/containerApps@2023-05-01' = {
             { name: 'AZURE_OPENAI_KEY', secretRef: 'azure-openai-key' }
             { name: 'OPENAI_DEPLOYMENT_CONFIG_PATH', value: openAIDeploymentConfigPath }
             { name: 'LOG_LEVEL', value: logLevel }
+            { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', secretRef: 'app-insights-connection-string' }
           ]
           volumeMounts: [
             {
