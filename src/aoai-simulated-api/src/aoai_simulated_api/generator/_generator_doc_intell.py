@@ -89,9 +89,9 @@ async def doc_intelligence_analyze_result(context, request: Request) -> Response
             headers={"Content-Type": "application/json"},
         )
 
-    del document_analysis_config[
-        result_id
-    ]  # TODO - should we delete or leave to allow multiple queries of the result? If we leave, when do we clean up (and should we also store the generated result)?
+    # TODO - should we delete or leave to allow multiple queries of the result?
+    # If we leave, when do we clean up (and should we also store the generated result)?
+    del document_analysis_config[result_id]
 
     # Pass the dictionary of operation values to the get_response function to build the response body.
     response_content = json.dumps(build_result(doc_config), default=datetime_handler)
@@ -208,7 +208,8 @@ def get_response_lines(line_count: int = 1):
             Each dictionary has the following keys:
             - content: The generated word.
             - polygon: A list of random numbers.
-            - spans: A list of dictionaries with keys 'offset' and 'length' representing the position and length of the word.
+            - spans: A list of dictionaries with keys 'offset' and 'length' representing
+                     the position and length of the word.
 
     """
     line_list = []

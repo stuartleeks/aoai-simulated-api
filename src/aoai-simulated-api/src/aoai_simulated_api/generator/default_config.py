@@ -1,5 +1,5 @@
-from fastapi import Request, Response
 from typing import Callable
+from fastapi import Request, Response
 
 
 # This file contains a default implementation of the get_generators function

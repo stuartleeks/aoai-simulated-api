@@ -1,12 +1,14 @@
 import asyncio
 import logging
 import os
+import secrets
 import traceback
-from typing import Callable
-from fastapi import FastAPI, Request, Response
+from typing import Annotated, Callable
+from fastapi import Depends, FastAPI, Request, Response, HTTPException, status
+from fastapi.security import APIKeyHeader
 from limits import storage
 
-import aoai_simulated_api.constants as constants
+from aoai_simulated_api import constants
 from aoai_simulated_api.config import Config, load_doc_intelligence_limit
 from aoai_simulated_api.generator import GeneratorManager
 from aoai_simulated_api.limiters import create_openai_limiter, create_doc_intelligence_limiter
@@ -14,7 +16,7 @@ from aoai_simulated_api.pipeline import RequestContext
 from aoai_simulated_api.record_replay import (
     RecordReplayHandler,
     YamlRecordingPersister,
-    RequestForwarder,
+    create_forwarder,
 )
 
 
@@ -24,10 +26,23 @@ def get_simulator(logger: logging.Logger, config: Config) -> FastAPI:
     """
     app = FastAPI()
 
+    header_scheme = APIKeyHeader(name="api-key")
+
+    def validate_api_key(api_key: Annotated[str, Depends(header_scheme)]):
+        if secrets.compare_digest(api_key, config.simulator_api_key):
+            return True
+
+        logger.warning("🔒 Incorrect api-key provided")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect api-key",
+        )
+
     logger.info("🚀 Starting aoai-simulated-api in %s mode", config.simulator_mode)
+    logger.info("🗝️ Simulator api-key        : %s", config.simulator_api_key)
     module_path = os.path.dirname(os.path.realpath(__file__))
     if config.simulator_mode == "generate":
-        logger.info("📝 Generator config path: %s", config.generator_config_path)
+        logger.info("📝 Generator config path    : %s", config.generator_config_path)
         generator_config_path = config.generator_config_path or os.path.join(module_path, "generator/default_config.py")
 
         generator_manager = GeneratorManager(generator_config_path=generator_config_path)
@@ -46,7 +61,7 @@ def get_simulator(logger: logging.Logger, config: Config) -> FastAPI:
         )
         if config.simulator_mode == "record":
             logger.info("📼 Forwarder config path: %s", forwarder_config_path)
-            forwarder = RequestForwarder(forwarder_config_path)
+            forwarder = create_forwarder(forwarder_config_path)
 
         record_replay_handler = RecordReplayHandler(
             simulator_mode=config.simulator_mode,
@@ -60,15 +75,15 @@ def get_simulator(logger: logging.Logger, config: Config) -> FastAPI:
         return {"message": "👋 aoai-simulated-api is running"}
 
     @app.post("/++/save-recordings")
-    def save_recordings():
+    def save_recordings(_: Annotated[bool, Depends(validate_api_key)]):
         if config.simulator_mode == "record":
             logger.info("📼 Saving recordings...")
             record_replay_handler.save_recordings()
             logger.info("📼 Recordings saved")
             return Response(content="📼 Recordings saved", status_code=200)
-        else:
-            logger.warn("⚠️ Not saving recordings as not in record mode")
-            return Response(content="⚠️ Not saving recordings as not in record mode", status_code=400)
+
+        logger.warn("⚠️ Not saving recordings as not in record mode")
+        return Response(content="⚠️ Not saving recordings as not in record mode", status_code=400)
 
     memory_storage = storage.MemoryStorage()
 
@@ -92,7 +107,7 @@ def get_simulator(logger: logging.Logger, config: Config) -> FastAPI:
     }
 
     @app.api_route("/{full_path:path}", methods=["GET", "POST", "PUT", "DELETE"])
-    async def catchall(request: Request):
+    async def catchall(request: Request, _: Annotated[bool, Depends(validate_api_key)]):
         logger.debug("⚡ handling route: %s", request.url.path)
 
         try:

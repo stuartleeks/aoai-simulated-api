@@ -2,8 +2,9 @@ import importlib.util
 import inspect
 import os
 import sys
+from typing import Callable
 from aoai_simulated_api.pipeline import RequestContext
-from fastapi import Request, Response
+from fastapi import Response
 from requests import Response as requests_Response
 
 
@@ -32,12 +33,12 @@ def _load_forwarders(forwarder_config_path: str):
     return module.get_forwarders()
 
 
-class RequestForwarder:
-    def __init__(self, forwarder_config_path: str):
-        self._forwarders = _load_forwarders(forwarder_config_path)
+def create_forwarder(forwarder_config_path: str) -> Callable[[RequestContext], ForwardedResponse]:
 
-    async def forward_request(self, context: RequestContext) -> ForwardedResponse:
-        for forwarder in self._forwarders:
+    forwarders = _load_forwarders(forwarder_config_path)
+
+    async def forward_request(context: RequestContext) -> ForwardedResponse:
+        for forwarder in forwarders:
             response = forwarder(context)
             if response is not None and inspect.isawaitable(response):
                 response = await response
@@ -70,3 +71,5 @@ class RequestForwarder:
                 return ForwardedResponse(response=response, persist_response=persist_response)
 
         return None
+
+    return forward_request

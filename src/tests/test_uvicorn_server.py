@@ -53,6 +53,7 @@ async def test_root_message():
 
     config = Config(
         simulator_mode="generate",
+        simulator_api_key="123456789",
         recording=RecordingConfig(
             autosave=False,
             dir="",

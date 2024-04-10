@@ -32,10 +32,13 @@ class TempDirectory:
         return self._temp_dir
 
 
+API_KEY = "123456879"
+
 def _get_record_config(httpserver: HTTPServer, recording_path: str) -> Config:
     forwarding_server_url = httpserver.url_for("/").removesuffix("/")
     return Config(
         simulator_mode="record",
+        simulator_api_key=API_KEY,
         recording=RecordingConfig(
             autosave=True,
             dir=recording_path,
@@ -52,6 +55,7 @@ def _get_record_config(httpserver: HTTPServer, recording_path: str) -> Config:
 def _get_replay_config(recording_path: str) -> Config:
     return Config(
         simulator_mode="replay",
+        simulator_api_key=API_KEY,
         recording=RecordingConfig(
             autosave=True,
             dir=recording_path,
@@ -84,7 +88,7 @@ async def test_openai_record_replay_completion(httpserver: HTTPServer):
         server = UvicornTestServer(config)
         with server.run_in_thread():
             aoai_client = AzureOpenAI(
-                api_key="123456789",
+                api_key=API_KEY,
                 api_version="2023-12-01-preview",
                 azure_endpoint="http://localhost:8001",
                 max_retries=0,

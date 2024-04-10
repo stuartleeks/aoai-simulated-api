@@ -4,7 +4,6 @@ import logging
 import time
 import random
 
-from aoai_simulated_api.pipeline import RequestContext
 import lorem
 import nanoid
 import tiktoken
@@ -12,6 +11,7 @@ import tiktoken
 from fastapi import Request, Response
 from fastapi.responses import StreamingResponse
 
+from aoai_simulated_api.pipeline import RequestContext
 from aoai_simulated_api.constants import (
     SIMULATOR_HEADER_OPENAI_TOKENS,
     SIMULATOR_HEADER_LIMITER,
@@ -86,7 +86,9 @@ def num_tokens_from_messages(messages, model):
         return num_tokens_from_messages(messages, model="gpt-4-0613")
     else:
         raise NotImplementedError(
-            f"""num_tokens_from_messages() is not implemented for model {model}. See https://github.com/openai/openai-python/blob/main/chatml.md for information on how messages are converted to tokens."""
+            f"num_tokens_from_messages() is not implemented for model {model}. "
+            + "See https://github.com/openai/openai-python/blob/main/chatml.md for information "
+            + " on how messages are converted to tokens."
         )
     num_tokens = 0
     for message in messages:
@@ -114,15 +116,15 @@ async def azure_openai_embedding(context: RequestContext, request: Request) -> R
     deployment_name = path_params["deployment"]
     request_body = await request.json()
     model_name = get_model_name_from_deployment_name(context, deployment_name)
-    input = request_body["input"]
+    request_input = request_body["input"]
     embeddings = []
-    if type(input) == str:
-        tokens = num_tokens_from_string(input, model_name)
+    if isinstance(request_input, str):
+        tokens = num_tokens_from_string(request_input, model_name)
         embeddings.append(_generate_embedding(0))
     else:
         tokens = 0
         index = 0
-        for i in input:
+        for i in request_input:
             tokens += num_tokens_from_string(i, model_name)
             embeddings.append(_generate_embedding(index))
             index += 1
@@ -168,7 +170,7 @@ async def azure_openai_completion(context: RequestContext, request: Request) -> 
         "id": "cmpl-" + nanoid.non_secure_generate(size=29),
         "object": "text_completion",
         "created": int(time.time()),
-        "model": "gpt-35-turbo",  # TODO - parameterise
+        "model": model_name,
         "choices": [
             {
                 "text": text,
@@ -293,7 +295,7 @@ async def azure_openai_chat_completion(context: RequestContext, request: Request
             },
         ],
         "usage": {
-            "prompt_tokens": prompt_tokens,  # TODO - calculate and fill out token usage
+            "prompt_tokens": prompt_tokens,
             "completion_tokens": completion_tokens,
             "total_tokens": total_tokens,
         },
