@@ -1,14 +1,18 @@
 from dataclasses import dataclass
 import json
+import logging
 import math
 import time
 from typing import Callable
 
+from aoai_simulated_api.pipeline import RequestContext
 from fastapi import Response
 from limits import storage, strategies, RateLimitItemPerSecond
 
 
 import aoai_simulated_api.constants as constants
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -21,7 +25,7 @@ class OpenAILimits:
 
 def create_openai_limiter(
     limit_storage: storage.Storage, deployments: dict[str, int]
-) -> Callable[[Response], Response | None]:
+) -> Callable[[RequestContext, Response], Response | None]:
     moving_window = strategies.MovingWindowRateLimiter(limit_storage)
     deployment_limits = {}
 
@@ -39,19 +43,20 @@ def create_openai_limiter(
             limit_requests_per_10s=limit_requests_per_10s,
         )
 
-    def limiter(response: Response) -> Response | None:
-        # TODO - handle header not present
-        token_cost = int(response.headers[constants.SIMULATOR_HEADER_OPENAI_TOKENS])
-        deployment_name = response.headers[constants.SIMULATOR_HEADER_LIMITER_KEY]
+    def limiter(context: RequestContext, _: Response) -> Response | None:
+        token_cost = context.values.get(constants.SIMULATOR_KEY_OPENAI_TOKENS)
+        deployment_name = context.values.get(constants.SIMULATOR_KEY_DEPLOYMENT_NAME)
+
+        if not token_cost or not deployment_name:
+            logger.warning("openai_limiter: No token cost or deployment name found in context")
 
         limits = deployment_limits.get(deployment_name)
         if not limits:
-            # TODO: log
+            # TODO: log (only log once per deployment, not every call)
             return None
 
         # TODO: revisit limiting logic: also track per minute limits? Allow burst?
 
-        # TODO: add logging on rate limiting
         if not moving_window.hit(limits.limit_requests_per_10s):
             stats = moving_window.get_window_stats(limit_requests_per_10s)
             current_time = int(time.time())
@@ -59,7 +64,8 @@ def create_openai_limiter(
             content = {
                 "error": {
                     "code": "429",
-                    "message": f"Requests to the OpenAI API Simulator have exceeded call rate limit. Please retry after {retry_after} seconds.",
+                    "message": "Requests to the OpenAI API Simulator have exceeded call rate limit. "
+                    + f"Please retry after {retry_after} seconds.",
                 }
             }
             return Response(
@@ -74,7 +80,8 @@ def create_openai_limiter(
             content = {
                 "error": {
                     "code": "429",
-                    "message": f"Requests to the OpenAI API Simulator have exceeded call rate limit. Please retry after {retry_after} seconds.",
+                    "message": "Requests to the OpenAI API Simulator have exceeded call rate limit. "
+                    + f"Please retry after {retry_after} seconds.",
                 }
             }
             return Response(
@@ -89,12 +96,11 @@ def create_openai_limiter(
 
 def create_doc_intelligence_limiter(
     limit_storage: storage.Storage, requests_per_second: int
-) -> Callable[[Response], Response | None]:
+) -> Callable[[RequestContext, Response], Response | None]:
     moving_window = strategies.MovingWindowRateLimiter(limit_storage)
     limit = RateLimitItemPerSecond(requests_per_second, 1)
 
-    def limiter(_: Response) -> Response | None:
-        # TODO: add logging on rate limiting
+    def limiter(_: RequestContext, __: Response) -> Response | None:
         if not moving_window.hit(limit):
             stats = moving_window.get_window_stats(limit)
             current_time = int(time.time())
@@ -102,7 +108,8 @@ def create_doc_intelligence_limiter(
             content = {
                 "error": {
                     "code": "429",
-                    "message": f"Requests to the Doc Intelligence API Simulator have exceeded call rate limit. Please retry after {retry_after} seconds.",
+                    "message": "Requests to the Doc Intelligence API Simulator have exceeded call rate limit. "
+                    + f"Please retry after {retry_after} seconds.",
                 }
             }
             return Response(

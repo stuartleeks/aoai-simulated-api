@@ -3,14 +3,16 @@ import random
 import json
 import uuid
 import lorem
-from fastapi import Request, Response
+from fastapi import Response
 
-from aoai_simulated_api.constants import SIMULATOR_HEADER_LIMITER
+from aoai_simulated_api.constants import SIMULATOR_KEY_LIMITER
+from aoai_simulated_api.pipeline import RequestContext
 
 document_analysis_config = {}
 
 
-async def doc_intelligence_analyze(context, request: Request) -> Response | None:
+async def doc_intelligence_analyze(context: RequestContext) -> Response | None:
+    request = context.request
     is_match, path_params = context.is_route_match(
         request=request, path="/formrecognizer/documentModels/{modelId}:analyze", methods=["POST"]
     )
@@ -36,9 +38,9 @@ async def doc_intelligence_analyze(context, request: Request) -> Response | None
     document_analysis_result_location = f"http://localhost:8000/formrecognizer/documentModels/{model_id}/analyzeResults/{result_id}?api-version={api_version}"
 
     # Set the HTTP response headers.
+    context.values[SIMULATOR_KEY_LIMITER] = "docintelligence"
     headers = {
         "Operation-Location": document_analysis_result_location,
-        SIMULATOR_HEADER_LIMITER: "docintelligence",
     }
 
     # Build a dictionary of values related to the original document analysis request.
@@ -57,7 +59,8 @@ async def doc_intelligence_analyze(context, request: Request) -> Response | None
     return Response(status_code=202, headers=headers)
 
 
-async def doc_intelligence_analyze_result(context, request: Request) -> Response | None:
+async def doc_intelligence_analyze_result(context: RequestContext) -> Response | None:
+    request = context.request
     is_match, path_params = context.is_route_match(
         request=request,
         path="/formrecognizer/documentModels/{model_id}/analyzeResults/{result_id}",

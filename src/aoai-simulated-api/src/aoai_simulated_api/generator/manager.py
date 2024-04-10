@@ -32,11 +32,10 @@ class GeneratorManager:
         self._generators = _load_generators(generator_config_path, setup_context)
 
     async def generate(self, context: RequestContext):
-        request = context.request
         for generator in self._generators:
-            response = generator(context=context, request=request)
+            response = generator(context=context)
             if response is not None and inspect.isawaitable(response):
                 response = await response
             if response is not None:
                 return response
-        raise Exception("No generator found for request")
+        raise ValueError("No generator found for request")

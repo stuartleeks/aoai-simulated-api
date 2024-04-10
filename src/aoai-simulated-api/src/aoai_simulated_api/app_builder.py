@@ -40,6 +40,11 @@ def get_simulator(logger: logging.Logger, config: Config) -> FastAPI:
         description="Full latency of handling the request (including simulated latency)",
         unit="milliseconds",
     )
+    historgram_tokens_used = meter.create_histogram(
+        name="aoai-simulator.tokens_used",
+        description="Number of tokens used per request",
+        unit="tokens",
+    )
 
     # api-key header for OpenAI
     # ocp-apim-subscription-key header for doc intelligence
@@ -124,7 +129,7 @@ def get_simulator(logger: logging.Logger, config: Config) -> FastAPI:
     # Each limiter is a function that takes a response and returns a boolean indicating
     # whether the request should be allowed
     # Limiter returns Response object if request should be blocked or None otherwise
-    limiters: dict[str, Callable[[Response], Response | None]] = {
+    limiters: dict[str, Callable[[RequestContext, Response], Response | None]] = {
         "openai": create_openai_limiter(memory_storage, openai_deployment_limits),
         "docintelligence": create_doc_intelligence_limiter(memory_storage, requests_per_second=doc_intelligence_rps),
     }
@@ -151,26 +156,15 @@ def get_simulator(logger: logging.Logger, config: Config) -> FastAPI:
                 logger.error("No response generated for request: %s", request.url.path)
                 return Response(status_code=500)
 
-            # Want limits here so that that they apply to record/replay as well as generate
-            # TODO work out mapping request to limiter(s)
-            #  - AOAI specifies rate limits by deployment and uses RPM + TPM
-            #  - Doc Intelligence uses flat RPM limit
-
-            limiter_name = response.headers.get(constants.SIMULATOR_HEADER_LIMITER)
+            # Apply limits here so that that they apply to record/replay as well as generate
+            limiter_name = context.values.get(constants.SIMULATOR_KEY_LIMITER)
             limiter = limiters.get(limiter_name) if limiter_name else None
             if limiter:
-                limit_response = limiter(response)
+                limit_response = limiter(context, response)
                 if limit_response:
                     return limit_response
             else:
                 logger.debug("No limiter found for response: %s", request.url.path)
-
-            # Strip out any simulator headers from the response
-            # TODO - move these header values to RequestContext to share (note telemetry also uses them!)
-            #        (then they don't need removing here!)
-            for key, _ in request.headers.items():
-                if key.startswith(constants.SIMULATOR_HEADER_PREFIX):
-                    del response.headers[key]
 
             base_end_time = time.perf_counter()
 
@@ -180,15 +174,28 @@ def get_simulator(logger: logging.Logger, config: Config) -> FastAPI:
                 current_span.set_attribute("simulator.added_latency", recorded_duration_ms)
                 await asyncio.sleep(recorded_duration_ms / 1000)
 
+            status_code = response.status_code
+            deployment_name = context.values.get(constants.SIMULATOR_KEY_DEPLOYMENT_NAME)
+            tokens_used = context.values.get(constants.SIMULATOR_KEY_OPENAI_TOKENS)
+
             full_end_time = time.perf_counter()
             histogram_latency_base.record(
                 (base_end_time - start_time) * 1000,
-                attributes={"path": request.url.path},  # TODO - what attributes are useful?
+                attributes={
+                    "status_code": status_code,
+                    "deployment": deployment_name,
+                },
             )
             histogram_latency_full.record(
                 (full_end_time - start_time) * 1000,
-                attributes={"path": request.url.path},  # TODO - what attributes are useful?
+                attributes={
+                    "status_code": status_code,
+                    "deployment": deployment_name,
+                },
             )
+            if status_code < 300:
+                # only track tokens for successful requests
+                historgram_tokens_used.record(tokens_used, attributes={"deployment": deployment_name})
 
             return response
         # pylint: disable-next=broad-exception-caught
@@ -211,18 +218,20 @@ def get_simulator(logger: logging.Logger, config: Config) -> FastAPI:
             if path:
                 span.set_attribute("simulator.path", path)
 
-    def client_response_hook(span: trace.Span, message: dict):
-        if span and span.is_recording():
-            headers = message.get("headers") or []  # only set for type=http.response.start
-            for key, value in headers:
-                if key == b"x-simulator-openai-tokens":
-                    span.set_attribute("simulator.openai.tokens", value)
+    # The following no longer works as tokens used etc are passed via context not headers now
+    # Do we care about the tokens on spans? (We have metrics being recorded for aggregation)
+    # def client_response_hook(span: trace.Span, message: dict):
+    #     if span and span.is_recording():
+    #         headers = message.get("headers") or []  # only set for type=http.response.start
+    #         for key, value in headers:
+    #             if key == b"x-simulator-openai-tokens":
+    #                 span.set_attribute("simulator.openai.tokens", value)
 
     FastAPIInstrumentor.instrument_app(
         app,
         server_request_hook=server_request_hook,
         client_request_hook=client_request_hook,
-        client_response_hook=client_response_hook,
+        # client_response_hook=client_response_hook,
     )
     # FastAPIInstrumentor.instrument_app(app)
 

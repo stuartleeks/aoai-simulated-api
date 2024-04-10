@@ -13,9 +13,9 @@ from fastapi.responses import StreamingResponse
 
 from aoai_simulated_api.pipeline import RequestContext
 from aoai_simulated_api.constants import (
-    SIMULATOR_HEADER_OPENAI_TOKENS,
-    SIMULATOR_HEADER_LIMITER,
-    SIMULATOR_HEADER_LIMITER_KEY,
+    SIMULATOR_KEY_DEPLOYMENT_NAME,
+    SIMULATOR_KEY_OPENAI_TOKENS,
+    SIMULATOR_KEY_LIMITER,
 )
 
 # This file contains a default implementation of the get_generators function
@@ -106,7 +106,8 @@ def _generate_embedding(index: int):
     return {"object": "embedding", "index": index, "embedding": [(random.random() - 0.5) * 4 for _ in range(1536)]}
 
 
-async def azure_openai_embedding(context: RequestContext, request: Request) -> Response | None:
+async def azure_openai_embedding(context: RequestContext) -> Response | None:
+    request = context.request
     is_match, path_params = context.is_route_match(
         request=request, path="/openai/deployments/{deployment}/embeddings", methods=["POST"]
     )
@@ -135,19 +136,23 @@ async def azure_openai_embedding(context: RequestContext, request: Request) -> R
         "model": "ada",
         "usage": {"prompt_tokens": tokens, "total_tokens": tokens},
     }
+
+    # store values in the context for use by the rate-limiter etc
+    context.values[SIMULATOR_KEY_LIMITER] = "openai"
+    context.values[SIMULATOR_KEY_DEPLOYMENT_NAME] = deployment_name
+    context.values[SIMULATOR_KEY_OPENAI_TOKENS] = tokens
+
     return Response(
         status_code=200,
         content=json.dumps(response_data),
         headers={
             "Content-Type": "application/json",
-            SIMULATOR_HEADER_OPENAI_TOKENS: str(tokens),
-            SIMULATOR_HEADER_LIMITER: "openai",
-            SIMULATOR_HEADER_LIMITER_KEY: deployment_name,
         },
     )
 
 
-async def azure_openai_completion(context: RequestContext, request: Request) -> Response | None:
+async def azure_openai_completion(context: RequestContext) -> Response | None:
+    request = context.request
     is_match, path_params = context.is_route_match(
         request=request, path="/openai/deployments/{deployment}/completions", methods=["POST"]
     )
@@ -186,19 +191,22 @@ async def azure_openai_completion(context: RequestContext, request: Request) -> 
         },
     }
 
+    # store values in the context for use by the rate-limiter etc
+    context.values[SIMULATOR_KEY_LIMITER] = "openai"
+    context.values[SIMULATOR_KEY_DEPLOYMENT_NAME] = deployment_name
+    context.values[SIMULATOR_KEY_OPENAI_TOKENS] = total_tokens
+
     return Response(
         content=json.dumps(response_body),
         headers={
             "Content-Type": "application/json",
-            SIMULATOR_HEADER_OPENAI_TOKENS: str(total_tokens),
-            SIMULATOR_HEADER_LIMITER: "openai",
-            SIMULATOR_HEADER_LIMITER_KEY: deployment_name,
         },
         status_code=200,
     )
 
 
-async def azure_openai_chat_completion(context: RequestContext, request: Request) -> Response | None:
+async def azure_openai_chat_completion(context: RequestContext) -> Response | None:
+    request = context.request
     is_match, path_params = context.is_route_match(
         request=request, path="/openai/deployments/{deployment}/chat/completions", methods=["POST"]
     )
@@ -301,13 +309,15 @@ async def azure_openai_chat_completion(context: RequestContext, request: Request
         },
     }
 
+    # store values in the context for use by the rate-limiter etc
+    context.values[SIMULATOR_KEY_LIMITER] = "openai"
+    context.values[SIMULATOR_KEY_DEPLOYMENT_NAME] = deployment_name
+    context.values[SIMULATOR_KEY_OPENAI_TOKENS] = total_tokens
+
     return Response(
         content=json.dumps(response_body),
         headers={
             "Content-Type": "application/json",
-            SIMULATOR_HEADER_OPENAI_TOKENS: str(total_tokens),
-            SIMULATOR_HEADER_LIMITER: "openai",
-            SIMULATOR_HEADER_LIMITER_KEY: deployment_name,
         },
         status_code=200,
     )

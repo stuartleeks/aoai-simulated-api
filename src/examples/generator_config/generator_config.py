@@ -12,5 +12,5 @@ from generator_config.temp import generate_echo_response
 #     return Response(content=f"Echo: {request_body.decode("utf-8")}", status_code=200)
 
 
-def get_generators(context) -> list:
+def get_generators(setup_context) -> list:
     return [generate_echo_response]
