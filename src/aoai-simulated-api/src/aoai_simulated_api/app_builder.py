@@ -146,10 +146,10 @@ def get_simulator(logger: logging.Logger, config: Config) -> FastAPI:
             response = None
             context = RequestContext(config=config, request=request)
 
+            # Get response
             if config.simulator_mode == "generate":
                 response = await generator_manager.generate(context)
-
-            if config.simulator_mode in ["record", "replay"]:
+            elif config.simulator_mode in ["record", "replay"]:
                 response = await record_replay_handler.handle_request(context)
 
             if not response:
@@ -162,17 +162,20 @@ def get_simulator(logger: logging.Logger, config: Config) -> FastAPI:
             if limiter:
                 limit_response = limiter(context, response)
                 if limit_response:
-                    return limit_response
+                    # replace response with limited response
+                    response = limit_response
             else:
                 logger.debug("No limiter found for response: %s", request.url.path)
 
+            # Add latency to successful responses
             base_end_time = time.perf_counter()
-
-            recorded_duration_ms = context.values.get(constants.RECORDED_DURATION_MS, 0)
-            if recorded_duration_ms > 0:
-                current_span = trace.get_current_span()
-                current_span.set_attribute("simulator.added_latency", recorded_duration_ms)
-                await asyncio.sleep(recorded_duration_ms / 1000)
+            if response.status_code < 300:
+                # TODO - apply latency to generated responses and allow config overrides
+                recorded_duration_ms = context.values.get(constants.RECORDED_DURATION_MS, 0)
+                if recorded_duration_ms > 0:
+                    current_span = trace.get_current_span()
+                    current_span.set_attribute("simulator.added_latency", recorded_duration_ms)
+                    await asyncio.sleep(recorded_duration_ms / 1000)
 
             status_code = response.status_code
             deployment_name = context.values.get(constants.SIMULATOR_KEY_DEPLOYMENT_NAME)
@@ -233,6 +236,5 @@ def get_simulator(logger: logging.Logger, config: Config) -> FastAPI:
         client_request_hook=client_request_hook,
         # client_response_hook=client_response_hook,
     )
-    # FastAPIInstrumentor.instrument_app(app)
 
     return app
