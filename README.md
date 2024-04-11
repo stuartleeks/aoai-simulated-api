@@ -61,7 +61,7 @@ When running the simulated API, there are a number of environment variables to c
 | `AZURE_OPENAI_DEPLOYMENT`       | Used by the test app to set the name of the deployed model in your Azure OpenAI service. Use a gpt-35-turbo-instruct deployment.                     |
 | `LOG_LEVEL`                    | The log level for the simulator. Defaults to `INFO`.                                                                                                 |
 
-To run the simulated API, run `uvicorn main:app --reload --port 8000` from the `src/aoai-simulated-api` directory using the environment variables above to configure.
+To run the simulated API, run `uvicorn aoai_simulated_api.main.main:app --reload --port 8000` from the `src/aoai-simulated-api` directory using the environment variables above to configure.
 
 For example, to use the API in record/replay mode:
 
@@ -186,7 +186,7 @@ The default forwarder can be found in `src/aoai_simulated_api/record_replay/_req
 To run with a custom forwarder set the `FORWARDER_CONFIG_PATH` environment variable:
 
 ```bash
-SIMULATOR_MODE=record FORWARDER_CONFIG_PATH=/path/to/forwarder_config.py uvicorn main:app --reload --port 8000
+SIMULATOR_MODE=record FORWARDER_CONFIG_PATH=/path/to/forwarder_config.py uvicorn aoai_simulated_api.main.main:app --reload --port 8000
 ```
 
 Or via Docker:
