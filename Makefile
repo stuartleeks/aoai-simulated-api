@@ -90,6 +90,15 @@ locust-chat-completions-100k:
 		--users 20 \
 		--spawn-rate 0.5 \
 		--autostart
+
+locust-chat-completions-100m:
+	LOCUST_WEB_PORT=8090 \
+	locust \
+		-f ./src/loadtest/test_chat_completions_100m.py \
+		-H http://localhost:8000/ \
+		--users 20 \
+		--spawn-rate 0.5 \
+		--autostart
 		
 locust-chat-completions-no-limit:
 	LOCUST_WEB_PORT=8090 \
