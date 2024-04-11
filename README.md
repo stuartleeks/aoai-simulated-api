@@ -61,27 +61,29 @@ When running the simulated API, there are a number of environment variables to c
 | `AZURE_OPENAI_DEPLOYMENT`       | Used by the test app to set the name of the deployed model in your Azure OpenAI service. Use a gpt-35-turbo-instruct deployment.                     |
 | `LOG_LEVEL`                    | The log level for the simulator. Defaults to `INFO`.                                                                                                 |
 
-To run the simulated API, run `uvicorn aoai_simulated_api.main.main:app --reload --port 8000` from the `src/aoai-simulated-api` directory using the environment variables above to configure.
+To run the simulated API, run `make run-simulated-api` from the repo root directory using the environment variables above to configure.
+
+The examples below show passing environment variables to the API directly on the command line, but you can also set them via a `.env` file in the root directory for convenience (see the `sample.env` for a starting point).
 
 For example, to use the API in record/replay mode:
 
 ```bash
 # Run the API in record mode
-SIMULATOR_MODE=record AZURE_OPENAI_ENDPOINT=https://mysvc.openai.azure.com/ AZURE_OPENAI_KEY=your-api-key uvicorn main:app --reload --port 8000
+SIMULATOR_MODE=record AZURE_OPENAI_ENDPOINT=https://mysvc.openai.azure.com/ AZURE_OPENAI_KEY=your-api-key make run-simulated-api
 
 # Run the API in replay mode
-SIMULATOR_MODE=replay uvicorn main:app --reload --port 8000
+SIMULATOR_MODE=replay make run-simulated-api
 ```
 
 To run the API in generator mode, you can set the `SIMULATOR_MODE` environment variable to `generate` and run the API as above.
 
 ```bash
 # Run the API in generator mode
-SIMULATOR_MODE=generate uvicorn main:app --reload --port 8000
+SIMULATOR_MODE=generate make run-simulated-api
 
 # Run the API in generator mode with a custom generator configuration
 # See src/examples/generator_config.py for an example of using a custom generator
-SIMULATOR_MODE=generate GENERATOR_CONFIG_PATH=/path/to/generator_config.py uvicorn main:app --reload --port 8000
+SIMULATOR_MODE=generate GENERATOR_CONFIG_PATH=/path/to/generator_config.py make run-simulated-api
 ```
 
 ## Running in Docker
@@ -186,7 +188,7 @@ The default forwarder can be found in `src/aoai_simulated_api/record_replay/_req
 To run with a custom forwarder set the `FORWARDER_CONFIG_PATH` environment variable:
 
 ```bash
-SIMULATOR_MODE=record FORWARDER_CONFIG_PATH=/path/to/forwarder_config.py uvicorn aoai_simulated_api.main.main:app --reload --port 8000
+SIMULATOR_MODE=record FORWARDER_CONFIG_PATH=/path/to/forwarder_config.py make run-simulated-api
 ```
 
 Or via Docker:
