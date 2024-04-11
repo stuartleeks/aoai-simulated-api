@@ -23,6 +23,10 @@ class OpenAILimits:
     limit_requests_per_10s: RateLimitItemPerSecond
 
 
+def no_op_limiter(_: RequestContext, __: Response) -> None:
+    return None
+
+
 def create_openai_limiter(
     limit_storage: storage.Storage, deployments: dict[str, int]
 ) -> Callable[[RequestContext, Response], Response | None]:
@@ -99,6 +103,9 @@ def create_doc_intelligence_limiter(
 ) -> Callable[[RequestContext, Response], Response | None]:
     moving_window = strategies.MovingWindowRateLimiter(limit_storage)
     limit = RateLimitItemPerSecond(requests_per_second, 1)
+
+    if requests_per_second <= 0:
+        return no_op_limiter
 
     def limiter(_: RequestContext, __: Response) -> Response | None:
         if not moving_window.hit(limit):

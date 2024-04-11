@@ -56,7 +56,7 @@ When running the simulated API, there are a number of environment variables to c
 | `FORWARDER_CONFIG_PATH`         | The path to a Python file that contains the forwarder configuration. See `src/examples/forwarder_config` for an example.                          |
 | `AZURE_OPENAI_ENDPOINT`         | The endpoint for the Azure OpenAI service, e.g. `https://mysvc.openai.azure.com/`                                                                    |
 | `AZURE_OPENAI_KEY`              | The API key for the Azure OpenAI service.                                                                                                            |
-| `DOC_INTELLIGENCE_RPS`          | The rate limit for the Document Intelligence service. Defaults to 15 RPS. See [Doc Intelligence Rate-Limiting](#document-intelligence-rate-limiting) |
+| `DOC_INTELLIGENCE_RPS`          | The rate limit for the Document Intelligence service. Defaults to 15 RPS. See [Doc Intelligence Rate-Limiting](#document-intelligence-rate-limiting). Set to a negative value to disable rate-limiting. |
 | `OPENAI_DEPLOYMENT_CONFIG_PATH` | The path to a JSON file that contains the deployment configuration. See [OpenAI Rate-Limiting](#openai-rate-limiting)                                |
 | `AZURE_OPENAI_DEPLOYMENT`       | Used by the test app to set the name of the deployed model in your Azure OpenAI service. Use a gpt-35-turbo-instruct deployment.                     |
 | `LOG_LEVEL`                    | The log level for the simulator. Defaults to `INFO`.                                                                                                 |
