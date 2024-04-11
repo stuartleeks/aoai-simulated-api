@@ -34,8 +34,13 @@ async def doc_intelligence_analyze(context: RequestContext) -> Response | None:
 
     result_id = str(uuid.uuid4())
     # Build the response header
-    # TODO - get base address from config to allow for running in ACA/AKS/... (but default to localhost and current port)
-    document_analysis_result_location = f"http://localhost:8000/formrecognizer/documentModels/{model_id}/analyzeResults/{result_id}?api-version={api_version}"
+    # TODO - get base address from config to allow for running in ACA/AKS/... (but default to request URL)
+    request_url = request.url
+    port = ":" + str(request_url.port) if request_url.port else ""
+    base_url = f"{request_url.scheme}://{request_url.hostname}{port}"
+    document_analysis_result_location = (
+        f"{base_url}/formrecognizer/documentModels/{model_id}/analyzeResults/{result_id}?api-version={api_version}"
+    )
 
     # Set the HTTP response headers.
     context.values[SIMULATOR_KEY_LIMITER] = "docintelligence"
