@@ -5,10 +5,31 @@ import uuid
 import lorem
 from fastapi import Response
 
+
 from aoai_simulated_api.constants import SIMULATOR_KEY_LIMITER
 from aoai_simulated_api.pipeline import RequestContext
 
 document_analysis_config = {}
+
+
+def get_wait_time_for_result(content_length: int) -> float:
+    """
+    Calculate the wait time for the result based on the content length.
+
+    Args:
+        content_length (int): The length of the content.
+
+    Returns:
+        float: The wait time in seconds.
+    """
+    return content_length / 500000  # allow 1s per 500kb
+
+
+def get_word_count_for_result(content_length: int) -> int:
+    # TODO: Determine how to handle the response content length.
+    #       For now, just use a fraction of the original content length.
+    response_content_length = round(content_length / 25000)  # 1 word per 25kb of input
+    return response_content_length
 
 
 async def doc_intelligence_analyze(context: RequestContext) -> Response | None:
@@ -81,7 +102,7 @@ async def doc_intelligence_analyze_result(context: RequestContext) -> Response |
 
     # Simulate latency between submission and generating a response
     now = datetime.datetime.now()
-    duration_s = doc_config["content_length"] / 100000  # allow 1s per 100kb
+    duration_s = get_wait_time_for_result(doc_config["content_length"])
     ready_at = doc_config["submitted_at"] + datetime.timedelta(seconds=duration_s)
     if now < ready_at:
         return Response(
@@ -137,9 +158,7 @@ def build_result(analyze_result_dict):
 
     content_length = analyze_result_dict["content_length"]
 
-    # TODO: Determine how to handle the response content length.
-    #       For now, just use a fraction of the original content length.
-    response_content_length = round(content_length * 0.1)
+    response_content_length = get_word_count_for_result(content_length)
 
     content = "".join(lorem.get_word(count=response_content_length))
 
