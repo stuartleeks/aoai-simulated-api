@@ -26,16 +26,24 @@ def get_simulator(logger: logging.Logger, config: Config) -> FastAPI:
     """
     app = FastAPI()
 
-    header_scheme = APIKeyHeader(name="api-key")
+    # api-key header for OpenAI
+    # ocp-apim-subscription-key header for doc intelligence
+    api_key_header_scheme = APIKeyHeader(name="api-key", auto_error=False)
+    ocp_apim_subscription_key_header_scheme = APIKeyHeader(name="ocp-apim-subscription-key", auto_error=False)
 
-    def validate_api_key(api_key: Annotated[str, Depends(header_scheme)]):
-        if secrets.compare_digest(api_key, config.simulator_api_key):
+    def validate_api_key(
+        api_key: Annotated[str, Depends(api_key_header_scheme)],
+        ocp_apim_subscription_key: Annotated[str, Depends(ocp_apim_subscription_key_header_scheme)],
+    ):
+        if api_key and secrets.compare_digest(api_key, config.simulator_api_key):
+            return True
+        if ocp_apim_subscription_key and secrets.compare_digest(ocp_apim_subscription_key, config.simulator_api_key):
             return True
 
-        logger.warning("🔒 Incorrect api-key provided")
+        logger.warning("🔒 Missing or incorrect API Key provided")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect api-key",
+            detail="Missing or incorrect API Key",
         )
 
     logger.info("🚀 Starting aoai-simulated-api in %s mode", config.simulator_mode)
