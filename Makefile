@@ -62,10 +62,10 @@ docker-run-simulated-api:
 		aoai-simulated-api
 
 test:
-	pytest .
+	pytest ./src/tests
 	
 test-watch:
-	ptw --clear
+	ptw --clear ./src/tests
 
 lint:
 	pylint ./src/aoai-simulated-api/
@@ -73,5 +73,30 @@ lint:
 deploy-aca: 
 	./scripts/deploy-aca.sh
 
-locust:
-	LOCUST_WEB_PORT=8090 locust -f ./src/loadtest/test-completions.py -H http://localhost:8000/ --users 1 --spawn-rate 1 --autostart
+locust-completions-100k:
+	LOCUST_WEB_PORT=8090 \
+	locust \
+		-f ./src/loadtest/test_completions_100k.py \
+		-H http://localhost:8000/ \
+		--users 20 \
+		--spawn-rate 0.5 \
+		--autostart
+
+locust-chat-completions-100k:
+	LOCUST_WEB_PORT=8090 \
+	locust \
+		-f ./src/loadtest/test_chat_completions_100k.py \
+		-H http://localhost:8000/ \
+		--users 20 \
+		--spawn-rate 0.5 \
+		--autostart
+		
+locust-chat-completions-no-limit:
+	LOCUST_WEB_PORT=8090 \
+	locust \
+		-f ./src/loadtest/test_chat_completions_no_limit.py \
+		-H http://localhost:8000/ \
+		--users 20 \
+		--spawn-rate 0.5 \
+		--autostart
+

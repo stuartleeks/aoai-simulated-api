@@ -40,6 +40,8 @@ var appInsightsName = 'aoaisim-${baseName}'
 var keyVaultName = replace('aoaisim-${baseName}', '-', '')
 var storageAccountName = replace('aoaisim${baseName}', '-', '')
 
+var apiSimulatorName = 'aoai-simulated-api'
+
 resource containerRegistry 'Microsoft.ContainerRegistry/registries@2021-12-01-preview' existing = {
   name: containerRegistryName
 }
@@ -115,7 +117,7 @@ resource assignSecretsReaderRole 'Microsoft.Authorization/roleAssignments@2020-0
   }
 }
 
-resource containerAppEnv 'Microsoft.App/managedEnvironments@2022-03-01' = {
+resource containerAppEnv 'Microsoft.App/managedEnvironments@2023-11-02-preview' = {
   name: containerAppEnvName
   location: location
   properties: {
@@ -164,7 +166,7 @@ resource appInsightsConnectionStringSecret 'Microsoft.KeyVault/vaults/secrets@20
 }
 
 resource apiSim 'Microsoft.App/containerApps@2023-05-01' = {
-  name: 'aoai-simulated-api'
+  name: apiSimulatorName
   location: location
   identity: {
     type: 'UserAssigned'
@@ -213,8 +215,10 @@ resource apiSim 'Microsoft.App/containerApps@2023-05-01' = {
           name: 'aoai-simulated-api'
           image: '${containerRegistry.properties.loginServer}/aoai-simulated-api:latest'
           resources: {
-            cpu: json('0.5')
-            memory: '1Gi'
+            // cpu: json('0.5')
+            // memory: '1Gi'
+            cpu: json('2')
+            memory: '4Gi'
           }
           env: [
             { name: 'SIMULATOR_API_KEY', secretRef: 'simulator-api-key' }
@@ -229,6 +233,10 @@ resource apiSim 'Microsoft.App/containerApps@2023-05-01' = {
             { name: 'OPENAI_DEPLOYMENT_CONFIG_PATH', value: openAIDeploymentConfigPath }
             { name: 'LOG_LEVEL', value: logLevel }
             { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', secretRef: 'app-insights-connection-string' }
+            // Ensure cloudRoleName is set in telemetry
+            // https://opentelemetry-python.readthedocs.io/en/latest/sdk/environment_variables.html#opentelemetry.sdk.environment_variables.OTEL_SERVICE_NAME
+            { name: 'OTEL_SERVICE_NAME', value : apiSimulatorName}
+            { name: 'OTEL_METRIC_EXPORT_INTERVAL', value : '10000'} // metric export interval in milliseconds
           ]
           volumeMounts: [
             {

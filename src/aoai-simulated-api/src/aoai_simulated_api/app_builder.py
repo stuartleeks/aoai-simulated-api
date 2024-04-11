@@ -33,16 +33,21 @@ def get_simulator(logger: logging.Logger, config: Config) -> FastAPI:
     histogram_latency_base = meter.create_histogram(
         name="aoai-simulator.latency.base",
         description="Latency of handling the request (before adding simulated latency)",
-        unit="milliseconds",
+        unit="seconds",
     )
     histogram_latency_full = meter.create_histogram(
         name="aoai-simulator.latency.full",
         description="Full latency of handling the request (including simulated latency)",
-        unit="milliseconds",
+        unit="seconds",
     )
-    historgram_tokens_used = meter.create_histogram(
+    histogram_tokens_used = meter.create_histogram(
         name="aoai-simulator.tokens_used",
         description="Number of tokens used per request",
+        unit="tokens",
+    )
+    histogram_tokens_requested = meter.create_histogram(
+        name="aoai-simulator.tokens_requested",
+        description="Number of tokens across all requests (success or not)",
         unit="tokens",
     )
 
@@ -169,13 +174,16 @@ def get_simulator(logger: logging.Logger, config: Config) -> FastAPI:
 
             # Add latency to successful responses
             base_end_time = time.perf_counter()
+            base_duration_s = base_end_time - start_time
             if response.status_code < 300:
                 # TODO - apply latency to generated responses and allow config overrides
                 recorded_duration_ms = context.values.get(constants.RECORDED_DURATION_MS, 0)
-                if recorded_duration_ms > 0:
+                recorded_duration_s = recorded_duration_ms / 1000
+                extra_latency = recorded_duration_s - base_duration_s
+                if extra_latency > 0:
                     current_span = trace.get_current_span()
-                    current_span.set_attribute("simulator.added_latency", recorded_duration_ms)
-                    await asyncio.sleep(recorded_duration_ms / 1000)
+                    current_span.set_attribute("simulator.added_latency", extra_latency)
+                    await asyncio.sleep(extra_latency)
 
             status_code = response.status_code
             deployment_name = context.values.get(constants.SIMULATOR_KEY_DEPLOYMENT_NAME)
@@ -183,22 +191,24 @@ def get_simulator(logger: logging.Logger, config: Config) -> FastAPI:
 
             full_end_time = time.perf_counter()
             histogram_latency_base.record(
-                (base_end_time - start_time) * 1000,
+                base_duration_s,
                 attributes={
                     "status_code": status_code,
                     "deployment": deployment_name,
                 },
             )
             histogram_latency_full.record(
-                (full_end_time - start_time) * 1000,
+                (full_end_time - start_time),
                 attributes={
                     "status_code": status_code,
                     "deployment": deployment_name,
                 },
             )
-            if status_code < 300:
-                # only track tokens for successful requests
-                historgram_tokens_used.record(tokens_used, attributes={"deployment": deployment_name})
+            if tokens_used:
+                histogram_tokens_requested.record(tokens_used, attributes={"deployment": deployment_name})
+                if status_code < 300:
+                    # only track tokens for successful requests
+                    histogram_tokens_used.record(tokens_used, attributes={"deployment": deployment_name})
 
             return response
         # pylint: disable-next=broad-exception-caught

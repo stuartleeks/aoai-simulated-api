@@ -14,11 +14,12 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=log_level)
 logging.getLogger("azure").setLevel(logging.WARNING)
 
-if os.getenv("APPLICATIONINSIGHTS_CONNECTION_STRING"):
+application_insights_connection_string = os.getenv("APPLICATIONINSIGHTS_CONNECTION_STRING")
+if application_insights_connection_string:
     logger.info("🚀 Configuring Azure Monitor telemetry")
-    # Configure OpenTelemetry to use Azure Monitor with the
-    # APPLICATIONINSIGHTS_CONNECTION_STRING environment variable.
-    configure_azure_monitor()
+
+    # Options: https://github.com/Azure/azure-sdk-for-python/tree/main/sdk/monitor/azure-monitor-opentelemetry#usage
+    configure_azure_monitor(connection_string=application_insights_connection_string)
 else:
     logger.info("🚀 Azure Monitor telemetry not configured (set APPLICATIONINSIGHTS_CONNECTION_STRING)")
 

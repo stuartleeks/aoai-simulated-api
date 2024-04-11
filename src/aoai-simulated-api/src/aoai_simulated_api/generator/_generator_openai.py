@@ -31,6 +31,8 @@ TOKEN_TO_WORD_FACTOR = 0.72
 
 # API docs: https://learn.microsoft.com/en-gb/azure/ai-services/openai/reference
 
+missing_deployment_names = set()
+
 
 def get_model_name_from_deployment_name(context: RequestContext, deployment_name: str) -> str:
     deployments = context.config.openai_deployments
@@ -40,7 +42,11 @@ def get_model_name_from_deployment_name(context: RequestContext, deployment_name
             return deployment.model
 
     default_model = "gpt-3.5-turbo-0613"
-    logger.warning("Deployment %s not found in config, using default model %s", deployment_name, default_model)
+
+    # Output warning for missing deployment name (only the first time we encounter it)
+    if deployment_name not in missing_deployment_names:
+        missing_deployment_names.add(deployment_name)
+        logger.warning("Deployment %s not found in config, using default model %s", deployment_name, default_model)
     return default_model
 
 
@@ -58,8 +64,16 @@ def num_tokens_from_string(string: str, model: str) -> int:
     return num_tokens
 
 
+# pylint: disable=invalid-name
+gpt_35_turbo_warning_issued = False
+gpt_4_warning_issued = False
+# pylint: enable=invalid-name
+
+
 def num_tokens_from_messages(messages, model):
     """Return the number of tokens used by a list of messages."""
+    # pylint: disable-next=global-statement
+    global gpt_35_turbo_warning_issued, gpt_4_warning_issued
     try:
         encoding = tiktoken.encoding_for_model(model)
     except KeyError:
@@ -79,10 +93,16 @@ def num_tokens_from_messages(messages, model):
         tokens_per_message = 4  # every message follows <|start|>{role/name}\n{content}<|end|>\n
         tokens_per_name = -1  # if there's a name, the role is omitted
     elif "gpt-3.5-turbo" in model:
-        logger.warning("Warning: gpt-3.5-turbo may update over time. Returning num tokens assuming gpt-3.5-turbo-0613.")
+        if not gpt_35_turbo_warning_issued:
+            logger.warning(
+                "Warning: gpt-3.5-turbo may update over time. Returning num tokens assuming gpt-3.5-turbo-0613."
+            )
+            gpt_35_turbo_warning_issued = True
         return num_tokens_from_messages(messages, model="gpt-3.5-turbo-0613")
     elif "gpt-4" in model:
-        logger.warning("Warning: gpt-4 may update over time. Returning num tokens assuming gpt-4-0613.")
+        if not gpt_4_warning_issued:
+            logger.warning("Warning: gpt-4 may update over time. Returning num tokens assuming gpt-4-0613.")
+            gpt_4_warning_issued = True
         return num_tokens_from_messages(messages, model="gpt-4-0613")
     else:
         raise NotImplementedError(
