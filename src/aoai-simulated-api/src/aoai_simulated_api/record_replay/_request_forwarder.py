@@ -60,7 +60,7 @@ def create_forwarder(forwarder_config_path: str) -> Callable[[RequestContext], F
                         content=response.text, status_code=response.status_code, headers=response.headers
                     )
                 else:
-                    raise Exception(f"Unhandled response type from forwarder: {type(response)}")
+                    raise ValueError(f"Unhandled response type from forwarder: {type(response)}")
 
                 if "Content-Length" in response.headers.keys():
                     # Content-Length will automatically be set when we return

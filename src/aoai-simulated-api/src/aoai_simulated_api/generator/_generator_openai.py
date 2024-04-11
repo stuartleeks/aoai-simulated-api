@@ -13,9 +13,9 @@ from fastapi.responses import StreamingResponse
 
 from aoai_simulated_api.pipeline import RequestContext
 from aoai_simulated_api.constants import (
-    SIMULATOR_HEADER_OPENAI_TOKENS,
-    SIMULATOR_HEADER_LIMITER,
-    SIMULATOR_HEADER_LIMITER_KEY,
+    SIMULATOR_KEY_DEPLOYMENT_NAME,
+    SIMULATOR_KEY_OPENAI_TOKENS,
+    SIMULATOR_KEY_LIMITER,
 )
 
 # This file contains a default implementation of the get_generators function
@@ -31,6 +31,8 @@ TOKEN_TO_WORD_FACTOR = 0.72
 
 # API docs: https://learn.microsoft.com/en-gb/azure/ai-services/openai/reference
 
+missing_deployment_names = set()
+
 
 def get_model_name_from_deployment_name(context: RequestContext, deployment_name: str) -> str:
     deployments = context.config.openai_deployments
@@ -40,7 +42,11 @@ def get_model_name_from_deployment_name(context: RequestContext, deployment_name
             return deployment.model
 
     default_model = "gpt-3.5-turbo-0613"
-    logger.warning("Deployment %s not found in config, using default model %s", deployment_name, default_model)
+
+    # Output warning for missing deployment name (only the first time we encounter it)
+    if deployment_name not in missing_deployment_names:
+        missing_deployment_names.add(deployment_name)
+        logger.warning("Deployment %s not found in config, using default model %s", deployment_name, default_model)
     return default_model
 
 
@@ -58,8 +64,16 @@ def num_tokens_from_string(string: str, model: str) -> int:
     return num_tokens
 
 
+# pylint: disable=invalid-name
+gpt_35_turbo_warning_issued = False
+gpt_4_warning_issued = False
+# pylint: enable=invalid-name
+
+
 def num_tokens_from_messages(messages, model):
     """Return the number of tokens used by a list of messages."""
+    # pylint: disable-next=global-statement
+    global gpt_35_turbo_warning_issued, gpt_4_warning_issued
     try:
         encoding = tiktoken.encoding_for_model(model)
     except KeyError:
@@ -79,10 +93,16 @@ def num_tokens_from_messages(messages, model):
         tokens_per_message = 4  # every message follows <|start|>{role/name}\n{content}<|end|>\n
         tokens_per_name = -1  # if there's a name, the role is omitted
     elif "gpt-3.5-turbo" in model:
-        logger.warning("Warning: gpt-3.5-turbo may update over time. Returning num tokens assuming gpt-3.5-turbo-0613.")
+        if not gpt_35_turbo_warning_issued:
+            logger.warning(
+                "Warning: gpt-3.5-turbo may update over time. Returning num tokens assuming gpt-3.5-turbo-0613."
+            )
+            gpt_35_turbo_warning_issued = True
         return num_tokens_from_messages(messages, model="gpt-3.5-turbo-0613")
     elif "gpt-4" in model:
-        logger.warning("Warning: gpt-4 may update over time. Returning num tokens assuming gpt-4-0613.")
+        if not gpt_4_warning_issued:
+            logger.warning("Warning: gpt-4 may update over time. Returning num tokens assuming gpt-4-0613.")
+            gpt_4_warning_issued = True
         return num_tokens_from_messages(messages, model="gpt-4-0613")
     else:
         raise NotImplementedError(
@@ -106,7 +126,8 @@ def _generate_embedding(index: int):
     return {"object": "embedding", "index": index, "embedding": [(random.random() - 0.5) * 4 for _ in range(1536)]}
 
 
-async def azure_openai_embedding(context: RequestContext, request: Request) -> Response | None:
+async def azure_openai_embedding(context: RequestContext) -> Response | None:
+    request = context.request
     is_match, path_params = context.is_route_match(
         request=request, path="/openai/deployments/{deployment}/embeddings", methods=["POST"]
     )
@@ -135,19 +156,23 @@ async def azure_openai_embedding(context: RequestContext, request: Request) -> R
         "model": "ada",
         "usage": {"prompt_tokens": tokens, "total_tokens": tokens},
     }
+
+    # store values in the context for use by the rate-limiter etc
+    context.values[SIMULATOR_KEY_LIMITER] = "openai"
+    context.values[SIMULATOR_KEY_DEPLOYMENT_NAME] = deployment_name
+    context.values[SIMULATOR_KEY_OPENAI_TOKENS] = tokens
+
     return Response(
         status_code=200,
         content=json.dumps(response_data),
         headers={
             "Content-Type": "application/json",
-            SIMULATOR_HEADER_OPENAI_TOKENS: str(tokens),
-            SIMULATOR_HEADER_LIMITER: "openai",
-            SIMULATOR_HEADER_LIMITER_KEY: deployment_name,
         },
     )
 
 
-async def azure_openai_completion(context: RequestContext, request: Request) -> Response | None:
+async def azure_openai_completion(context: RequestContext) -> Response | None:
+    request = context.request
     is_match, path_params = context.is_route_match(
         request=request, path="/openai/deployments/{deployment}/completions", methods=["POST"]
     )
@@ -186,19 +211,22 @@ async def azure_openai_completion(context: RequestContext, request: Request) -> 
         },
     }
 
+    # store values in the context for use by the rate-limiter etc
+    context.values[SIMULATOR_KEY_LIMITER] = "openai"
+    context.values[SIMULATOR_KEY_DEPLOYMENT_NAME] = deployment_name
+    context.values[SIMULATOR_KEY_OPENAI_TOKENS] = total_tokens
+
     return Response(
         content=json.dumps(response_body),
         headers={
             "Content-Type": "application/json",
-            SIMULATOR_HEADER_OPENAI_TOKENS: str(total_tokens),
-            SIMULATOR_HEADER_LIMITER: "openai",
-            SIMULATOR_HEADER_LIMITER_KEY: deployment_name,
         },
         status_code=200,
     )
 
 
-async def azure_openai_chat_completion(context: RequestContext, request: Request) -> Response | None:
+async def azure_openai_chat_completion(context: RequestContext) -> Response | None:
+    request = context.request
     is_match, path_params = context.is_route_match(
         request=request, path="/openai/deployments/{deployment}/chat/completions", methods=["POST"]
     )
@@ -301,13 +329,15 @@ async def azure_openai_chat_completion(context: RequestContext, request: Request
         },
     }
 
+    # store values in the context for use by the rate-limiter etc
+    context.values[SIMULATOR_KEY_LIMITER] = "openai"
+    context.values[SIMULATOR_KEY_DEPLOYMENT_NAME] = deployment_name
+    context.values[SIMULATOR_KEY_OPENAI_TOKENS] = total_tokens
+
     return Response(
         content=json.dumps(response_body),
         headers={
             "Content-Type": "application/json",
-            SIMULATOR_HEADER_OPENAI_TOKENS: str(total_tokens),
-            SIMULATOR_HEADER_LIMITER: "openai",
-            SIMULATOR_HEADER_LIMITER_KEY: deployment_name,
         },
         status_code=200,
     )

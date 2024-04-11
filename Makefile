@@ -24,8 +24,12 @@ erase-recording:
 	rm -rf src/aoai-simulated-api/.recording
 
 run-simulated-api:
-	gunicorn aoai_simulated_api.main:app --worker-class uvicorn.workers.UvicornWorker --workers 1 --bind 0.0.0.0:8000
-
+	gunicorn \
+		aoai_simulated_api.main:app \
+		--worker-class uvicorn.workers.UvicornWorker \
+		--workers 1 \
+		--bind 0.0.0.0:8000 \
+		--timeout 3600
 
 run-test-client:
 	cd src/test-client && \
@@ -33,7 +37,11 @@ run-test-client:
 
 run-test-client-simulator-local:
 	cd src/test-client && \
-	AZURE_OPENAI_KEY=${SIMULATOR_API_KEY} AZURE_OPENAI_ENDPOINT=http://localhost:8000 AZURE_FORM_RECOGNIZER_ENDPOINT=http://localhost:8000 python app.py
+	AZURE_OPENAI_KEY=${SIMULATOR_API_KEY} \
+	AZURE_OPENAI_ENDPOINT=http://localhost:8000 \
+	AZURE_FORM_RECOGNIZER_ENDPOINT=http://localhost:8000 \
+	AZURE_FORM_RECOGNIZER_KEY=${SIMULATOR_API_KEY} \
+	python app.py
 
 run-test-client-simulator-aca:
 	./scripts/run-test-client-aca.sh
@@ -62,13 +70,60 @@ docker-run-simulated-api:
 		aoai-simulated-api
 
 test:
-	pytest .
+	pytest ./src/tests
 	
 test-watch:
-	ptw --clear
+	ptw --clear ./src/tests
 
 lint:
 	pylint ./src/aoai-simulated-api/
 
 deploy-aca: 
 	./scripts/deploy-aca.sh
+
+locust-completions-100k:
+	LOCUST_WEB_PORT=8090 \
+	locust \
+		-f ./src/loadtest/test_completions_100k.py \
+		-H http://localhost:8000/ \
+		--users 20 \
+		--spawn-rate 0.5 \
+		--autostart
+
+locust-chat-completions-100k:
+	LOCUST_WEB_PORT=8090 \
+	locust \
+		-f ./src/loadtest/test_chat_completions_100k.py \
+		-H http://localhost:8000/ \
+		--users 20 \
+		--spawn-rate 0.5 \
+		--autostart
+
+locust-chat-completions-100m:
+	LOCUST_WEB_PORT=8090 \
+	locust \
+		-f ./src/loadtest/test_chat_completions_100m.py \
+		-H http://localhost:8000/ \
+		--users 20 \
+		--spawn-rate 0.5 \
+		--autostart
+		
+locust-chat-completions-no-limit:
+	LOCUST_WEB_PORT=8090 \
+	locust \
+		-f ./src/loadtest/test_chat_completions_no_limit.py \
+		-H http://localhost:8000/ \
+		--users 20 \
+		--spawn-rate 0.5 \
+		--autostart
+
+
+
+locust-doc-intell:
+	LOCUST_WEB_PORT=8090 \
+	locust \
+		-f ./src/loadtest/test_doc_intell.py \
+		-H http://localhost:8000/ \
+		--users 20 \
+		--spawn-rate 0.5 \
+		--autostart

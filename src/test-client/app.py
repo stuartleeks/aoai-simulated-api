@@ -126,9 +126,11 @@ def doc_intelligence():
     base_path = os.path.dirname(os.path.realpath(__file__))
     pdf_path = os.path.join(base_path, "receipt.png")
 
+    print("Making request...")
     with open(pdf_path, "rb") as f:
         poller = document_analysis_client.begin_analyze_document("prebuilt-receipt", f)
 
+    print("Polling for result...")
     result = poller.result()
     print("Poller result: ", result)
 

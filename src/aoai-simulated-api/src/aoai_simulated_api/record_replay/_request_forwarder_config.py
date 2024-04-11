@@ -6,9 +6,9 @@ import requests
 
 from aoai_simulated_api.pipeline import RequestContext
 from aoai_simulated_api.constants import (
-    SIMULATOR_HEADER_OPENAI_TOKENS,
-    SIMULATOR_HEADER_LIMITER,
-    SIMULATOR_HEADER_LIMITER_KEY,
+    SIMULATOR_KEY_DEPLOYMENT_NAME,
+    SIMULATOR_KEY_OPENAI_TOKENS,
+    SIMULATOR_KEY_LIMITER,
 )
 
 # This file contains a default implementation of the get_forwarders function
@@ -127,10 +127,12 @@ async def forward_to_azure_openai(context: RequestContext) -> dict:
         # no further processing - indicate not to persist this response
         return {"response": response, "persist_response": False}
 
-    # inject headers into the response for use by the rate-limiter
-    response.headers[SIMULATOR_HEADER_LIMITER] = "openai"
-    response.headers[SIMULATOR_HEADER_LIMITER_KEY] = _get_deployment_name_from_url(request.url.path)
-    response.headers[SIMULATOR_HEADER_OPENAI_TOKENS] = str(_get_token_usage_from_response(response.text))
+    # store values in the context for use by the rate-limiter etc
+    deployment_name = _get_deployment_name_from_url(request.url.path)
+    tokens_used = _get_token_usage_from_response(response.text)
+    context.values[SIMULATOR_KEY_LIMITER] = "openai"
+    context.values[SIMULATOR_KEY_DEPLOYMENT_NAME] = deployment_name
+    context.values[SIMULATOR_KEY_OPENAI_TOKENS] = tokens_used
 
     return {"response": response, "persist_response": True}
 

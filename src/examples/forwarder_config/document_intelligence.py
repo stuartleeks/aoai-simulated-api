@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+from aoai_simulated_api import constants
 from aoai_simulated_api.pipeline import RequestContext
 import fastapi
 from fastapi.datastructures import URL
@@ -24,14 +25,16 @@ def initialize_document_intelligence():
     doc_intelligence_initialized = True
 
     if doc_intelligence_api_key and doc_intelligence_api_endpoint:
-        logger.info(f"🚀 Initialized Azure Document Intelligence forwarder with the following settings:")
-        logger.info(f"🔑 API endpoint: {doc_intelligence_api_endpoint}")
+        logger.info("🚀 Initialized Azure Document Intelligence forwarder with the following settings:")
+        logger.info("🔑 API endpoint: %s", doc_intelligence_api_endpoint)
         masked_api_key = doc_intelligence_api_key[:4] + "..." + doc_intelligence_api_key[-4:]
-        logger.info(f"🔑 API key: {masked_api_key}")
+        logger.info("🔑 API key: %s", masked_api_key)
 
     else:
-        logger.warn(
-            f"Got a request that looked like a Document Intelligence request, but missing some or all of the required environment variables for forwarding: AZURE_FORM_RECOGNIZER_ENDPOINT, AZURE_FORM_RECOGNIZER_KEY",
+        logger.warning(
+            "Got a request that looked like a Document Intelligence request, "
+            + "but missing some or all of the required environment variables for forwarding: "
+            + "AZURE_FORM_RECOGNIZER_ENDPOINT, AZURE_FORM_RECOGNIZER_KEY",
         )
 
 
@@ -54,7 +57,7 @@ async def forward_to_azure_document_intelligence(
         # assume not an Doc Intelligence request
         return None
 
-    logger.debug("Forwarding Document Intelligence request:" + request.url.path)
+    logger.debug("Forwarding Document Intelligence request: %s", request.url.path)
 
     if not doc_intelligence_initialized:
         # Only initialize once, and only if we need to
@@ -97,7 +100,7 @@ async def forward_to_azure_document_intelligence(
     else:
         # Set header to indicate which limiter to use
         # Only set on analyze request, not on querying results
-        response.headers["X-Simulator-Limiter"] = "docintelligence"
+        context.values[constants.SIMULATOR_KEY_LIMITER] = "docintelligence"
 
     if "operation-location" in response.headers:
         operation_location = URL(response.headers["operation-location"])

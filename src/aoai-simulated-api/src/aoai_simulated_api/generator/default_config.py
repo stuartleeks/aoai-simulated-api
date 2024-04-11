@@ -1,5 +1,7 @@
 from typing import Callable
-from fastapi import Request, Response
+from fastapi import Response
+from aoai_simulated_api.pipeline import RequestContext
+from aoai_simulated_api.generator import GeneratorSetupContext
 
 
 # This file contains a default implementation of the get_generators function
@@ -8,7 +10,7 @@ from fastapi import Request, Response
 # See src/examples/generator_config.py for an example of how to define your own generators
 
 
-def get_generators(setup_context) -> list[Callable[[Request], Response | None]]:
+def get_generators(setup_context: GeneratorSetupContext) -> list[Callable[[RequestContext], Response | None]]:
     # Return a list of functions
     # If the function returns a Response object, it will be used as the response for the request
     # If the function returns None, the next function in the list will be called
@@ -18,7 +20,7 @@ def get_generators(setup_context) -> list[Callable[[Request], Response | None]]:
         setup_context.built_in_generators["azure_openai_chat_completion"],
         setup_context.built_in_generators["doc_intelligence_analyze"],
         setup_context.built_in_generators["doc_intelligence_analyze_result"],
-        lambda context, request: Response(
+        lambda context: Response(
             content="Default generated response - see src/examples/generator_config.py for example generator code",
             status_code=200,
         ),
