@@ -8,7 +8,7 @@
             "envFile": "${workspaceFolder}/.env",
             "program": "/home/vscode/.local/bin/gunicorn",
             "args": [
-                "main:app",
+                "aoai_simulated_api.main:app",
                 "--worker-class",
                 "uvicorn.workers.UvicornWorker",
                 "-b",
