@@ -61,9 +61,12 @@ When running the simulated API, there are a number of environment variables to c
 | `AZURE_OPENAI_DEPLOYMENT`       | Used by the test app to set the name of the deployed model in your Azure OpenAI service. Use a gpt-35-turbo-instruct deployment.                     |
 | `LOG_LEVEL`                    | The log level for the simulator. Defaults to `INFO`.                                                                                                 |
 
-To run the simulated API, run `make run-simulated-api` from the repo root directory using the environment variables above to configure.
-
 The examples below show passing environment variables to the API directly on the command line, but you can also set them via a `.env` file in the root directory for convenience (see the `sample.env` for a starting point).
+The `.http` files for testing the endpoints also use the `.env` file to set the environment variables for calling the API.
+
+> Note: when running the simulator it will auto-generate an API. This needs to be passed to the API when making requests. To avoid the API Key changing each time the simulator is run, set the `SIMULATOR_API_KEY` environment variable to a fixed value.
+
+To run the simulated API, run `make run-simulated-api` from the repo root directory using the environment variables above to configure.
 
 For example, to use the API in record/replay mode:
 
