@@ -30,8 +30,8 @@ def no_op_limiter(_: RequestContext, __: Response) -> None:
 def create_openai_limiter(
     limit_storage: storage.Storage, deployments: dict[str, int]
 ) -> Callable[[RequestContext, Response], Response | None]:
-    moving_window = strategies.MovingWindowRateLimiter(limit_storage)
     deployment_limits = {}
+    window = strategies.FixedWindowRateLimiter(limit_storage)
 
     for deployment, tokens_per_minute in deployments.items():
         tokens_per_10s = math.ceil(tokens_per_minute / 6)
@@ -61,8 +61,8 @@ def create_openai_limiter(
 
         # TODO: revisit limiting logic: also track per minute limits? Allow burst?
 
-        if not moving_window.hit(limits.limit_requests_per_10s):
-            stats = moving_window.get_window_stats(limit_requests_per_10s)
+        if not window.hit(limits.limit_requests_per_10s):
+            stats = window.get_window_stats(limit_requests_per_10s)
             current_time = int(time.time())
             retry_after = str(stats.reset_time - current_time)
             content = {
@@ -77,8 +77,8 @@ def create_openai_limiter(
                 content=json.dumps(content),
                 headers={"Retry-After": retry_after, "x-ratelimit-reset-requests": retry_after},
             )
-        if not moving_window.hit(limits.limit_tokens_per_10s, cost=token_cost):
-            stats = moving_window.get_window_stats(limit_tokens_per_10s)
+        if not window.hit(limits.limit_tokens_per_10s, cost=token_cost):
+            stats = window.get_window_stats(limit_tokens_per_10s)
             current_time = int(time.time())
             retry_after = str(stats.reset_time - current_time)
             content = {
