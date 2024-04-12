@@ -9,7 +9,6 @@ from fastapi import Depends, FastAPI, Request, Response, HTTPException, status
 from fastapi.security import APIKeyHeader
 from limits import storage
 from opentelemetry import trace, metrics
-from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 
 from aoai_simulated_api import constants
 from aoai_simulated_api.config import Config, load_doc_intelligence_limit
@@ -215,36 +214,5 @@ def get_simulator(logger: logging.Logger, config: Config) -> FastAPI:
         except Exception as e:
             logger.error("Error: %s\n%s", e, traceback.format_exc())
             return Response(status_code=500)
-
-    # https://opentelemetry-python-contrib.readthedocs.io/en/latest/instrumentation/fastapi/fastapi.html#request-response-hooks
-    def server_request_hook(span: trace.Span, scope: dict):
-        if span and span.is_recording():
-            path = scope.get("path")
-            if path:
-                # update name as catch-all shows "<method> /{full_path:path}"
-                span.update_name(f"{scope['method']} {path}")
-                span.set_attribute("simulator.path", path)
-
-    def client_request_hook(span: trace.Span, scope: dict):
-        if span and span.is_recording():
-            path = scope.get("path")
-            if path:
-                span.set_attribute("simulator.path", path)
-
-    # The following no longer works as tokens used etc are passed via context not headers now
-    # Do we care about the tokens on spans? (We have metrics being recorded for aggregation)
-    # def client_response_hook(span: trace.Span, message: dict):
-    #     if span and span.is_recording():
-    #         headers = message.get("headers") or []  # only set for type=http.response.start
-    #         for key, value in headers:
-    #             if key == b"x-simulator-openai-tokens":
-    #                 span.set_attribute("simulator.openai.tokens", value)
-
-    FastAPIInstrumentor.instrument_app(
-        app,
-        server_request_hook=server_request_hook,
-        client_request_hook=client_request_hook,
-        # client_response_hook=client_response_hook,
-    )
 
     return app
