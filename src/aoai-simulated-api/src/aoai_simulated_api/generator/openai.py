@@ -8,20 +8,20 @@ import lorem
 import nanoid
 import tiktoken
 
-from fastapi import Request, Response
+from fastapi import Response
 from fastapi.responses import StreamingResponse
 
-from aoai_simulated_api.pipeline import RequestContext
+from aoai_simulated_api.models import RequestContext
 from aoai_simulated_api.constants import (
     SIMULATOR_KEY_DEPLOYMENT_NAME,
     SIMULATOR_KEY_OPENAI_TOKENS,
     SIMULATOR_KEY_LIMITER,
 )
 
-# This file contains a default implementation of the get_generators function
+# This file contains a default implementation of the openai generators
 # You can configure your own generators by creating a generator_config.py file and setting the
-# GENERATOR_CONFIG_PATH environment variable to the path of the file when running the API
-# See src/examples/generator_config.py for an example of how to define your own generators
+# EXTENSION_PATH environment variable to the path of the file when running the API
+# See src/examples/generator_config for an example of how to define your own generators
 
 logger = logging.getLogger(__name__)
 

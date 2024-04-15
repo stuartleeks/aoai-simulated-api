@@ -5,12 +5,12 @@ import math
 import time
 from typing import Callable
 
-from aoai_simulated_api.pipeline import RequestContext
 from fastapi import Response
 from limits import storage, strategies, RateLimitItemPerSecond
 
 
-import aoai_simulated_api.constants as constants
+from aoai_simulated_api import constants
+from aoai_simulated_api.models import RequestContext
 
 logger = logging.getLogger(__name__)
 

@@ -7,7 +7,7 @@ from fastapi import Response
 
 
 from aoai_simulated_api.constants import SIMULATOR_KEY_LIMITER
-from aoai_simulated_api.pipeline import RequestContext
+from aoai_simulated_api.models import RequestContext
 
 document_analysis_config = {}
 
@@ -166,6 +166,7 @@ def build_result(analyze_result_dict):
 
     # TODO: Vary the pages, words, documents based on the desired response size.
 
+    # pylint: disable-next=line-too-long
     # Based on https://learn.microsoft.com/en-us/rest/api/aiservices/document-models/get-analyze-result?view=rest-aiservices-2023-07-31&tabs=HTTP,
     # Many fields appear to be optional (likely varying by model), so we can just return a minimal response for now.
 

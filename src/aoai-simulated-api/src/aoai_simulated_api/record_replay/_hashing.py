@@ -2,7 +2,8 @@ from fastapi import Request
 
 
 def hash_request_parts(method: str, url: str, body: bytes):
-    body_hash = hash(body)  # TODO: look for incremental hashing function in Python
+    # Potential future optimisation would be to look for incremental hashing function in Python
+    body_hash = hash(body)
     return hash(method + "|" + url + "|" + str(body_hash))
 
 

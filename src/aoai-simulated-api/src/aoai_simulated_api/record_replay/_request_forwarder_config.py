@@ -1,21 +1,20 @@
 import json
 import logging
-from typing import Callable
+from typing import Awaitable, Callable
 import fastapi
 import requests
 
-from aoai_simulated_api.pipeline import RequestContext
+from aoai_simulated_api.models import RequestContext
 from aoai_simulated_api.constants import (
     SIMULATOR_KEY_DEPLOYMENT_NAME,
     SIMULATOR_KEY_OPENAI_TOKENS,
     SIMULATOR_KEY_LIMITER,
 )
 
-# This file contains a default implementation of the get_forwarders function
-# for handling forwarded requests
+# This file contains a default openai forwarder
 # You can configure your own forwarders by creating a forwarder_config.py file and setting the
-# FORWWARDER_CONFIG_PATH environment variable to the path of the file when running the API
-# See src/example_forwarder_config/forwarder_config.py for an example of how to define your own forwarders
+# EXTENSION_PATH environment variable to the path of the file when running the API
+# See src/examples/forwarder_config for an example of how to define your own forwarders
 
 config_validated: bool = False
 
@@ -39,7 +38,8 @@ def _validate_endpoint_config(context: RequestContext):
 
     else:
         logger.warning(
-            "Got a request that looked like an openai request, but missing some or all of the required environment variables for forwarding: AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_KEY"
+            "Got a request that looked like an openai request, but missing some or all of the "
+            + "required environment variables for forwarding: AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_KEY"
         )
 
 
@@ -137,10 +137,26 @@ async def forward_to_azure_openai(context: RequestContext) -> dict:
     return {"response": response, "persist_response": True}
 
 
-def get_forwarders() -> list[Callable[[RequestContext], fastapi.Response | requests.Response | None]]:
+def get_default_forwarders() -> list[
+    Callable[
+        [RequestContext],
+        fastapi.Response
+        | Awaitable[fastapi.Response]
+        | requests.Response
+        | Awaitable[requests.Response]
+        | dict
+        | Awaitable[dict]
+        | None,
+    ]
+]:
     # Return a list of functions to call when recording and no matching saved request is found
-    # If the function returns a Response object (from FastAPI or requests package), it will be used as the response for the request
-    # If the function returns a dict then it should have a "response" property with the response and a "persist" property that is True/False to indicate whether to persist the response
+    #
+    # If the function returns a Response object (from FastAPI or requests package)
+    # it will be used as the response for the request
+    #
+    # If the function returns a dict then it should have a "response" property
+    # with the response and a "persist" property that is True/False to indicate whether to persist the response
+    #
     # If the function returns None, the next function in the list will be called
     return [
         forward_to_azure_openai,

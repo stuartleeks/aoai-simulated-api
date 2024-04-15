@@ -1,25 +1,24 @@
-from fastapi import Request
+from dataclasses import dataclass
+from typing import Awaitable, Callable
+
+# from aoai_simulated_api.pipeline import RequestContext
+from fastapi import Request, Response
+from requests import Response as requests_Response
 from starlette.routing import Route, Match
-from aoai_simulated_api.config import Config
-
-
-# re-using Starlette's Route class to define a route
-# endpoint to pass to Route
-def _endpoint():
-    pass
 
 
 class RequestContext:
+    _config: "Config"
     _request: Request
     _values: dict[str, any]
 
-    def __init__(self, config: Config, request: Request):
+    def __init__(self, config: "Config", request: Request):
         self._config = config
         self._request = request
         self._values = {}
 
     @property
-    def config(self) -> Config:
+    def config(self) -> "Config":
         return self._config
 
     @property
@@ -57,3 +56,53 @@ class RequestContext:
         if match != Match.FULL:
             return (False, {})
         return (True, scopes["path_params"])
+
+
+@dataclass
+class RecordingConfig:
+    dir: str
+    autosave: bool
+    aoai_api_key: str | None = None
+    aoai_api_endpoint: str | None = None
+    forwarders: (
+        list[
+            Callable[
+                [RequestContext],
+                Response
+                | Awaitable[Response]
+                | requests_Response
+                | Awaitable[requests_Response]
+                | dict
+                | Awaitable[dict]
+                | None,
+            ]
+        ]
+        | None
+    ) = None
+
+
+@dataclass
+class Config:
+    """
+    Configuration for the simulator
+    """
+
+    simulator_mode: str
+    simulator_api_key: str
+    recording: RecordingConfig
+    openai_deployments: dict[str, "OpenAIDeployment"] | None
+    generators: list[Callable[[RequestContext], Response | Awaitable[Response] | None]]
+    doc_intelligence_rps: int
+
+
+@dataclass
+class OpenAIDeployment:
+    name: str
+    model: str
+    tokens_per_minute: int
+
+
+# re-using Starlette's Route class to define a route
+# endpoint to pass to Route
+def _endpoint():
+    pass

@@ -8,9 +8,10 @@ This repo is an exploration into creating a simulated API implementation for Azu
   - [Getting Started](#getting-started)
   - [Running in Docker](#running-in-docker)
   - [Deploying to Azure Container Apps](#deploying-to-azure-container-apps)
-  - [Providing custom forwarders](#providing-custom-forwarders)
-    - [Creating a custom forwarder](#creating-a-custom-forwarder)
-    - [Running with a customer forwarder](#running-with-a-customer-forwarder)
+  - [Extending the simulator](#extending-the-simulator)
+    - [Creating a custom forwarder extension](#creating-a-custom-forwarder-extension)
+    - [Creating a custom generator extension](#creating-a-custom-generator-extension)
+    - [Running with an extension](#running-with-an-extension)
   - [Large recordings](#large-recordings)
   - [Rate-limiting](#rate-limiting)
     - [OpenAI Rate-Limiting](#openai-rate-limiting)
@@ -54,10 +55,8 @@ When running the simulated API, there are a number of environment variables to c
 | `SIMULATOR_MODE`                | The mode the simulator should run in. Current options are `record`, `replay`, and `generate`.                                                        |
 | `SIMULATOR_API_KEY` | The API key used by the simulator to authenticate requests. If not specified a key is auto-generated (see the logs). It is recommended to set a deterministic key value in `.env` |
 | `RECORDING_DIR`                 | The directory to store the recorded requests and responses (defaults to `.recording`).                                                               |
-| `RECORDING_FORMAT`              | Currently only `yaml` is supported. Use to specify the format of the recorded requests/responses.                                                    |
 | `RECORDING_AUTOSAVE`            | If set to `True` (default), the simulator will save the recording after each request.                                                                |
-| `GENERATOR_CONFIG_PATH`         | The path to a Python file that contains the generator configuration. See `src/examples/generator_config` for an example.                          |
-| `FORWARDER_CONFIG_PATH`         | The path to a Python file that contains the forwarder configuration. See `src/examples/forwarder_config` for an example.                          |
+| `EXTENSION_PATH`         | The path to a Python file that contains the extension configuration. This can be a single python file or a package folder - see `src/examples`|
 | `AZURE_OPENAI_ENDPOINT`         | The endpoint for the Azure OpenAI service, e.g. `https://mysvc.openai.azure.com/`                                                                    |
 | `AZURE_OPENAI_KEY`              | The API key for the Azure OpenAI service.                                                                                                            |
 | `DOC_INTELLIGENCE_RPS`          | The rate limit for the Document Intelligence service. Defaults to 15 RPS. See [Doc Intelligence Rate-Limiting](#document-intelligence-rate-limiting). Set to a negative value to disable rate-limiting. |
@@ -87,10 +86,6 @@ To run the API in generator mode, you can set the `SIMULATOR_MODE` environment v
 ```bash
 # Run the API in generator mode
 SIMULATOR_MODE=generate make run-simulated-api
-
-# Run the API in generator mode with a custom generator configuration
-# See src/examples/generator_config.py for an example of using a custom generator
-SIMULATOR_MODE=generate GENERATOR_CONFIG_PATH=/path/to/generator_config.py make run-simulated-api
 ```
 
 ## Running in Docker
@@ -116,27 +111,30 @@ If no value is specified for `RECORDING_DIR`, the simulator will use `/mnt/simul
 
 The file share can also be used for setting the OpenAI deployment configuration or for any forwarder/generator config.
 
-## Providing custom forwarders
+## Extending the simulator
+
+The simulator allows extending some aspects of the behavior without modifying the original source code.
+
+The `EXTENSION_PATH` environment variable can be set to the path to an extension.
+This can be a single python file or a package folder.
+The extension should contain an `initialize` method that receives the simulator configuration and can modify it.
+
+### Creating a custom forwarder extension
 
 When running in `record` mode, the simulator forwards requests on to a backend API and records the request/response information for later replay.
 
 The default implementation uses the `AZURE_OPENAI_ENDPOINT` and `AZURE_OPENAI_KEY` environment variables to forward requests on to Azure OpenAI.
 
-To provide a custom forwarder you need to:
-1. create a Python file with a `get_forwarders` method
-2. set the `FORWARDER_CONFIG_PATH` to point to your custom config when running the simulator
+To forward requests on to a different backend API, you can create a custom forwarder extension.
 
-
-### Creating a custom forwarder
-
->  NOTE: This example uses a single file implementation for the forwarder. The forwarder can be split into multiple files if needed (see `src/examples/forwarder_config` for an example)
-
-A custom forwarder file needs to have a `get_forwarders` method as shown below:
+An extension needs to have an `initialize` method as shown below:
 
 ```python
 from typing import Callable
 from fastapi import Request
 import requests
+
+from aoai_simulated_api.models import Config
 
 async def forward_to_my_host(request: Request) -> Response | None:
 	# build up the forwarded request from the incoming request
@@ -151,19 +149,16 @@ async def forward_to_my_host(request: Request) -> Response | None:
     )
 	return response
 
-
-def get_forwarders() -> list[Callable[[fastapi.Request], fastapi.Response | requests.Response | dict | None]]:
-    # Return a list of functions to call when recording and no matching saved request is found
-    # If the function returns a Response object (from FastAPI or requests package), it will be used as the response for the request
-    # If the function returns None, the next function in the list will be called
-    return [
-        forward_to_my_host,
-    ]
-
+def initialize(config: Config):
+    # initialize is the entry point invoked by the simulator
+    # here we append the custom forwarder to the list of forwarders
+    config.recording.forwarders.append(forward_to_my_host)
 ```
 
-The `get_forwarders` method returns an array of functions.
-Each function can return a number of options:
+The `initialize` method receives the simulator config and can manipulate it to change the simulator behavior.
+
+The `config.recording.forwarders` property is a list of functions that are called in order to forward requests on to the backend API.
+Each function can by sync or async and can return a number of options:
 
 - A `Response` object from the `fastapi` package
 - A `Response` object from the `requests` package
@@ -188,20 +183,46 @@ async def forward_to_my_host(request: Request) -> Response | None:
 	# rest of the implementation here...
 ```
 
-The default forwarder can be found in `src/aoai_simulated_api/record_replay/_request_forwarder_config.py`.
+### Creating a custom generator extension
 
-### Running with a customer forwarder
+If you want to add custom logic to generate responses in `generate` mode, you can create a custom generator extension.
+This allows you to replace the default lorem ipsum responses with responses that are more relevant to your scenario, or are based on the input request.
 
-To run with a custom forwarder set the `FORWARDER_CONFIG_PATH` environment variable:
+An extension needs to have an `initialize` method as shown below:
+
+```python
+from aoai_simulated_api.models import Config, RequestContext
+from fastapi import Response
+
+def initialize(config: Config):
+    # initialize is the entry point invoked by the simulator
+    # here we append the custom generator to the list of generators
+    config.generators.append(generate_echo_response)
+
+async def generate_echo_response(context: RequestContext) -> Response | None:
+    request = context.request
+    if request.url.path != "/echo" or request.method != "POST":
+        return None
+    request_body = await request.body()
+    return Response(content=f"Echo: {request_body.decode("utf-8")}", status_code=200)
+```
+
+If the generator function returns a `Response` object then that response is used as the response for the request.
+If the generator function returns `None` then the next generator function is called.
+
+
+### Running with an extension
+
+To run with an extension,  set the `EXTENSION_PATH` environment variable:
 
 ```bash
-SIMULATOR_MODE=record FORWARDER_CONFIG_PATH=/path/to/forwarder_config.py make run-simulated-api
+SIMULATOR_MODE=record EXTENSION_PATH=/path/to/extension.py make run-simulated-api
 ```
 
 Or via Docker:
 
 ```bash
-docker run -p 8000:8000 -e SIMULATOR_MODE=record -e FORWARDER_CONFIG_PATH=/aoai/forwarder_config.py -v /path/to/forwarder_config.py:/aoai aoai-simulated-api
+docker run -p 8000:8000 -e SIMULATOR_MODE=record -e EXTENSION_PATH=/mnt/extension.py -v /path/to/extension.py:/mnt/extension.py
 ```
 
 ## Large recordings

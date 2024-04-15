@@ -11,7 +11,7 @@ import requests
 import uvicorn
 
 from aoai_simulated_api.app_builder import get_simulator
-from aoai_simulated_api.config import Config, RecordingConfig
+from aoai_simulated_api.models import Config, RecordingConfig
 
 logger = logging.getLogger("tests")
 
@@ -57,11 +57,11 @@ async def test_root_message():
         recording=RecordingConfig(
             autosave=False,
             dir="",
-            format="",
-            forwarder_config_path="",
+            forwarders=[],
         ),
-        generator_config_path="",
         openai_deployments=None,
+        generators=[],
+        doc_intelligence_rps=123,
     )
     server = UvicornTestServer(config)
     with server.run_in_thread():

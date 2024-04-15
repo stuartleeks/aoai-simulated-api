@@ -1,34 +1,74 @@
+import inspect
 import logging
 import time
-from typing import Callable
-from fastapi import Response
+from typing import Awaitable, Callable
+
+import fastapi
+import requests
 
 from aoai_simulated_api import constants
-from aoai_simulated_api.pipeline import RequestContext
+from aoai_simulated_api.models import RequestContext
 
 from aoai_simulated_api.record_replay._hashing import get_request_hash, hash_request_parts
 from aoai_simulated_api.record_replay._models import RecordedResponse
 from aoai_simulated_api.record_replay._persistence import YamlRecordingPersister
-from aoai_simulated_api.record_replay._request_forwarder import ForwardedResponse
 
 logger = logging.getLogger(__name__)
+
+text_content_types = ["application/json", "application/text"]
+
+
+class ForwardedResponse:
+    def __init__(self, response: fastapi.Response, persist_response: bool):
+        self._response = response
+        self._persist_response = persist_response
+
+    @property
+    def response(self) -> fastapi.Response:
+        return self._response
+
+    @property
+    def persist_response(self) -> bool:
+        return self._persist_response
 
 
 class RecordReplayHandler:
 
     _recordings: dict[str, dict[int, RecordedResponse]]
-    _forwarder: Callable[[RequestContext], ForwardedResponse] | None
+    _forwarders: list[
+        Callable[
+            [RequestContext],
+            fastapi.Response
+            | Awaitable[fastapi.Response]
+            | requests.Response
+            | Awaitable[requests.Response]
+            | dict
+            | Awaitable[dict]
+            | None,
+        ]
+    ]
 
     def __init__(
         self,
         simulator_mode: str,
         persister: YamlRecordingPersister,
-        forwarder: Callable[[RequestContext], ForwardedResponse] | None,
+        forwarders: list[
+            Callable[
+                [RequestContext],
+                fastapi.Response
+                | Awaitable[fastapi.Response]
+                | requests.Response
+                | Awaitable[requests.Response]
+                | dict
+                | Awaitable[dict]
+                | None,
+            ]
+        ],
         autosave: bool,
     ):
         self._simulator_mode = simulator_mode
         self._persister = persister
-        self._forwarder = forwarder
+        self._forwarders = forwarders
         self._autosave = autosave
 
         # recordings keyed by URL, within a recording, requests are keyed by hash of request values
@@ -47,7 +87,7 @@ class RecordReplayHandler:
         self._recordings[url] = recording
         return recording
 
-    async def handle_request(self, context: RequestContext) -> Response | None:
+    async def handle_request(self, context: RequestContext) -> fastapi.Response | None:
         request = context.request
         url = request.url.path
         recording = await self._get_recording_for_url(url)
@@ -57,9 +97,10 @@ class RecordReplayHandler:
             if response_info:
                 headers = {k: v[0] for k, v in response_info.headers.items()}
                 context.values[constants.RECORDED_DURATION_MS] = response_info.duration_ms
-                return Response(content=response_info.body, status_code=response_info.status_code, headers=headers)
-            else:
-                logger.debug("No recorded response found for request %s %s", request.method, url)
+                return fastapi.Response(
+                    content=response_info.body, status_code=response_info.status_code, headers=headers
+                )
+            logger.debug("No recorded response found for request %s %s", request.method, url)
         else:
             logger.debug("No recording found for URL: %s", url)
 
@@ -68,14 +109,12 @@ class RecordReplayHandler:
 
         return None
 
-    async def _record_request(self, context: RequestContext) -> Response:
-        if not self._forwarder:
-            raise ValueError("No forwarder available to record request")
-
+    async def _record_request(self, context: RequestContext) -> fastapi.Response:
         request = context.request
 
+        # Forward the response and capture the request duration
         start_time = time.time()
-        forwarded_response: ForwardedResponse | None = await self._forwarder(context)
+        forwarded_response: ForwardedResponse | None = await self.forward_request(context)
         end_time = time.time()
         if not forwarded_response:
             raise ValueError(
@@ -85,6 +124,18 @@ class RecordReplayHandler:
         elapsed_time = end_time - start_time
         elapsed_time_ms = int(elapsed_time * 1000)
 
+        recorded_response = await self.get_recorded_response(request, forwarded_response, elapsed_time_ms)
+        if forwarded_response.persist_response:
+            self.store_recorded_response(request, recorded_response)
+
+        context.values[constants.RECORDED_DURATION_MS] = elapsed_time_ms
+        return fastapi.Response(
+            content=recorded_response.body,
+            status_code=recorded_response.status_code,
+            headers=forwarded_response.response.headers,  # use original headers in returned content
+        )
+
+    async def get_recorded_response(self, request, forwarded_response, elapsed_time_ms):
         response = forwarded_response.response
         request_body = await request.body()
         body = response.body
@@ -94,7 +145,6 @@ class RecordReplayHandler:
         if "content-length" in response.headers:
             del response.headers["content-length"]
 
-        text_content_types = ["application/json", "application/text"]
         response_content_type = response.headers.get("content-type", "").split(";")[0]
         if response_content_type in text_content_types:
             # simplify format for editing recording files
@@ -119,22 +169,55 @@ class RecordReplayHandler:
             duration_ms=elapsed_time_ms,
         )
 
-        if forwarded_response.persist_response:
-            # Save the recording
-            logger.info("📝 Storing recording for %s %s", request.method, request.url)
-            recording = self._recordings.get(request.url.path)
-            if not recording:
-                recording = {}
-                self._recordings[request.url.path] = recording
-            recording[recorded_response.request_hash] = recorded_response
+        return recorded_response
 
-            if self._autosave:
-                # Save the recording to disk
-                self._persister.save_recording(request.url.path, recording)
+    def store_recorded_response(self, request, recorded_response):
+        logger.info("📝 Storing recording for %s %s", request.method, request.url)
+        recording = self._recordings.get(request.url.path)
+        if not recording:
+            recording = {}
+            self._recordings[request.url.path] = recording
+        recording[recorded_response.request_hash] = recorded_response
 
-        context.values[constants.RECORDED_DURATION_MS] = elapsed_time_ms
-        return Response(content=body, status_code=response.status_code, headers=response.headers)
+        if self._autosave:
+            # Save the recording to disk
+            self._persister.save_recording(request.url.path, recording)
 
     def save_recordings(self):
         for url, recording in self._recordings.items():
             self._persister.save_recording(url, recording)
+
+    async def forward_request(self, context: RequestContext) -> ForwardedResponse:
+        for forwarder in self._forwarders:
+            response = forwarder(context)
+            if response is not None and inspect.isawaitable(response):
+                response = await response
+            if response is not None:
+                persist_response = True
+                # unwrap dictionary response
+                if isinstance(response, dict):
+                    original_response = response
+                    response = original_response["response"]
+                    persist_response = original_response.get("persist", persist_response)
+
+                # normalize response to FastAPI Response
+                if isinstance(response, fastapi.Response):
+                    # Already a FastAPI response
+                    pass
+                elif isinstance(response, requests.Response):
+                    # convert requests response to FastAPI response
+                    response = fastapi.Response(
+                        content=response.text, status_code=response.status_code, headers=response.headers
+                    )
+                else:
+                    raise ValueError(f"Unhandled response type from forwarder: {type(response)}")
+
+                if "Content-Length" in response.headers.keys():
+                    # Content-Length will automatically be set when we return
+                    # Strip out before recording to avoid issues
+                    del response.headers["Content-Length"]
+
+                # wrap and return
+                return ForwardedResponse(response=response, persist_response=persist_response)
+
+        return None

@@ -4,12 +4,14 @@ Test the OpenAI generator endpoints
 
 import shutil
 import tempfile
-from aoai_simulated_api.config import Config, RecordingConfig
+from aoai_simulated_api.models import Config, RecordingConfig
 from openai import AzureOpenAI
 import pytest
 from pytest_httpserver import HTTPServer
 
 from .test_uvicorn_server import UvicornTestServer
+
+from aoai_simulated_api.record_replay import get_default_forwarders
 
 
 class TempDirectory:
@@ -34,6 +36,7 @@ class TempDirectory:
 
 API_KEY = "123456879"
 
+
 def _get_record_config(httpserver: HTTPServer, recording_path: str) -> Config:
     forwarding_server_url = httpserver.url_for("/").removesuffix("/")
     return Config(
@@ -42,13 +45,13 @@ def _get_record_config(httpserver: HTTPServer, recording_path: str) -> Config:
         recording=RecordingConfig(
             autosave=True,
             dir=recording_path,
-            format="yaml",
-            forwarder_config_path="",
             aoai_api_endpoint=forwarding_server_url,
             aoai_api_key="123456789",
+            forwarders=get_default_forwarders(),
         ),
-        generator_config_path="",
+        generators=[],
         openai_deployments=None,
+        doc_intelligence_rps=123,
     )
 
 
@@ -59,11 +62,11 @@ def _get_replay_config(recording_path: str) -> Config:
         recording=RecordingConfig(
             autosave=True,
             dir=recording_path,
-            format="yaml",
-            forwarder_config_path="",
+            forwarders=get_default_forwarders(),
         ),
-        generator_config_path="",
         openai_deployments=None,
+        generators=[],
+        doc_intelligence_rps=123,
     )
 
 
