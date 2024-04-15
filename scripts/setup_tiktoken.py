@@ -3,7 +3,11 @@ import urllib.request
 
 # Create the tiktoken_cache folder
 folder_path = os.path.join(
-    os.path.dirname(__file__), "..", "src", "aoai-simulated-api", "src", "aoai_simulated_api", "tiktoken_cache"
+    os.path.dirname(__file__),
+    "..",
+    "src",
+    "aoai-simulated-api",
+    "tiktoken_cache",
 )
 
 print(folder_path)

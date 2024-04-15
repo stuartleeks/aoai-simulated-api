@@ -118,17 +118,3 @@ def load_doc_intelligence_limit() -> int:
     # Default is 15 RPS based on:
     # https://learn.microsoft.com/en-us/azure/ai-services/document-intelligence/service-limits?view=doc-intel-4.0.0
     return int(os.getenv("DOC_INTELLIGENCE_RPS", "15"))
-
-
-def setup_tiktoken_cache() -> None:
-    tiktoken_cache_dir = os.path.join(os.path.dirname(__file__), "tiktoken_cache")
-
-    if not os.path.exists(
-        os.path.join(
-            tiktoken_cache_dir,
-            "9b5ad71b2ce5302211f9c61530b329a4922fc6a4",
-        )
-    ):
-        raise Exception(f"Could not find tiktoken encoding file in {tiktoken_cache_dir}.")
-
-    os.environ["TIKTOKEN_CACHE_DIR"] = tiktoken_cache_dir
