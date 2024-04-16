@@ -11,7 +11,7 @@ import requests
 
 from .test_uvicorn_server import UvicornTestServer
 
-from aoai_simulated_api.record_replay import get_default_forwarders
+from aoai_simulated_api.record_replay.handler import get_default_forwarders
 
 API_KEY = "123456789"
 

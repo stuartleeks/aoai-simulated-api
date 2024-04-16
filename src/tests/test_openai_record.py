@@ -11,7 +11,7 @@ from pytest_httpserver import HTTPServer
 
 from .test_uvicorn_server import UvicornTestServer
 
-from aoai_simulated_api.record_replay import get_default_forwarders
+from aoai_simulated_api.record_replay.handler import get_default_forwarders
 
 
 class TempDirectory:

@@ -14,7 +14,8 @@ from aoai_simulated_api import constants
 from aoai_simulated_api.generator.manager import invoke_generators
 from aoai_simulated_api.limiters import create_openai_limiter, create_doc_intelligence_limiter
 from aoai_simulated_api.models import Config, RequestContext
-from aoai_simulated_api.record_replay import RecordReplayHandler, YamlRecordingPersister
+from aoai_simulated_api.record_replay.handler import RecordReplayHandler
+from aoai_simulated_api.record_replay.persistence import YamlRecordingPersister
 
 
 @dataclass

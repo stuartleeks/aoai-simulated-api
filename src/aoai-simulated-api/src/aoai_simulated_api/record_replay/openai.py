@@ -135,29 +135,3 @@ async def forward_to_azure_openai(context: RequestContext) -> dict:
     context.values[SIMULATOR_KEY_OPENAI_TOKENS] = tokens_used
 
     return {"response": response, "persist_response": True}
-
-
-def get_default_forwarders() -> list[
-    Callable[
-        [RequestContext],
-        fastapi.Response
-        | Awaitable[fastapi.Response]
-        | requests.Response
-        | Awaitable[requests.Response]
-        | dict
-        | Awaitable[dict]
-        | None,
-    ]
-]:
-    # Return a list of functions to call when recording and no matching saved request is found
-    #
-    # If the function returns a Response object (from FastAPI or requests package)
-    # it will be used as the response for the request
-    #
-    # If the function returns a dict then it should have a "response" property
-    # with the response and a "persist" property that is True/False to indicate whether to persist the response
-    #
-    # If the function returns None, the next function in the list will be called
-    return [
-        forward_to_azure_openai,
-    ]

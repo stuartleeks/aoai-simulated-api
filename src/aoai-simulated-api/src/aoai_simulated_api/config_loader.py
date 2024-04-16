@@ -6,7 +6,7 @@ import os
 import sys
 
 from aoai_simulated_api.models import Config, OpenAIDeployment, RecordingConfig
-from aoai_simulated_api.record_replay import get_default_forwarders
+from aoai_simulated_api.record_replay.handler import get_default_forwarders
 from aoai_simulated_api.generator.manager import get_default_generators
 import nanoid
 
