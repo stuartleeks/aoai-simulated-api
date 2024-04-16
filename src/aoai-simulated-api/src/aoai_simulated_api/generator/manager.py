@@ -1,10 +1,13 @@
 import importlib.util
 import inspect
+import logging
 import os
 import sys
 
 from aoai_simulated_api.pipeline import RequestContext
 from ._generator_context import GeneratorSetupContext
+
+logger = logging.getLogger(__name__)
 
 
 def _load_generators(generator_config_path: str, setup_context: GeneratorSetupContext):
@@ -32,11 +35,18 @@ class GeneratorManager:
         self._generators = _load_generators(generator_config_path, setup_context)
 
     async def generate(self, context: RequestContext):
-        request = context.request
         for generator in self._generators:
-            response = generator(context=context, request=request)
-            if response is not None and inspect.isawaitable(response):
-                response = await response
-            if response is not None:
-                return response
-        raise Exception("No generator found for request")
+            try:
+                response = generator(context=context)
+                if response is not None and inspect.isawaitable(response):
+                    response = await response
+                if response is not None:
+                    return response
+            except Exception as e:  # pylint: disable=broad-except
+                logger.error(
+                    "Error generating response (name='%s', request='%s')",
+                    generator.__name__,
+                    context.request.url,
+                    exc_info=e,
+                )
+        raise ValueError("No generator found for request")

@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 class RecordReplayHandler:
 
     _recordings: dict[str, dict[int, RecordedResponse]]
+    _forwarder: Callable[[RequestContext], ForwardedResponse] | None
 
     def __init__(
         self,
@@ -69,16 +70,17 @@ class RecordReplayHandler:
 
     async def _record_request(self, context: RequestContext) -> Response:
         if not self._forwarder:
-            raise Exception("No forwarder available to record request")
+            raise ValueError("No forwarder available to record request")
 
         request = context.request
 
         start_time = time.time()
-        forwarded_response = await self._forwarder(context)
+        forwarded_response: ForwardedResponse | None = await self._forwarder(context)
         end_time = time.time()
         if not forwarded_response:
-            raise Exception(
-                f"Failed to forward request - no configured forwarders returned a response for {request.method} {request.url}"
+            raise ValueError(
+                "Failed to forward request - no configured forwarders returned a response for"
+                + f"{request.method} {request.url}"
             )
         elapsed_time = end_time - start_time
         elapsed_time_ms = int(elapsed_time * 1000)
@@ -92,7 +94,7 @@ class RecordReplayHandler:
         if "content-length" in response.headers:
             del response.headers["content-length"]
 
-        text_content_types = ["application/json", "application/text"]  # TODO - handle other text types
+        text_content_types = ["application/json", "application/text"]
         response_content_type = response.headers.get("content-type", "").split(";")[0]
         if response_content_type in text_content_types:
             # simplify format for editing recording files

@@ -60,33 +60,37 @@ When running the simulated API, there are a number of environment variables to c
 | `FORWARDER_CONFIG_PATH`         | The path to a Python file that contains the forwarder configuration. See `src/examples/forwarder_config` for an example.                          |
 | `AZURE_OPENAI_ENDPOINT`         | The endpoint for the Azure OpenAI service, e.g. `https://mysvc.openai.azure.com/`                                                                    |
 | `AZURE_OPENAI_KEY`              | The API key for the Azure OpenAI service.                                                                                                            |
-| `DOC_INTELLIGENCE_RPS`          | The rate limit for the Document Intelligence service. Defaults to 15 RPS. See [Doc Intelligence Rate-Limiting](#document-intelligence-rate-limiting) |
+| `DOC_INTELLIGENCE_RPS`          | The rate limit for the Document Intelligence service. Defaults to 15 RPS. See [Doc Intelligence Rate-Limiting](#document-intelligence-rate-limiting). Set to a negative value to disable rate-limiting. |
 | `OPENAI_DEPLOYMENT_CONFIG_PATH` | The path to a JSON file that contains the deployment configuration. See [OpenAI Rate-Limiting](#openai-rate-limiting)                                |
 | `AZURE_OPENAI_DEPLOYMENT`       | Used by the test app to set the name of the deployed model in your Azure OpenAI service. Use a gpt-35-turbo-instruct deployment.                     |
 | `LOG_LEVEL`                    | The log level for the simulator. Defaults to `INFO`.                                                                                                 |
 
+The examples below show passing environment variables to the API directly on the command line, but you can also set them via a `.env` file in the root directory for convenience (see the `sample.env` for a starting point).
+The `.http` files for testing the endpoints also use the `.env` file to set the environment variables for calling the API.
 
-To run the simulated API, run `uvicorn main:app --reload --port 8000` from the `src/aoai-simulated-api` directory using the environment variables above to configure.
+> Note: when running the simulator it will auto-generate an API. This needs to be passed to the API when making requests. To avoid the API Key changing each time the simulator is run, set the `SIMULATOR_API_KEY` environment variable to a fixed value.
+
+To run the simulated API, run `make run-simulated-api` from the repo root directory using the environment variables above to configure.
 
 For example, to use the API in record/replay mode:
 
 ```bash
 # Run the API in record mode
-SIMULATOR_MODE=record AZURE_OPENAI_ENDPOINT=https://mysvc.openai.azure.com/ AZURE_OPENAI_KEY=your-api-key uvicorn main:app --reload --port 8000
+SIMULATOR_MODE=record AZURE_OPENAI_ENDPOINT=https://mysvc.openai.azure.com/ AZURE_OPENAI_KEY=your-api-key make run-simulated-api
 
 # Run the API in replay mode
-SIMULATOR_MODE=replay uvicorn main:app --reload --port 8000
+SIMULATOR_MODE=replay make run-simulated-api
 ```
 
 To run the API in generator mode, you can set the `SIMULATOR_MODE` environment variable to `generate` and run the API as above.
 
 ```bash
 # Run the API in generator mode
-SIMULATOR_MODE=generate uvicorn main:app --reload --port 8000
+SIMULATOR_MODE=generate make run-simulated-api
 
 # Run the API in generator mode with a custom generator configuration
 # See src/examples/generator_config.py for an example of using a custom generator
-SIMULATOR_MODE=generate GENERATOR_CONFIG_PATH=/path/to/generator_config.py uvicorn main:app --reload --port 8000
+SIMULATOR_MODE=generate GENERATOR_CONFIG_PATH=/path/to/generator_config.py make run-simulated-api
 ```
 
 ## Running in Docker
@@ -191,7 +195,7 @@ The default forwarder can be found in `src/aoai_simulated_api/record_replay/_req
 To run with a custom forwarder set the `FORWARDER_CONFIG_PATH` environment variable:
 
 ```bash
-SIMULATOR_MODE=record FORWARDER_CONFIG_PATH=/path/to/forwarder_config.py uvicorn main:app --reload --port 8000
+SIMULATOR_MODE=record FORWARDER_CONFIG_PATH=/path/to/forwarder_config.py make run-simulated-api
 ```
 
 Or via Docker:

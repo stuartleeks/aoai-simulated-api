@@ -3,14 +3,37 @@ import random
 import json
 import uuid
 import lorem
-from fastapi import Request, Response
+from fastapi import Response
 
-from aoai_simulated_api.constants import SIMULATOR_HEADER_LIMITER
+
+from aoai_simulated_api.constants import SIMULATOR_KEY_LIMITER
+from aoai_simulated_api.pipeline import RequestContext
 
 document_analysis_config = {}
 
 
-async def doc_intelligence_analyze(context, request: Request) -> Response | None:
+def get_wait_time_for_result(content_length: int) -> float:
+    """
+    Calculate the wait time for the result based on the content length.
+
+    Args:
+        content_length (int): The length of the content.
+
+    Returns:
+        float: The wait time in seconds.
+    """
+    return content_length / 500000  # allow 1s per 500kb
+
+
+def get_word_count_for_result(content_length: int) -> int:
+    # TODO: Determine how to handle the response content length.
+    #       For now, just use a fraction of the original content length.
+    response_content_length = round(content_length / 25000)  # 1 word per 25kb of input
+    return response_content_length
+
+
+async def doc_intelligence_analyze(context: RequestContext) -> Response | None:
+    request = context.request
     is_match, path_params = context.is_route_match(
         request=request, path="/formrecognizer/documentModels/{modelId}:analyze", methods=["POST"]
     )
@@ -32,13 +55,18 @@ async def doc_intelligence_analyze(context, request: Request) -> Response | None
 
     result_id = str(uuid.uuid4())
     # Build the response header
-    # TODO - get base address from config to allow for running in ACA/AKS/... (but default to localhost and current port)
-    document_analysis_result_location = f"http://localhost:8000/formrecognizer/documentModels/{model_id}/analyzeResults/{result_id}?api-version={api_version}"
+    # TODO - get base address from config to allow for running in ACA/AKS/... (but default to request URL)
+    request_url = request.url
+    port = ":" + str(request_url.port) if request_url.port else ""
+    base_url = f"{request_url.scheme}://{request_url.hostname}{port}"
+    document_analysis_result_location = (
+        f"{base_url}/formrecognizer/documentModels/{model_id}/analyzeResults/{result_id}?api-version={api_version}"
+    )
 
     # Set the HTTP response headers.
+    context.values[SIMULATOR_KEY_LIMITER] = "docintelligence"
     headers = {
         "Operation-Location": document_analysis_result_location,
-        SIMULATOR_HEADER_LIMITER: "docintelligence",
     }
 
     # Build a dictionary of values related to the original document analysis request.
@@ -57,7 +85,8 @@ async def doc_intelligence_analyze(context, request: Request) -> Response | None
     return Response(status_code=202, headers=headers)
 
 
-async def doc_intelligence_analyze_result(context, request: Request) -> Response | None:
+async def doc_intelligence_analyze_result(context: RequestContext) -> Response | None:
+    request = context.request
     is_match, path_params = context.is_route_match(
         request=request,
         path="/formrecognizer/documentModels/{model_id}/analyzeResults/{result_id}",
@@ -73,7 +102,7 @@ async def doc_intelligence_analyze_result(context, request: Request) -> Response
 
     # Simulate latency between submission and generating a response
     now = datetime.datetime.now()
-    duration_s = doc_config["content_length"] / 100000  # allow 1s per 100kb
+    duration_s = get_wait_time_for_result(doc_config["content_length"])
     ready_at = doc_config["submitted_at"] + datetime.timedelta(seconds=duration_s)
     if now < ready_at:
         return Response(
@@ -129,9 +158,7 @@ def build_result(analyze_result_dict):
 
     content_length = analyze_result_dict["content_length"]
 
-    # TODO: Determine how to handle the response content length.
-    #       For now, just use a fraction of the original content length.
-    response_content_length = round(content_length * 0.1)
+    response_content_length = get_word_count_for_result(content_length)
 
     content = "".join(lorem.get_word(count=response_content_length))
 

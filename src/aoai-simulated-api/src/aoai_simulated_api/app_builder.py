@@ -2,11 +2,13 @@ import asyncio
 import logging
 import os
 import secrets
+import time
 import traceback
 from typing import Annotated, Callable
 from fastapi import Depends, FastAPI, Request, Response, HTTPException, status
 from fastapi.security import APIKeyHeader
 from limits import storage
+from opentelemetry import trace, metrics
 
 from aoai_simulated_api import constants
 from aoai_simulated_api.config import Config, load_doc_intelligence_limit
@@ -26,16 +28,46 @@ def get_simulator(logger: logging.Logger, config: Config) -> FastAPI:
     """
     app = FastAPI()
 
-    header_scheme = APIKeyHeader(name="api-key")
+    meter = metrics.get_meter(__name__)
+    histogram_latency_base = meter.create_histogram(
+        name="aoai-simulator.latency.base",
+        description="Latency of handling the request (before adding simulated latency)",
+        unit="seconds",
+    )
+    histogram_latency_full = meter.create_histogram(
+        name="aoai-simulator.latency.full",
+        description="Full latency of handling the request (including simulated latency)",
+        unit="seconds",
+    )
+    histogram_tokens_used = meter.create_histogram(
+        name="aoai-simulator.tokens_used",
+        description="Number of tokens used per request",
+        unit="tokens",
+    )
+    histogram_tokens_requested = meter.create_histogram(
+        name="aoai-simulator.tokens_requested",
+        description="Number of tokens across all requests (success or not)",
+        unit="tokens",
+    )
 
-    def validate_api_key(api_key: Annotated[str, Depends(header_scheme)]):
-        if secrets.compare_digest(api_key, config.simulator_api_key):
+    # api-key header for OpenAI
+    # ocp-apim-subscription-key header for doc intelligence
+    api_key_header_scheme = APIKeyHeader(name="api-key", auto_error=False)
+    ocp_apim_subscription_key_header_scheme = APIKeyHeader(name="ocp-apim-subscription-key", auto_error=False)
+
+    def validate_api_key(
+        api_key: Annotated[str, Depends(api_key_header_scheme)],
+        ocp_apim_subscription_key: Annotated[str, Depends(ocp_apim_subscription_key_header_scheme)],
+    ):
+        if api_key and secrets.compare_digest(api_key, config.simulator_api_key):
+            return True
+        if ocp_apim_subscription_key and secrets.compare_digest(ocp_apim_subscription_key, config.simulator_api_key):
             return True
 
-        logger.warning("🔒 Incorrect api-key provided")
+        logger.warning("🔒 Missing or incorrect API Key provided")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect api-key",
+            detail="Missing or incorrect API Key",
         )
 
     logger.info("🚀 Starting aoai-simulated-api in %s mode", config.simulator_mode)
@@ -101,7 +133,7 @@ def get_simulator(logger: logging.Logger, config: Config) -> FastAPI:
     # Each limiter is a function that takes a response and returns a boolean indicating
     # whether the request should be allowed
     # Limiter returns Response object if request should be blocked or None otherwise
-    limiters: dict[str, Callable[[Response], Response | None]] = {
+    limiters: dict[str, Callable[[RequestContext, Response], Response | None]] = {
         "openai": create_openai_limiter(memory_storage, openai_deployment_limits),
         "docintelligence": create_doc_intelligence_limiter(memory_storage, requests_per_second=doc_intelligence_rps),
     }
@@ -109,45 +141,73 @@ def get_simulator(logger: logging.Logger, config: Config) -> FastAPI:
     @app.api_route("/{full_path:path}", methods=["GET", "POST", "PUT", "DELETE"])
     async def catchall(request: Request, _: Annotated[bool, Depends(validate_api_key)]):
         logger.debug("⚡ handling route: %s", request.url.path)
+        # TODO check for traceparent in inbound request and propagate
+        #      to allow for correlating load test with back-end data
+
+        start_time = time.perf_counter()  # N.B. this doesn't accound for the validate_api_key time
 
         try:
             response = None
             context = RequestContext(config=config, request=request)
 
+            # Get response
             if config.simulator_mode == "generate":
                 response = await generator_manager.generate(context)
-
-            if config.simulator_mode in ["record", "replay"]:
+            elif config.simulator_mode in ["record", "replay"]:
                 response = await record_replay_handler.handle_request(context)
 
             if not response:
                 logger.error("No response generated for request: %s", request.url.path)
                 return Response(status_code=500)
 
-            # Want limits here so that that they apply to record/replay as well as generate
-            # TODO work out mapping request to limiter(s)
-            #  - AOAI specifies rate limits by deployment and uses RPM + TPM
-            #  - Doc Intelligence uses flat RPM limit
-
-            limiter_name = response.headers.get(constants.SIMULATOR_HEADER_LIMITER)
+            # Apply limits here so that that they apply to record/replay as well as generate
+            limiter_name = context.values.get(constants.SIMULATOR_KEY_LIMITER)
             limiter = limiters.get(limiter_name) if limiter_name else None
             if limiter:
-                limit_response = limiter(response)
+                limit_response = limiter(context, response)
                 if limit_response:
-                    return limit_response
+                    # replace response with limited response
+                    response = limit_response
             else:
                 logger.debug("No limiter found for response: %s", request.url.path)
 
-            recorded_duration_ms = context.values.get(constants.RECORDED_DURATION_MS, 0)
-            if recorded_duration_ms > 0:
-                await asyncio.sleep(recorded_duration_ms / 1000)
+            # Add latency to successful responses
+            base_end_time = time.perf_counter()
+            base_duration_s = base_end_time - start_time
+            if response.status_code < 300:
+                # TODO - apply latency to generated responses and allow config overrides
+                recorded_duration_ms = context.values.get(constants.RECORDED_DURATION_MS, 0)
+                recorded_duration_s = recorded_duration_ms / 1000
+                extra_latency = recorded_duration_s - base_duration_s
+                if extra_latency > 0:
+                    current_span = trace.get_current_span()
+                    current_span.set_attribute("simulator.added_latency", extra_latency)
+                    await asyncio.sleep(extra_latency)
 
-            # Strip out any simulator headers from the response
-            # TODO - move these header values to RequestContext to share
-            #        (then they don't need removing here!)
-            for key, _ in request.headers.items():
-                if key.startswith(constants.SIMULATOR_HEADER_PREFIX):
-                    del response.headers[key]
+            status_code = response.status_code
+            deployment_name = context.values.get(constants.SIMULATOR_KEY_DEPLOYMENT_NAME)
+            tokens_used = context.values.get(constants.SIMULATOR_KEY_OPENAI_TOKENS)
+
+            full_end_time = time.perf_counter()
+            histogram_latency_base.record(
+                base_duration_s,
+                attributes={
+                    "status_code": status_code,
+                    "deployment": deployment_name,
+                },
+            )
+            histogram_latency_full.record(
+                (full_end_time - start_time),
+                attributes={
+                    "status_code": status_code,
+                    "deployment": deployment_name,
+                },
+            )
+            if tokens_used:
+                histogram_tokens_requested.record(tokens_used, attributes={"deployment": deployment_name})
+                if status_code < 300:
+                    # only track tokens for successful requests
+                    histogram_tokens_used.record(tokens_used, attributes={"deployment": deployment_name})
 
             return response
         # pylint: disable-next=broad-exception-caught
