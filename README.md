@@ -18,6 +18,9 @@ This repo is an exploration into creating a simulated API implementation for Azu
   - [Current Status/Notes](#current-statusnotes)
     - [Replay Exploration](#replay-exploration)
     - [Using the simulator with restricted network access](#using-the-simulator-with-restricted-network-access)
+      - [Unrestricted Network Access](#unrestricted-network-access)
+      - [Semi-Restricted Network Access](#semi-restricted-network-access)
+      - [Restricted Network Access](#restricted-network-access)
 
 
 ## Rationale
@@ -61,7 +64,7 @@ When running the simulated API, there are a number of environment variables to c
 | `OPENAI_DEPLOYMENT_CONFIG_PATH` | The path to a JSON file that contains the deployment configuration. See [OpenAI Rate-Limiting](#openai-rate-limiting)                                |
 | `AZURE_OPENAI_DEPLOYMENT`       | Used by the test app to set the name of the deployed model in your Azure OpenAI service. Use a gpt-35-turbo-instruct deployment.                     |
 | `LOG_LEVEL`                    | The log level for the simulator. Defaults to `INFO`.                                                                                                 |
-| `USE_TIKTOKEN_CACHE` | If set to `True`, the simulator will use a cached TikToken encoding file instead of retrieving it through public internet. See [Using the simulator with restricted network access](#using-the-simulator-with-restricted-network-access) for setup instructions. Defaults to false. |
+
 
 To run the simulated API, run `uvicorn main:app --reload --port 8000` from the `src/aoai-simulated-api` directory using the environment variables above to configure.
 
@@ -262,10 +265,31 @@ Timings for replay exploration are below. Results are in the format `initial tim
 | 100,000        | 140 MB    | 44s (44s)             | 4m26s (0.7s)             | 44s (0.7s)                              |
 
 ### Using the simulator with restricted network access
-During initialization, tiktoken attempts to download an OpenAI encoding file from a public blob storage account managed by OpenAI. When running the simulator in an environment with restricted network access, this can cause the simulator to fail to start.
 
-The simulator can still however be used in an environment with restricted network access by caching the encoding file. This can be done by running the [setup_tiktoken.py](./scripts/setup_tiktoken.py) script. 
-Alternatively, you can download the [encoding file](https://openaipublic.blob.core.windows.net/encodings/cl100k_base.tiktoken) from the public blob storage account and place it in the `src/aoai-simulated-api/src/aoai_simulated_api/tiktoken_cache` directory. Then rename the file to `9b5ad71b2ce5302211f9c61530b329a4922fc6a4`.
+During initialization, TikToken attempts to download an OpenAI encoding file from a public blob storage account managed by OpenAI. When running the simulator in an environment with restricted network access, this can cause the simulator to fail to start.  
+  
+The simulator supports three networking scenarios with different levels of access to the public internet:  
+  
+- Unrestricted network access  
+- Semi-restricted network access  
+- Restricted network access  
 
-Then set the `USE_TIKTOKEN_CACHE` environment variable to `True`. This will let TikToken use the cached TikToken encoding file instead of retrieving it through the public internet.
+Different build arguments can be used to build the simulator for each of these scenarios.
+#### Unrestricted Network Access  
+  
+In this mode, the simulator operates normally, with TikToken downloading the OpenAI encoding file from OpenAI's public blob storage account. This scenario assumes that the Docker container can access the public internet during runtime.
+This is the default build mode.
+  
+#### Semi-Restricted Network Access  
+  
+The semi-restricted network access scenario applies when the build machine has access to the public internet but the runtime environment does not. In this scenario,
+ the simulator can be built using the Docker build argument `network_type=semi-restricted`. This will download the TikToken encoding file during the Docker image build process and cache it within the Docker image. The build process will also set the required `TIKTOKEN_CACHE_DIR` environment variable to point to the cached TikToken encoding file. 
+  
+#### Restricted Network Access  
+The restricted network access scenario applies when both the build machine and the runtime environment do not have access to the public internet. In this scenario, the simulator can be built using a pre-downloaded TikToken encoding file that must be included in a specific location. 
+
+This can be done by running the [setup_tiktoken.py](./scripts/setup_tiktoken.py) script. 
+Alternatively, you can download the [encoding file](https://openaipublic.blob.core.windows.net/encodings/cl100k_base.tiktoken) from the public blob storage account and place it in the `src/aoai-simulated-api/tiktoken_cache` directory. Then rename the file to `9b5ad71b2ce5302211f9c61530b329a4922fc6a4`.
+
+To build the simulator in this mode, set the Docker build argument `network_type=restricted`. The simulator and the build process will then use the cached TikToken encoding file instead of retrieving it through the public internet. The build process will also set the required `TIKTOKEN_CACHE_DIR` environment variable to point to the cached TikToken encoding file. 
 
