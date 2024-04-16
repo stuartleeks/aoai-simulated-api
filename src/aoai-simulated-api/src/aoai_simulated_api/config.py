@@ -50,8 +50,6 @@ def get_config_from_env_vars(logger: logging.Logger) -> Config:
     generator_config_path = os.getenv("GENERATOR_CONFIG_PATH")
     forwarder_config_path = os.getenv("FORWARDER_CONFIG_PATH")
 
-    use_tiktoken_cache = os.getenv("USE_TIKTOKEN_CACHE", "false").lower() == "true"
-
     allowed_simulator_modes = ["replay", "record", "generate"]
     if simulator_mode not in allowed_simulator_modes:
         logger.error("SIMULATOR_MODE must be one of %s", allowed_simulator_modes)
@@ -61,9 +59,6 @@ def get_config_from_env_vars(logger: logging.Logger) -> Config:
     if recording_format not in allowed_recording_formats:
         logger.error("RECORDING_FORMAT must be one of %s", allowed_recording_formats)
         raise ValueError(f"Invalid RECORDING_FORMAT: {recording_format}")
-
-    if use_tiktoken_cache:
-        setup_tiktoken_cache()
 
     return Config(
         simulator_mode=simulator_mode,
