@@ -212,10 +212,8 @@ resource apiSim 'Microsoft.App/containerApps@2023-05-01' = {
           name: 'aoai-simulated-api'
           image: '${containerRegistry.properties.loginServer}/aoai-simulated-api:latest'
           resources: {
-            // cpu: json('0.5')
-            // memory: '1Gi'
-            cpu: json('2')
-            memory: '4Gi'
+            cpu: json('1')
+            memory: '2Gi'
           }
           env: [
             { name: 'SIMULATOR_API_KEY', secretRef: 'simulator-api-key' }
