@@ -5,7 +5,7 @@ from azure.monitor.opentelemetry import configure_azure_monitor
 
 # from opentelemetry import trace
 
-from aoai_simulated_api.config import get_config_from_env_vars
+from aoai_simulated_api.config_loader import get_config_from_env_vars
 from aoai_simulated_api.app_builder import get_simulator
 
 log_level = os.getenv("LOG_LEVEL") or "INFO"

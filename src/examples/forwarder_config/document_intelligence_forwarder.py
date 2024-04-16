@@ -1,14 +1,19 @@
 import json
 import logging
 import os
-from aoai_simulated_api import constants
-from aoai_simulated_api.pipeline import RequestContext
+
 import fastapi
-from fastapi.datastructures import URL
 import requests
 
-# This file is an example of how you can define your request forwarders
-# Forwarders can be sync or async methods
+from fastapi.datastructures import URL
+
+from aoai_simulated_api import constants
+from aoai_simulated_api.models import RequestContext
+
+#
+# This example shows a multi-file extension to the simulator
+# See __init__.py for the initialize method
+#
 
 doc_intelligence_api_key: str | None = None
 doc_intelligence_api_endpoint: str | None = None

@@ -19,9 +19,7 @@ param recordingFormat string = 'yaml'
 
 param recordingAutoSave string
 
-param generatorConfigPath string
-
-param forwardingConfigPath string
+param extensionPath string
 
 param azureOpenAIEndpoint string
 
@@ -95,7 +93,6 @@ resource appInsights 'Microsoft.Insights/components@2020-02-02' = {
     WorkspaceResourceId: logAnalytics.id
   }
 }
-
 
 resource managedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
   name: '${containerAppEnvName}-identity'
@@ -215,10 +212,8 @@ resource apiSim 'Microsoft.App/containerApps@2023-05-01' = {
           name: 'aoai-simulated-api'
           image: '${containerRegistry.properties.loginServer}/aoai-simulated-api:latest'
           resources: {
-            // cpu: json('0.5')
-            // memory: '1Gi'
-            cpu: json('2')
-            memory: '4Gi'
+            cpu: json('1')
+            memory: '2Gi'
           }
           env: [
             { name: 'SIMULATOR_API_KEY', secretRef: 'simulator-api-key' }
@@ -226,8 +221,7 @@ resource apiSim 'Microsoft.App/containerApps@2023-05-01' = {
             { name: 'RECORDING_DIR', value: recordingDir }
             { name: 'RECORDING_FORMAT', value: recordingFormat }
             { name: 'RECORDING_AUTO_SAVE', value: recordingAutoSave }
-            { name: 'GENERATOR_CONFIG_PATH', value: generatorConfigPath }
-            { name: 'FORWARDING_CONFIG_PATH', value: forwardingConfigPath }
+            { name: 'EXTENSION_PATH', value: extensionPath }
             { name: 'AZURE_OPENAI_ENDPOINT', value: azureOpenAIEndpoint }
             { name: 'AZURE_OPENAI_KEY', secretRef: 'azure-openai-key' }
             { name: 'OPENAI_DEPLOYMENT_CONFIG_PATH', value: openAIDeploymentConfigPath }
@@ -235,8 +229,8 @@ resource apiSim 'Microsoft.App/containerApps@2023-05-01' = {
             { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', secretRef: 'app-insights-connection-string' }
             // Ensure cloudRoleName is set in telemetry
             // https://opentelemetry-python.readthedocs.io/en/latest/sdk/environment_variables.html#opentelemetry.sdk.environment_variables.OTEL_SERVICE_NAME
-            { name: 'OTEL_SERVICE_NAME', value : apiSimulatorName}
-            { name: 'OTEL_METRIC_EXPORT_INTERVAL', value : '10000'} // metric export interval in milliseconds
+            { name: 'OTEL_SERVICE_NAME', value: apiSimulatorName }
+            { name: 'OTEL_METRIC_EXPORT_INTERVAL', value: '10000' } // metric export interval in milliseconds
           ]
           volumeMounts: [
             {

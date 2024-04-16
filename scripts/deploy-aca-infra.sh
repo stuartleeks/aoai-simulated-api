@@ -57,11 +57,8 @@ cat << EOF > "$script_dir/../infra/azuredeploy.parameters.json"
 	"recordingAutoSave": {
 	  "value": "${RECORDING_AUTO_SAVE}"
 	},
-	"generatorConfigPath": {
-	  "value": "${GENERATOR_CONFIG_PATH}"
-	},
-	"forwardingConfigPath" : {
-	  "value": "${FORWARDING_CONFIG_PATH}"
+	"extensionPath": {
+	  "value": "${EXTENSION_PATH}"
 	},
 	"azureOpenAIEndpoint": {
 	  "value": "${AZURE_OPENAI_ENDPOINT}"

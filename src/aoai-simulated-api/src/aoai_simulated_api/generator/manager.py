@@ -1,52 +1,41 @@
-import importlib.util
 import inspect
 import logging
-import os
-import sys
+from typing import Callable, Awaitable
 
-from aoai_simulated_api.pipeline import RequestContext
-from ._generator_context import GeneratorSetupContext
+from fastapi import Response
+
+from aoai_simulated_api.models import RequestContext
+from .openai import azure_openai_embedding, azure_openai_completion, azure_openai_chat_completion
+from .doc_intell import doc_intelligence_analyze, doc_intelligence_analyze_result
 
 logger = logging.getLogger(__name__)
 
 
-def _load_generators(generator_config_path: str, setup_context: GeneratorSetupContext):
-    # generator_config_path is the path to a folder with a __init__.py
-    # use the last folder name as the module name as that is intuitive when the __init__.py
-    # references other files in the same folder
-    config_is_dir = os.path.isdir(generator_config_path)
-    if config_is_dir:
-        module_name = os.path.basename(generator_config_path)
-        path_to_load = os.path.join(generator_config_path, "__init__.py")
-    else:
-        module_name = "__generator_config"
-        path_to_load = generator_config_path
-
-    module_spec = importlib.util.spec_from_file_location(module_name, path_to_load)
-    module = importlib.util.module_from_spec(module_spec)
-    sys.modules[module_spec.name] = module
-    module_spec.loader.exec_module(module)
-    return module.get_generators(setup_context)
+def get_default_generators() -> list[Callable[[RequestContext], Response | Awaitable[Response] | None]]:
+    return [
+        azure_openai_embedding,
+        azure_openai_completion,
+        azure_openai_chat_completion,
+        doc_intelligence_analyze,
+        doc_intelligence_analyze_result,
+    ]
 
 
-class GeneratorManager:
-    def __init__(self, generator_config_path: str):
-        setup_context = GeneratorSetupContext()
-        self._generators = _load_generators(generator_config_path, setup_context)
-
-    async def generate(self, context: RequestContext):
-        for generator in self._generators:
-            try:
-                response = generator(context=context)
-                if response is not None and inspect.isawaitable(response):
-                    response = await response
-                if response is not None:
-                    return response
-            except Exception as e:  # pylint: disable=broad-except
-                logger.error(
-                    "Error generating response (name='%s', request='%s')",
-                    generator.__name__,
-                    context.request.url,
-                    exc_info=e,
-                )
-        raise ValueError("No generator found for request")
+async def invoke_generators(
+    context: RequestContext, generators: list[Callable[[RequestContext], Response | Awaitable[Response] | None]]
+):
+    for generator in generators:
+        try:
+            response = generator(context=context)
+            if response is not None and inspect.isawaitable(response):
+                response = await response
+            if response is not None:
+                return response
+        except Exception as e:  # pylint: disable=broad-except
+            logger.error(
+                "Error generating response (name='%s', request='%s')",
+                generator.__name__,
+                context.request.url,
+                exc_info=e,
+            )
+    raise ValueError("No generator found for request")

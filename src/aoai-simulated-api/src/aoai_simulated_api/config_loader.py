@@ -1,33 +1,14 @@
+import importlib
 import json
 import logging
 import os
 
-from dataclasses import dataclass
+import sys
 
+from aoai_simulated_api.models import Config, OpenAIDeployment, RecordingConfig
+from aoai_simulated_api.record_replay.handler import get_default_forwarders
+from aoai_simulated_api.generator.manager import get_default_generators
 import nanoid
-
-
-@dataclass
-class RecordingConfig:
-    dir: str
-    format: str
-    autosave: bool
-    forwarder_config_path: str | None
-    aoai_api_key: str | None = None
-    aoai_api_endpoint: str | None = None
-
-
-@dataclass
-class Config:
-    """
-    Configuration for the simulator
-    """
-
-    simulator_mode: str
-    simulator_api_key: str
-    recording: RecordingConfig
-    generator_config_path: str | None
-    openai_deployments: dict[str, "OpenAIDeployment"] | None
 
 
 def get_config_from_env_vars(logger: logging.Logger) -> Config:
@@ -37,7 +18,6 @@ def get_config_from_env_vars(logger: logging.Logger) -> Config:
     simulator_mode = os.getenv("SIMULATOR_MODE") or "replay"
     recording_dir = os.getenv("RECORDING_DIR") or ".recording"
     recording_dir = os.path.abspath(recording_dir)
-    recording_format = os.getenv("RECORDING_FORMAT") or "yaml"
     recording_autosave = os.getenv("RECORDING_AUTOSAVE", "true").lower() == "true"
 
     forwarding_aoai_api_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
@@ -47,40 +27,31 @@ def get_config_from_env_vars(logger: logging.Logger) -> Config:
     if not simulator_api_key:
         simulator_api_key = nanoid.generate(size=30)
 
-    generator_config_path = os.getenv("GENERATOR_CONFIG_PATH")
-    forwarder_config_path = os.getenv("FORWARDER_CONFIG_PATH")
+    extension_path = os.getenv("EXTENSION_PATH")
 
     allowed_simulator_modes = ["replay", "record", "generate"]
     if simulator_mode not in allowed_simulator_modes:
         logger.error("SIMULATOR_MODE must be one of %s", allowed_simulator_modes)
         raise ValueError(f"Invalid SIMULATOR_MODE: {simulator_mode}")
 
-    allowed_recording_formats = ["yaml", "json"]
-    if recording_format not in allowed_recording_formats:
-        logger.error("RECORDING_FORMAT must be one of %s", allowed_recording_formats)
-        raise ValueError(f"Invalid RECORDING_FORMAT: {recording_format}")
-
-    return Config(
+    config = Config(
         simulator_mode=simulator_mode,
         simulator_api_key=simulator_api_key,
         recording=RecordingConfig(
             dir=recording_dir,
-            format=recording_format,
             autosave=recording_autosave,
-            forwarder_config_path=forwarder_config_path,
             aoai_api_endpoint=forwarding_aoai_api_endpoint,
             aoai_api_key=forwarding_aoai_api_key,
+            forwarders=get_default_forwarders(),
         ),
-        generator_config_path=generator_config_path,
+        generators=get_default_generators(),
         openai_deployments=_load_openai_deployments(logger),
+        doc_intelligence_rps=load_doc_intelligence_limit(),
     )
 
-
-@dataclass
-class OpenAIDeployment:
-    name: str
-    model: str
-    tokens_per_minute: int
+    # load extension and invoke to update config (customise forwarders, generators, etc.)
+    load_extension(extension_path, config)
+    return config
 
 
 def _load_openai_deployments(logger: logging.Logger) -> dict[str, OpenAIDeployment]:
@@ -113,3 +84,26 @@ def load_doc_intelligence_limit() -> int:
     # Default is 15 RPS based on:
     # https://learn.microsoft.com/en-us/azure/ai-services/document-intelligence/service-limits?view=doc-intel-4.0.0
     return int(os.getenv("DOC_INTELLIGENCE_RPS", "15"))
+
+
+def load_extension(extension_path: str, config: Config):
+
+    if not extension_path:
+        return
+
+    # extension_path can either be a single python file or the path to a folder with a __init__.py
+    # If an __init__.py, use the last folder name as the module name as that is intuitive when the __init__.py
+    # references other files in the same folder
+    config_is_dir = os.path.isdir(extension_path)
+    if config_is_dir:
+        module_name = os.path.basename(extension_path)
+        path_to_load = os.path.join(extension_path, "__init__.py")
+    else:
+        module_name = "__extension"
+        path_to_load = extension_path
+
+    module_spec = importlib.util.spec_from_file_location(module_name, path_to_load)
+    module = importlib.util.module_from_spec(module_spec)
+    sys.modules[module_spec.name] = module
+    module_spec.loader.exec_module(module)
+    module.initialize(config)

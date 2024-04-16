@@ -3,8 +3,7 @@ import os
 from fastapi.datastructures import URL
 import yaml
 
-from ._hashing import hash_request_parts
-from ._models import RecordedResponse
+from .models import RecordedResponse, hash_request_parts
 
 logger = logging.getLogger(__name__)
 

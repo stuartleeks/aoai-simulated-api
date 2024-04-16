@@ -1,6 +1,6 @@
 import asyncio
+from dataclasses import dataclass
 import logging
-import os
 import secrets
 import time
 import traceback
@@ -11,15 +11,45 @@ from limits import storage
 from opentelemetry import trace, metrics
 
 from aoai_simulated_api import constants
-from aoai_simulated_api.config import Config, load_doc_intelligence_limit
-from aoai_simulated_api.generator import GeneratorManager
+from aoai_simulated_api.generator.manager import invoke_generators
 from aoai_simulated_api.limiters import create_openai_limiter, create_doc_intelligence_limiter
-from aoai_simulated_api.pipeline import RequestContext
-from aoai_simulated_api.record_replay import (
-    RecordReplayHandler,
-    YamlRecordingPersister,
-    create_forwarder,
-)
+from aoai_simulated_api.models import Config, RequestContext
+from aoai_simulated_api.record_replay.handler import RecordReplayHandler
+from aoai_simulated_api.record_replay.persistence import YamlRecordingPersister
+
+
+@dataclass
+class SimulatorMetrics:
+    histogram_latency_base: metrics.Histogram
+    histogram_latency_full: metrics.Histogram
+    histogram_tokens_used: metrics.Histogram
+    histogram_tokens_requested: metrics.Histogram
+
+
+def _get_simulator_metrics() -> SimulatorMetrics:
+    meter = metrics.get_meter(__name__)
+    return SimulatorMetrics(
+        histogram_latency_base=meter.create_histogram(
+            name="aoai-simulator.latency.base",
+            description="Latency of handling the request (before adding simulated latency)",
+            unit="seconds",
+        ),
+        histogram_latency_full=meter.create_histogram(
+            name="aoai-simulator.latency.full",
+            description="Full latency of handling the request (including simulated latency)",
+            unit="seconds",
+        ),
+        histogram_tokens_used=meter.create_histogram(
+            name="aoai-simulator.tokens_used",
+            description="Number of tokens used per request",
+            unit="tokens",
+        ),
+        histogram_tokens_requested=meter.create_histogram(
+            name="aoai-simulator.tokens_requested",
+            description="Number of tokens across all requests (success or not)",
+            unit="tokens",
+        ),
+    )
 
 
 def get_simulator(logger: logging.Logger, config: Config) -> FastAPI:
@@ -28,27 +58,7 @@ def get_simulator(logger: logging.Logger, config: Config) -> FastAPI:
     """
     app = FastAPI()
 
-    meter = metrics.get_meter(__name__)
-    histogram_latency_base = meter.create_histogram(
-        name="aoai-simulator.latency.base",
-        description="Latency of handling the request (before adding simulated latency)",
-        unit="seconds",
-    )
-    histogram_latency_full = meter.create_histogram(
-        name="aoai-simulator.latency.full",
-        description="Full latency of handling the request (including simulated latency)",
-        unit="seconds",
-    )
-    histogram_tokens_used = meter.create_histogram(
-        name="aoai-simulator.tokens_used",
-        description="Number of tokens used per request",
-        unit="tokens",
-    )
-    histogram_tokens_requested = meter.create_histogram(
-        name="aoai-simulator.tokens_requested",
-        description="Number of tokens across all requests (success or not)",
-        unit="tokens",
-    )
+    simulator_metrics = _get_simulator_metrics()
 
     # api-key header for OpenAI
     # ocp-apim-subscription-key header for doc intelligence
@@ -72,33 +82,16 @@ def get_simulator(logger: logging.Logger, config: Config) -> FastAPI:
 
     logger.info("🚀 Starting aoai-simulated-api in %s mode", config.simulator_mode)
     logger.info("🗝️ Simulator api-key        : %s", config.simulator_api_key)
-    module_path = os.path.dirname(os.path.realpath(__file__))
-    if config.simulator_mode == "generate":
-        logger.info("📝 Generator config path    : %s", config.generator_config_path)
-        generator_config_path = config.generator_config_path or os.path.join(module_path, "generator/default_config.py")
 
-        generator_manager = GeneratorManager(generator_config_path=generator_config_path)
-    else:
+    if config.simulator_mode in ["record", "replay"]:
         logger.info("📼 Recording directory      : %s", config.recording.dir)
-        logger.info("📼 Recording format         : %s", config.recording.format)
         logger.info("📼 Recording auto-save      : %s", config.recording.autosave)
-        # TODO - handle JSON loading (or update docs!)
-        if config.recording.format != "yaml":
-            raise ValueError(f"Unsupported recording format: {config.recording.format}")
         persister = YamlRecordingPersister(config.recording.dir)
-
-        forwarder = None
-        forwarder_config_path = config.recording.forwarder_config_path or os.path.join(
-            module_path, "record_replay/_request_forwarder_config.py"
-        )
-        if config.simulator_mode == "record":
-            logger.info("📼 Forwarder config path: %s", forwarder_config_path)
-            forwarder = create_forwarder(forwarder_config_path)
 
         record_replay_handler = RecordReplayHandler(
             simulator_mode=config.simulator_mode,
             persister=persister,
-            forwarder=forwarder,
+            forwarders=config.recording.forwarders,
             autosave=config.recording.autosave,
         )
 
@@ -119,9 +112,7 @@ def get_simulator(logger: logging.Logger, config: Config) -> FastAPI:
 
     memory_storage = storage.MemoryStorage()
 
-    doc_intelligence_rps = load_doc_intelligence_limit()
-    logger.info("📝 Using Doc Intelligence RPS: %s", doc_intelligence_rps)
-
+    logger.info("📝 Using Doc Intelligence RPS: %s", config.doc_intelligence_rps)
     logger.info("📝 Using OpenAI deployments: %s", config.openai_deployments)
 
     openai_deployment_limits = (
@@ -135,7 +126,9 @@ def get_simulator(logger: logging.Logger, config: Config) -> FastAPI:
     # Limiter returns Response object if request should be blocked or None otherwise
     limiters: dict[str, Callable[[RequestContext, Response], Response | None]] = {
         "openai": create_openai_limiter(memory_storage, openai_deployment_limits),
-        "docintelligence": create_doc_intelligence_limiter(memory_storage, requests_per_second=doc_intelligence_rps),
+        "docintelligence": create_doc_intelligence_limiter(
+            memory_storage, requests_per_second=config.doc_intelligence_rps
+        ),
     }
 
     @app.api_route("/{full_path:path}", methods=["GET", "POST", "PUT", "DELETE"])
@@ -152,7 +145,7 @@ def get_simulator(logger: logging.Logger, config: Config) -> FastAPI:
 
             # Get response
             if config.simulator_mode == "generate":
-                response = await generator_manager.generate(context)
+                response = await invoke_generators(context, config.generators)
             elif config.simulator_mode in ["record", "replay"]:
                 response = await record_replay_handler.handle_request(context)
 
@@ -189,14 +182,14 @@ def get_simulator(logger: logging.Logger, config: Config) -> FastAPI:
             tokens_used = context.values.get(constants.SIMULATOR_KEY_OPENAI_TOKENS)
 
             full_end_time = time.perf_counter()
-            histogram_latency_base.record(
+            simulator_metrics.histogram_latency_base.record(
                 base_duration_s,
                 attributes={
                     "status_code": status_code,
                     "deployment": deployment_name,
                 },
             )
-            histogram_latency_full.record(
+            simulator_metrics.histogram_latency_full.record(
                 (full_end_time - start_time),
                 attributes={
                     "status_code": status_code,
@@ -204,10 +197,14 @@ def get_simulator(logger: logging.Logger, config: Config) -> FastAPI:
                 },
             )
             if tokens_used:
-                histogram_tokens_requested.record(tokens_used, attributes={"deployment": deployment_name})
+                simulator_metrics.histogram_tokens_requested.record(
+                    tokens_used, attributes={"deployment": deployment_name}
+                )
                 if status_code < 300:
                     # only track tokens for successful requests
-                    histogram_tokens_used.record(tokens_used, attributes={"deployment": deployment_name})
+                    simulator_metrics.histogram_tokens_used.record(
+                        tokens_used, attributes={"deployment": deployment_name}
+                    )
 
             return response
         # pylint: disable-next=broad-exception-caught

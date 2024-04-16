@@ -2,7 +2,8 @@
 Test the OpenAI generator endpoints
 """
 
-from aoai_simulated_api.config import Config, RecordingConfig
+from aoai_simulated_api.models import Config, RecordingConfig
+from aoai_simulated_api.generator.manager import get_default_generators
 from openai import AzureOpenAI
 import pytest
 
@@ -10,18 +11,15 @@ from .test_uvicorn_server import UvicornTestServer
 
 API_KEY = "123456789"
 
+
 def _get_generator_config() -> Config:
     return Config(
         simulator_mode="generate",
         simulator_api_key=API_KEY,
-        recording=RecordingConfig(
-            autosave=False,
-            dir="",
-            format="",
-            forwarder_config_path="",
-        ),
-        generator_config_path="",
+        recording=RecordingConfig(autosave=False, dir="", forwarders=[]),
         openai_deployments=None,
+        generators=get_default_generators(),
+        doc_intelligence_rps=123,
     )
 
 
