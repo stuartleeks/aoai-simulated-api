@@ -24,5 +24,6 @@ echo "=="
 echo "== Testing API is up and running at https://$api_fqdn"
 echo "=="
 
-curl -s -w "\nGot response: %{http_code}" https://$api_fqdn/
+curl -s --max-time 30 -w "\nGot response: %{http_code}" https://$api_fqdn/ || echo -e "\nTimed out"
+
 echo -e "\n\n"

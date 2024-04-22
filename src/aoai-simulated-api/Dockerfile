@@ -5,6 +5,10 @@ FROM python:3.12.1-slim-bullseye AS base
 WORKDIR /app
 
 FROM base as simulator-unrestricted-network
+
+COPY ./requirements.txt ./
+RUN pip install -r requirements.txt
+
 COPY . .
 RUN pip install .
 

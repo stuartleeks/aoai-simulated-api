@@ -15,8 +15,6 @@ param simulatorApiKey string
 
 param recordingDir string
 
-param recordingFormat string = 'yaml'
-
 param recordingAutoSave string
 
 param extensionPath string
@@ -219,7 +217,6 @@ resource apiSim 'Microsoft.App/containerApps@2023-05-01' = {
             { name: 'SIMULATOR_API_KEY', secretRef: 'simulator-api-key' }
             { name: 'SIMULATOR_MODE', value: simulatorMode }
             { name: 'RECORDING_DIR', value: recordingDir }
-            { name: 'RECORDING_FORMAT', value: recordingFormat }
             { name: 'RECORDING_AUTO_SAVE', value: recordingAutoSave }
             { name: 'EXTENSION_PATH', value: extensionPath }
             { name: 'AZURE_OPENAI_ENDPOINT', value: azureOpenAIEndpoint }

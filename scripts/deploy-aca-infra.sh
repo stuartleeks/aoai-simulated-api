@@ -51,9 +51,6 @@ cat << EOF > "$script_dir/../infra/azuredeploy.parameters.json"
 	"recordingDir": {
 	  "value": "${RECORDING_DIR}"
 	},
-	"recordingFormat": {
-	  "value": "${RECORDING_FORMAT}"
-	},
 	"recordingAutoSave": {
 	  "value": "${RECORDING_AUTO_SAVE}"
 	},
