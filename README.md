@@ -210,6 +210,16 @@ async def generate_echo_response(context: RequestContext) -> Response | None:
 If the generator function returns a `Response` object then that response is used as the response for the request.
 If the generator function returns `None` then the next generator function is called.
 
+### Adding custom bearer token authentication
+
+The simulator expects either an `api-key` or `ocp-apim-subscription-key` header with a valid key for every request. To enable bearer token authentication you can intialize your custom extension with a valid `auth_bearer_token` as follows:
+
+```python
+def initialize(config: Config):
+    # token defined below will allow requests to your extension
+    # with header 'Authorization: Bearer your-bearer-token'
+    config.auth_bearer_token('your-bearer-token')
+```
 
 ### Running with an extension
 

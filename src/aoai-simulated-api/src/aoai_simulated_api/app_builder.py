@@ -76,11 +76,9 @@ def get_simulator(logger: logging.Logger, config: Config) -> FastAPI:
             return True
         if ocp_apim_subscription_key and secrets.compare_digest(ocp_apim_subscription_key, config.simulator_api_key):
             return True
-        if (
-            auth_bearer_token
-            and config.auth_bearer_token
-            and secrets.compare_digest(auth_bearer_token, f"Bearer {config.auth_bearer_token}")
-        ):
+
+        auth_bearer_token_config = getattr(config, "auth_bearer_token", None)
+        if auth_bearer_token and secrets.compare_digest(auth_bearer_token, f"Bearer {auth_bearer_token_config}"):
             return True
 
         logger.warning("🔒 Missing or incorrect API Key provided")
