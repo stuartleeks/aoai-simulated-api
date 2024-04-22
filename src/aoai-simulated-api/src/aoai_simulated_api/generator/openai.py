@@ -14,8 +14,10 @@ from fastapi.responses import StreamingResponse
 from aoai_simulated_api.models import RequestContext
 from aoai_simulated_api.constants import (
     SIMULATOR_KEY_DEPLOYMENT_NAME,
-    SIMULATOR_KEY_OPENAI_TOKENS,
+    SIMULATOR_KEY_OPENAI_COMPLETION_TOKENS,
+    SIMULATOR_KEY_OPENAI_TOTAL_TOKENS,
     SIMULATOR_KEY_LIMITER,
+    SIMULATOR_KEY_OPERATION_NAME,
 )
 
 # This file contains a default implementation of the openai generators
@@ -159,8 +161,9 @@ async def azure_openai_embedding(context: RequestContext) -> Response | None:
 
     # store values in the context for use by the rate-limiter etc
     context.values[SIMULATOR_KEY_LIMITER] = "openai"
+    context.values[SIMULATOR_KEY_OPERATION_NAME] = "embeddings"
     context.values[SIMULATOR_KEY_DEPLOYMENT_NAME] = deployment_name
-    context.values[SIMULATOR_KEY_OPENAI_TOKENS] = tokens
+    context.values[SIMULATOR_KEY_OPENAI_TOTAL_TOKENS] = tokens
 
     return Response(
         status_code=200,
@@ -183,8 +186,11 @@ async def azure_openai_completion(context: RequestContext) -> Response | None:
     model_name = get_model_name_from_deployment_name(context, deployment_name)
     request_body = await request.json()
     prompt_tokens = num_tokens_from_string(request_body["prompt"], model_name)
-    max_tokens = request_body.get("max_tokens", 10)  # TODO - what is the default max tokens?
 
+    # TODO - determine the maxiumum tokens to use based on the model
+    max_tokens = request_body.get("max_tokens", 4096)
+
+    # TODO - randomise the finish reason (i.e. don't always use the full set of tokens)
     words_to_generate = int(TOKEN_TO_WORD_FACTOR * max_tokens)
     text = "".join(lorem.get_word(count=words_to_generate))
 
@@ -213,8 +219,10 @@ async def azure_openai_completion(context: RequestContext) -> Response | None:
 
     # store values in the context for use by the rate-limiter etc
     context.values[SIMULATOR_KEY_LIMITER] = "openai"
+    context.values[SIMULATOR_KEY_OPERATION_NAME] = "completions"
     context.values[SIMULATOR_KEY_DEPLOYMENT_NAME] = deployment_name
-    context.values[SIMULATOR_KEY_OPENAI_TOKENS] = total_tokens
+    context.values[SIMULATOR_KEY_OPENAI_COMPLETION_TOKENS] = completion_tokens
+    context.values[SIMULATOR_KEY_OPENAI_TOTAL_TOKENS] = total_tokens
 
     return Response(
         content=json.dumps(response_body),
@@ -238,8 +246,9 @@ async def azure_openai_chat_completion(context: RequestContext) -> Response | No
     model_name = get_model_name_from_deployment_name(context, deployment_name)
     prompt_tokens = num_tokens_from_messages(request_body["messages"], model_name)
 
-    # TODO - determine the token size to use
-    max_tokens = 250
+    # TODO - determine the maxiumum tokens to use based on the model
+    max_tokens = request_body.get("max_tokens", 4096)
+    # TODO - randomise the finish reason (i.e. don't always use the full set of tokens)
     words_to_generate = int(TOKEN_TO_WORD_FACTOR * max_tokens)
     words = lorem.get_word(count=words_to_generate)
 
@@ -308,7 +317,7 @@ async def azure_openai_chat_completion(context: RequestContext) -> Response | No
         ],
         "choices": [
             {
-                "finish_reason": "stop",
+                "finish_reason": "length",
                 "index": 0,
                 "message": {
                     "role": "assistant",
@@ -331,8 +340,10 @@ async def azure_openai_chat_completion(context: RequestContext) -> Response | No
 
     # store values in the context for use by the rate-limiter etc
     context.values[SIMULATOR_KEY_LIMITER] = "openai"
+    context.values[SIMULATOR_KEY_OPERATION_NAME] = "chat-completions"
     context.values[SIMULATOR_KEY_DEPLOYMENT_NAME] = deployment_name
-    context.values[SIMULATOR_KEY_OPENAI_TOKENS] = total_tokens
+    context.values[SIMULATOR_KEY_OPENAI_COMPLETION_TOKENS] = completion_tokens
+    context.values[SIMULATOR_KEY_OPENAI_TOTAL_TOKENS] = total_tokens
 
     return Response(
         content=json.dumps(response_body),

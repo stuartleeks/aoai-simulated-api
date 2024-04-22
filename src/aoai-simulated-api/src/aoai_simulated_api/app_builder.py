@@ -1,6 +1,7 @@
 import asyncio
 from dataclasses import dataclass
 import logging
+import random
 import secrets
 import time
 import traceback
@@ -167,19 +168,33 @@ def get_simulator(logger: logging.Logger, config: Config) -> FastAPI:
             # Add latency to successful responses
             base_end_time = time.perf_counter()
             base_duration_s = base_end_time - start_time
-            if response.status_code < 300:
-                # TODO - apply latency to generated responses and allow config overrides
-                recorded_duration_ms = context.values.get(constants.RECORDED_DURATION_MS, 0)
-                recorded_duration_s = recorded_duration_ms / 1000
-                extra_latency = recorded_duration_s - base_duration_s
+
+            status_code = response.status_code
+            deployment_name = context.values.get(constants.SIMULATOR_KEY_DEPLOYMENT_NAME)
+            tokens_used = context.values.get(constants.SIMULATOR_KEY_OPENAI_TOTAL_TOKENS)
+            completion_tokens = context.values.get(constants.SIMULATOR_KEY_OPENAI_COMPLETION_TOKENS)
+            if status_code < 300:
+                # Determine if we need to add extra latency to simulate the time it took to generate the response
+                # TODO - enable config and extensibility to control this
+                recorded_duration_ms = context.values.get(constants.RECORDED_DURATION_MS, None)
+                if recorded_duration_ms:
+                    recorded_duration_s = recorded_duration_ms / 1000
+                    extra_latency = recorded_duration_s - base_duration_s
+                elif tokens_used > 0:
+                    operation_name = context.values.get(constants.SIMULATOR_KEY_OPERATION_NAME)
+                    if operation_name == "embeddings":
+                        extra_latency = 100
+                    elif operation_name == "completions":
+                        ms_per_token = random.normalvariate(15, 2)
+                        extra_latency = ms_per_token * completion_tokens / 1000
+                    elif operation_name == "chat-completions":
+                        ms_per_token = random.normalvariate(19, 6)
+                        extra_latency = ms_per_token * completion_tokens / 1000
+
                 if extra_latency > 0:
                     current_span = trace.get_current_span()
                     current_span.set_attribute("simulator.added_latency", extra_latency)
                     await asyncio.sleep(extra_latency)
-
-            status_code = response.status_code
-            deployment_name = context.values.get(constants.SIMULATOR_KEY_DEPLOYMENT_NAME)
-            tokens_used = context.values.get(constants.SIMULATOR_KEY_OPENAI_TOKENS)
 
             full_end_time = time.perf_counter()
             simulator_metrics.histogram_latency_base.record(
