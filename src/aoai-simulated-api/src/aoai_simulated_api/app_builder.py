@@ -62,16 +62,25 @@ def get_simulator(logger: logging.Logger, config: Config) -> FastAPI:
 
     # api-key header for OpenAI
     # ocp-apim-subscription-key header for doc intelligence
+    # auth bearer token for custom endpoints
     api_key_header_scheme = APIKeyHeader(name="api-key", auto_error=False)
     ocp_apim_subscription_key_header_scheme = APIKeyHeader(name="ocp-apim-subscription-key", auto_error=False)
+    auth_bearer_token_header_scheme = APIKeyHeader(name="Authorization", auto_error=False)
 
     def validate_api_key(
         api_key: Annotated[str, Depends(api_key_header_scheme)],
         ocp_apim_subscription_key: Annotated[str, Depends(ocp_apim_subscription_key_header_scheme)],
+        auth_bearer_token: Annotated[str, Depends(auth_bearer_token_header_scheme)],
     ):
         if api_key and secrets.compare_digest(api_key, config.simulator_api_key):
             return True
         if ocp_apim_subscription_key and secrets.compare_digest(ocp_apim_subscription_key, config.simulator_api_key):
+            return True
+        if (
+            auth_bearer_token
+            and config.auth_bearer_token
+            and secrets.compare_digest(auth_bearer_token, f"Bearer {config.auth_bearer_token}")
+        ):
             return True
 
         logger.warning("🔒 Missing or incorrect API Key provided")
