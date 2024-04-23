@@ -70,13 +70,13 @@ def send_test_embedding():
 def send_test_completion():
     # Send a completion call to generate an answer
     prompt_1 = "A good DAD joke is ...."
-    print("Sending a test completion job: ", prompt_1)
+    print("Sending a test completion job: ", prompt_1, max_tokens=50)
     response = aoai_client.completions.create(model=get_deployment_name(), prompt=prompt_1, max_tokens=50)
     print(response.choices[0].text)
 
     print("")
     prompt_2 = "A good story opening is"
-    print("Sending another test completion job: ", prompt_2)
+    print("Sending another test completion job: ", prompt_2, max_tokens=150)
     response = aoai_client.completions.create(model=get_deployment_name(), prompt=prompt_2, max_tokens=50)
     print(response.choices[0].text)
 
@@ -85,6 +85,7 @@ def send_test_chat_completion():
     response = aoai_client.chat.completions.create(
         model=get_deployment_name(),
         messages=[{"role": "user", "content": "What is the meaning of life?"}],
+        max_tokens=100,
     )
     print(response)
 

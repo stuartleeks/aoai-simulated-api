@@ -50,7 +50,8 @@ api-key: {{aoai_key}}
     "role": "user",
     "content": "What is the meaning of life?"
     }],
-  "model": "gpt-5-turbo-1"
+  "model": "gpt-5-turbo-1",
+  "max_tokens": 50
 }
 
 
@@ -88,8 +89,7 @@ api-key: {{aoai_key}}
     {"role": "user", "content": "How fast is it travelling?"},
     {"role": "assistant", "content": "As of August 2021, Voyager 1 is traveling at a speed of about 17.7 km/s (62,136 km/h or 38,614 miles per hour). This is about 0.006% of the speed of light, which means it would take over 17,000 years to travel one light-year."},
 
-    {"role": "user", "content": "How much does it weigh?"},
-    {"role": "assistant", "content": "The total weight of the Voyager 1 spacecraft at launch was approximately 773 kilograms (1,704 pounds), including the scientific instruments, electronics, and propulsion system. However, as it has been traveling through space for more than four decades, some of its expended fuel and other parts have been jettisoned, so its actual weight is a bit less than the launch weight."}
+    {"role": "user", "content": "How much does it weigh?"}
   ],
   "model": "gpt-5-turbo-1"
 }

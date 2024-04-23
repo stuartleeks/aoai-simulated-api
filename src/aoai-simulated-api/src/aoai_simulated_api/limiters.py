@@ -48,7 +48,7 @@ def create_openai_limiter(
         )
 
     def limiter(context: RequestContext, _: Response) -> Response | None:
-        token_cost = context.values.get(constants.SIMULATOR_KEY_OPENAI_TOKENS)
+        token_cost = context.values.get(constants.SIMULATOR_KEY_OPENAI_TOTAL_TOKENS)
         deployment_name = context.values.get(constants.SIMULATOR_KEY_DEPLOYMENT_NAME)
 
         if not token_cost or not deployment_name:

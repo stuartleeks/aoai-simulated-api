@@ -11,7 +11,7 @@ import requests
 import uvicorn
 
 from aoai_simulated_api.app_builder import get_simulator
-from aoai_simulated_api.models import Config, RecordingConfig
+from aoai_simulated_api.models import Config, LatencyConfig, NormalLatencyAmount, RecordingConfig
 
 logger = logging.getLogger("tests")
 
@@ -62,6 +62,11 @@ async def test_root_message():
         openai_deployments=None,
         generators=[],
         doc_intelligence_rps=123,
+        latency=LatencyConfig(
+            open_ai_completions=NormalLatencyAmount(mean=0, std_dev=0.1),
+            open_ai_chat_completions=NormalLatencyAmount(mean=0, std_dev=0.1),
+            open_ai_embeddings=NormalLatencyAmount(mean=0, std_dev=0.1),
+        ),
     )
     server = UvicornTestServer(config)
     with server.run_in_thread():

@@ -1,13 +1,11 @@
 import json
 import logging
-from typing import Awaitable, Callable
-import fastapi
 import requests
 
 from aoai_simulated_api.models import RequestContext
 from aoai_simulated_api.constants import (
     SIMULATOR_KEY_DEPLOYMENT_NAME,
-    SIMULATOR_KEY_OPENAI_TOKENS,
+    SIMULATOR_KEY_OPENAI_TOTAL_TOKENS,
     SIMULATOR_KEY_LIMITER,
 )
 
@@ -132,6 +130,6 @@ async def forward_to_azure_openai(context: RequestContext) -> dict:
     tokens_used = _get_token_usage_from_response(response.text)
     context.values[SIMULATOR_KEY_LIMITER] = "openai"
     context.values[SIMULATOR_KEY_DEPLOYMENT_NAME] = deployment_name
-    context.values[SIMULATOR_KEY_OPENAI_TOKENS] = tokens_used
+    context.values[SIMULATOR_KEY_OPENAI_TOTAL_TOKENS] = tokens_used
 
     return {"response": response, "persist_response": True}

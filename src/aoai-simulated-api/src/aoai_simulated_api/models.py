@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import random
 from typing import Awaitable, Callable
 
 # from aoai_simulated_api.pipeline import RequestContext
@@ -82,6 +83,30 @@ class RecordingConfig:
 
 
 @dataclass
+class NormalLatencyAmount:
+    mean: float
+    std_dev: float
+
+    def get_value(self) -> float:
+        return random.normalvariate(self.mean, self.std_dev)
+
+
+@dataclass
+class LatencyConfig:
+    """
+    Defines the latency for different types of requests
+
+    open_ai_embeddings: the latency for OpenAI embeddings - mean is mean request duration in milliseconds
+    open_ai_completions: the latency for OpenAI completions - mean is the number of milliseconds per token
+    open_ai_chat_completions: the latency for OpenAI chat completions - mean is the number of milliseconds per token
+    """
+
+    open_ai_completions: NormalLatencyAmount
+    open_ai_chat_completions: NormalLatencyAmount
+    open_ai_embeddings: NormalLatencyAmount
+
+
+@dataclass
 class Config:
     """
     Configuration for the simulator
@@ -93,6 +118,7 @@ class Config:
     openai_deployments: dict[str, "OpenAIDeployment"] | None
     generators: list[Callable[[RequestContext], Response | Awaitable[Response] | None]]
     doc_intelligence_rps: int
+    latency: LatencyConfig
 
 
 @dataclass

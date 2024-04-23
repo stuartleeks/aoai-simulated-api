@@ -70,7 +70,7 @@ docker-run-simulated-api:
 		aoai-simulated-api
 
 test:
-	pytest ./src/tests
+	pytest ./src/tests -v
 	
 test-watch:
 	ptw --clear ./src/tests
