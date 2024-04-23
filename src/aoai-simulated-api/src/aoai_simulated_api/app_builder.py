@@ -1,5 +1,5 @@
 import asyncio
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 import logging
 import random
 import secrets
@@ -121,6 +121,37 @@ def get_simulator(logger: logging.Logger, config: Config) -> FastAPI:
         if config.openai_deployments
         else {}
     )
+
+    @app.get("/++/config")
+    def get_config():
+        # return a subset of the config as not all properties make sense (e.g. generator functions)
+        return {
+            "mode": config.simulator_mode,
+            "doc_intelligence_rps": config.doc_intelligence_rps,
+            "latency": {
+                "open_ai_embeddings": {
+                    "mean": config.latency.open_ai_embeddings.mean,
+                    "stddev": config.latency.open_ai_embeddings.std_dev,
+                },
+                "open_ai_completions": {
+                    "mean": config.latency.open_ai_completions.mean,
+                    "stddev": config.latency.open_ai_completions.std_dev,
+                },
+                "open_ai_chat_completions": {
+                    "mean": config.latency.open_ai_chat_completions.mean,
+                    "stddev": config.latency.open_ai_chat_completions.std_dev,
+                },
+            },
+            "openai_deployments": (
+                {
+                    name: {"tokens_per_minute": deployment.tokens_per_minute, "model": deployment.model}
+                    for name, deployment in config.openai_deployments.items()
+                }
+                if config.openai_deployments
+                else None
+            ),
+        }
+
     # Dictionary of limiters keyed by name
     # Each limiter is a function that takes a response and returns a boolean indicating
     # whether the request should be allowed
