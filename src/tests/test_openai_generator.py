@@ -2,7 +2,13 @@
 Test the OpenAI generator endpoints
 """
 
-from aoai_simulated_api.models import Config, LatencyConfig, NormalLatencyAmount, RecordingConfig
+from aoai_simulated_api.models import (
+    Config,
+    LatencyConfig,
+    ChatCompletionLatency,
+    CompletionLatency,
+    EmbeddingLatency,
+)
 from aoai_simulated_api.generator.manager import get_default_generators
 from openai import AzureOpenAI
 import pytest
@@ -13,19 +19,24 @@ API_KEY = "123456789"
 
 
 def _get_generator_config() -> Config:
-    return Config(
-        simulator_mode="generate",
-        simulator_api_key=API_KEY,
-        recording=RecordingConfig(autosave=False, dir="", forwarders=[]),
-        openai_deployments=None,
-        generators=get_default_generators(),
-        doc_intelligence_rps=123,
-        latency=LatencyConfig(
-            open_ai_completions=NormalLatencyAmount(mean=0, std_dev=0.1),
-            open_ai_chat_completions=NormalLatencyAmount(mean=0, std_dev=0.1),
-            open_ai_embeddings=NormalLatencyAmount(mean=0, std_dev=0.1),
+    config = Config(generators=get_default_generators())
+    config.simulator_api_key = API_KEY
+    config.simulator_mode = "generate"
+    config.latency = LatencyConfig(
+        open_ai_completions=CompletionLatency(
+            LATENCY_OPENAI_COMPLETIONS_MEAN=0,
+            LATENCY_OPENAI_COMPLETIONS_STD_DEV=0.1,
+        ),
+        open_ai_chat_completions=ChatCompletionLatency(
+            LATENCY_OPENAI_CHAT_COMPLETIONS_MEAN=0,
+            LATENCY_OPENAI_CHAT_COMPLETIONS_STD_DEV=0.1,
+        ),
+        open_ai_embeddings=EmbeddingLatency(
+            LATENCY_OPENAI_EMBEDDINGS_MEAN=0,
+            LATENCY_OPENAI_EMBEDDINGS_STD_DEV=0.1,
         ),
     )
+    return config
 
 
 @pytest.mark.asyncio
