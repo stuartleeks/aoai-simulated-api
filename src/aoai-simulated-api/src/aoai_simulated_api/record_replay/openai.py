@@ -1,7 +1,5 @@
 import json
 import logging
-from typing import Awaitable, Callable
-import fastapi
 import requests
 
 from aoai_simulated_api.models import RequestContext

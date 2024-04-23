@@ -2,7 +2,7 @@
 Test the OpenAI generator endpoints
 """
 
-from aoai_simulated_api.models import Config, RecordingConfig
+from aoai_simulated_api.models import Config, LatencyConfig, NormalLatencyAmount, RecordingConfig
 from aoai_simulated_api.generator.manager import get_default_generators
 from openai import AzureOpenAI
 import pytest
@@ -20,6 +20,11 @@ def _get_generator_config() -> Config:
         openai_deployments=None,
         generators=get_default_generators(),
         doc_intelligence_rps=123,
+        latency=LatencyConfig(
+            open_ai_completions=NormalLatencyAmount(mean=0, std_dev=0.1),
+            open_ai_chat_completions=NormalLatencyAmount(mean=0, std_dev=0.1),
+            open_ai_embeddings=NormalLatencyAmount(mean=0, std_dev=0.1),
+        ),
     )
 
 

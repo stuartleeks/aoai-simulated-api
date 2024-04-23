@@ -5,7 +5,7 @@ import os
 
 import sys
 
-from aoai_simulated_api.models import Config, OpenAIDeployment, RecordingConfig
+from aoai_simulated_api.models import Config, LatencyConfig, NormalLatencyAmount, OpenAIDeployment, RecordingConfig
 from aoai_simulated_api.record_replay.handler import get_default_forwarders
 from aoai_simulated_api.generator.manager import get_default_generators
 import nanoid
@@ -47,6 +47,7 @@ def get_config_from_env_vars(logger: logging.Logger) -> Config:
         generators=get_default_generators(),
         openai_deployments=_load_openai_deployments(logger),
         doc_intelligence_rps=load_doc_intelligence_limit(),
+        latency=load_latency_config(),
     )
 
     # load extension and invoke to update config (customise forwarders, generators, etc.)
@@ -107,3 +108,17 @@ def load_extension(extension_path: str, config: Config):
     sys.modules[module_spec.name] = module
     module_spec.loader.exec_module(module)
     module.initialize(config)
+
+
+def load_latency_normal(base_name: str, default_mean: float, default_std_dev) -> NormalLatencyAmount:
+    return NormalLatencyAmount(
+        mean=os.getenv(f"{base_name}_MEAN", default_mean), std_dev=os.getenv(f"{base_name}_STD_DEV", default_std_dev)
+    )
+
+
+def load_latency_config() -> LatencyConfig:
+    return LatencyConfig(
+        open_ai_completions=load_latency_normal("LATENCY_OPENAI_COMPLETIONS", 15, 2),
+        open_ai_chat_completions=load_latency_normal("LATENCY_OPENAI_CHAT_COMPLETIONS", 19, 6),
+        open_ai_embeddings=load_latency_normal("LATENCY_OPENAI_EMBEDDINGS", 100, 30),
+    )

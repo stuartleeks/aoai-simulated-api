@@ -13,6 +13,7 @@ This repo is an exploration into creating a simulated API implementation for Azu
     - [Creating a custom generator extension](#creating-a-custom-generator-extension)
     - [Running with an extension](#running-with-an-extension)
   - [Large recordings](#large-recordings)
+  - [Latency](#latency)
   - [Rate-limiting](#rate-limiting)
     - [OpenAI Rate-Limiting](#openai-rate-limiting)
     - [Document Intelligence Rate-Limiting](#document-intelligence-rate-limiting)
@@ -50,19 +51,20 @@ After cloning the repo, install dependencies using `make install-requirements`.
 
 When running the simulated API, there are a number of environment variables to configure:
 
-| Variable                        | Description                                                                                                                                          |
-| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `SIMULATOR_MODE`                | The mode the simulator should run in. Current options are `record`, `replay`, and `generate`.                                                        |
-| `SIMULATOR_API_KEY` | The API key used by the simulator to authenticate requests. If not specified a key is auto-generated (see the logs). It is recommended to set a deterministic key value in `.env` |
-| `RECORDING_DIR`                 | The directory to store the recorded requests and responses (defaults to `.recording`).                                                               |
-| `RECORDING_AUTOSAVE`            | If set to `True` (default), the simulator will save the recording after each request.                                                                |
-| `EXTENSION_PATH`         | The path to a Python file that contains the extension configuration. This can be a single python file or a package folder - see `src/examples`|
-| `AZURE_OPENAI_ENDPOINT`         | The endpoint for the Azure OpenAI service, e.g. `https://mysvc.openai.azure.com/`                                                                    |
-| `AZURE_OPENAI_KEY`              | The API key for the Azure OpenAI service.                                                                                                            |
+| Variable                        | Description                                                                                                                                                                                             |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SIMULATOR_MODE`                | The mode the simulator should run in. Current options are `record`, `replay`, and `generate`.                                                                                                           |
+| `SIMULATOR_API_KEY`             | The API key used by the simulator to authenticate requests. If not specified a key is auto-generated (see the logs). It is recommended to set a deterministic key value in `.env`                       |
+| `RECORDING_DIR`                 | The directory to store the recorded requests and responses (defaults to `.recording`).                                                                                                                  |
+| `RECORDING_AUTOSAVE`            | If set to `True` (default), the simulator will save the recording after each request.                                                                                                                   |
+| `EXTENSION_PATH`                | The path to a Python file that contains the extension configuration. This can be a single python file or a package folder - see `src/examples`                                                          |
+| `AZURE_OPENAI_ENDPOINT`         | The endpoint for the Azure OpenAI service, e.g. `https://mysvc.openai.azure.com/`                                                                                                                       |
+| `AZURE_OPENAI_KEY`              | The API key for the Azure OpenAI service.                                                                                                                                                               |
 | `DOC_INTELLIGENCE_RPS`          | The rate limit for the Document Intelligence service. Defaults to 15 RPS. See [Doc Intelligence Rate-Limiting](#document-intelligence-rate-limiting). Set to a negative value to disable rate-limiting. |
-| `OPENAI_DEPLOYMENT_CONFIG_PATH` | The path to a JSON file that contains the deployment configuration. See [OpenAI Rate-Limiting](#openai-rate-limiting)                                |
-| `AZURE_OPENAI_DEPLOYMENT`       | Used by the test app to set the name of the deployed model in your Azure OpenAI service. Use a gpt-35-turbo-instruct deployment.                     |
-| `LOG_LEVEL`                    | The log level for the simulator. Defaults to `INFO`.                                                                                                 |
+| `OPENAI_DEPLOYMENT_CONFIG_PATH` | The path to a JSON file that contains the deployment configuration. See [OpenAI Rate-Limiting](#openai-rate-limiting)                                                                                   |
+| `AZURE_OPENAI_DEPLOYMENT`       | Used by the test app to set the name of the deployed model in your Azure OpenAI service. Use a gpt-35-turbo-instruct deployment.                                                                        |
+| `LOG_LEVEL`                     | The log level for the simulator. Defaults to `INFO`.                                                                                                                                                    |
+| `LATENCY_OPENAI_*`              | The latency to add to the OpenAI service when using generated output. See [Latency](#latency) for more details.                                                                                         |
 
 The examples below show passing environment variables to the API directly on the command line, but you can also set them via a `.env` file in the root directory for convenience (see the `sample.env` for a starting point).
 The `.http` files for testing the endpoints also use the `.env` file to set the environment variables for calling the API.
@@ -231,6 +233,29 @@ By default, the simulator saves the recording file after each new recorded reque
 If you need to create a large recording, you may want to turn off the autosave feature to improve performance.
 
 With autosave off, you can save the recording manually by sending a `POST` request to `/++/save-recordings` to save the recordings files once you have made all the requests you want to capture. You can do this using ` curl localhost:8000/++/save-recordings -X POST`. 
+
+## Latency
+
+When running in `record` mode, the simulator captures the duration of the forwarded response.
+This is stored in the recording file and used to add latency to requests in `replay` mode.
+
+When running in `generate` mode, the simulator can add latency to the response based on the `LATENCY_OPENAI_*` environment variables.
+
+| Variable Prefix                   | Description                                                                                                                                                                        |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `LATENCY_OPENAI_EMBEDDINGS`       | Speficy the latency to add to embeddings requests in milliseconds using `LATENCY_OPENAI_EMBEDDINGS_MEAN` and `LATENCY_OPENAI_EMBEDDINGS_STD_DEV`                                   |
+| `LATENCY_OPENAI_COMPLETIONS`      | Specify the latency to add to completions _per completion token_ in milliseconds using `LATENCY_OPEN_AI_COMPLETIONS_MEAN` and `LATENCY_OPEN_AI_COMPLETIONS_STD_DEV`                |
+| `LATENCY_OPENAI_CHAT_COMPLETIONS` | Specify the latency to add to chat completions _per completion token_ in milliseconds using `LATENCY_OPEN_AI_CHAT_COMPLETIONS_MEAN` and `LATENCY_OPEN_AI_CHAT_COMPLETIONS_STD_DEV` |
+
+
+The default values are:
+
+| Prefix                            | Mean | Std Dev |
+| --------------------------------- | ---- | ------- |
+| `LATENCY_OPENAI_EMBEDDINGS`       | 100  | 30      |
+| `LATENCY_OPENAI_COMPLETIONS`      | 15   | 2       |
+| `LATENCY_OPENAI_CHAT_COMPLETIONS` | 19   | 6       |
+
 
 ## Rate-limiting
 
