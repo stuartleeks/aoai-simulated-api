@@ -1,11 +1,15 @@
 from dataclasses import dataclass
 import random
-from typing import Awaitable, Callable
+from typing import Annotated, Awaitable, Callable
 
 # from aoai_simulated_api.pipeline import RequestContext
 from fastapi import Request, Response
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from requests import Response as requests_Response
 from starlette.routing import Route, Match
+
+import nanoid
 
 
 class RequestContext:
@@ -59,12 +63,13 @@ class RequestContext:
         return (True, scopes["path_params"])
 
 
-@dataclass
-class RecordingConfig:
-    dir: str
-    autosave: bool
-    aoai_api_key: str | None = None
-    aoai_api_endpoint: str | None = None
+class RecordingConfig(BaseSettings):
+    model_config = SettingsConfigDict(extra="ignore")
+
+    dir: str = Field(default=".recording", alias="RECORDING_DIR")
+    autosave: bool = Field(default=True, alias="RECORDING_AUTOSAVE")
+    aoai_api_key: str | None = Field(default=None, alias="AZURE_OPENAI_KEY")
+    aoai_api_endpoint: str | None = Field(default=None, alias="AZURE_OPENAI_ENDPOINT")
     forwarders: (
         list[
             Callable[
@@ -79,20 +84,34 @@ class RecordingConfig:
             ]
         ]
         | None
-    ) = None
+    ) = []
 
 
-@dataclass
-class NormalLatencyAmount:
-    mean: float
-    std_dev: float
+class CompletionLatency(BaseSettings):
+    mean: float = Field(default=15, alias="LATENCY_OPENAI_COMPLETIONS_MEAN")
+    std_dev: float = Field(default=2, alias="LATENCY_OPENAI_COMPLETIONS_STD_DEV")
 
     def get_value(self) -> float:
         return random.normalvariate(self.mean, self.std_dev)
 
 
-@dataclass
-class LatencyConfig:
+class ChatCompletionLatency(BaseSettings):
+    mean: float = Field(default=19, alias="LATENCY_OPENAI_CHAT_COMPLETIONS_MEAN")
+    std_dev: float = Field(default=6, alias="LATENCY_OPENAI_CHAT_COMPLETIONS_STD_DEV")
+
+    def get_value(self) -> float:
+        return random.normalvariate(self.mean, self.std_dev)
+
+
+class EmbeddingLatency(BaseSettings):
+    mean: float = Field(default=100, alias="LATENCY_OPENAI_EMBEDDINGS_MEAN")
+    std_dev: float = Field(default=30, alias="LATENCY_OPENAI_EMBEDDINGS_STD_DEV")
+
+    def get_value(self) -> float:
+        return random.normalvariate(self.mean, self.std_dev)
+
+
+class LatencyConfig(BaseSettings):
     """
     Defines the latency for different types of requests
 
@@ -101,24 +120,26 @@ class LatencyConfig:
     open_ai_chat_completions: the latency for OpenAI chat completions - mean is the number of milliseconds per token
     """
 
-    open_ai_completions: NormalLatencyAmount
-    open_ai_chat_completions: NormalLatencyAmount
-    open_ai_embeddings: NormalLatencyAmount
+    open_ai_completions: CompletionLatency = Field(default=CompletionLatency())
+    open_ai_chat_completions: ChatCompletionLatency = Field(default=ChatCompletionLatency())
+    open_ai_embeddings: EmbeddingLatency = Field(default=EmbeddingLatency())
 
 
-@dataclass
-class Config:
+class PatchableConfig(BaseSettings):
+    simulator_mode: str = Field(default="generate", alias="SIMULATOR_MODE", pattern="^(generate|record|replay)$")
+    simulator_api_key: str = Field(default=nanoid.generate(size=30), alias="SIMULATOR_API_KEY")
+    recording: RecordingConfig = Field(default=RecordingConfig())
+    openai_deployments: dict[str, "OpenAIDeployment"] | None = Field(default=None)
+    doc_intelligence_rps: int = Field(default=15, alias="DOC_INTELLIGENCE_RPS")
+    latency: Annotated[LatencyConfig, Field(default=LatencyConfig())]
+
+
+class Config(PatchableConfig):
     """
     Configuration for the simulator
     """
 
-    simulator_mode: str
-    simulator_api_key: str
-    recording: RecordingConfig
-    openai_deployments: dict[str, "OpenAIDeployment"] | None
-    generators: list[Callable[[RequestContext], Response | Awaitable[Response] | None]]
-    doc_intelligence_rps: int
-    latency: LatencyConfig
+    generators: list[Callable[[RequestContext], Response | Awaitable[Response] | None]] = None
 
 
 @dataclass

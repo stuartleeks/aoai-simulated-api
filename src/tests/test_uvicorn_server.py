@@ -10,8 +10,16 @@ import pytest
 import requests
 import uvicorn
 
-from aoai_simulated_api.app_builder import get_simulator
-from aoai_simulated_api.models import Config, LatencyConfig, NormalLatencyAmount, RecordingConfig
+from aoai_simulated_api.app_builder import app, initialize
+from aoai_simulated_api.config_loader import set_config
+from aoai_simulated_api.models import (
+    Config,
+    LatencyConfig,
+    RecordingConfig,
+    ChatCompletionLatency,
+    CompletionLatency,
+    EmbeddingLatency,
+)
 
 logger = logging.getLogger("tests")
 
@@ -23,7 +31,8 @@ class UvicornTestServer(uvicorn.Server):
     """
 
     def __init__(self, config: Config):
-        app = get_simulator(logger=logger, config=config)
+        set_config(config)
+        initialize()
         uvconfig = uvicorn.Config(app, host="127.0.0.1", port=8001, loop="asyncio")
 
         super().__init__(uvconfig)
@@ -51,23 +60,25 @@ class UvicornTestServer(uvicorn.Server):
 async def test_root_message():
     # This mostly validates that the UvicornTestServer starts up the simulator :-)
 
-    config = Config(
-        simulator_mode="generate",
-        simulator_api_key="123456789",
-        recording=RecordingConfig(
-            autosave=False,
-            dir="",
-            forwarders=[],
+    config = Config(generators=[])
+    config.simulator_mode = "generate"
+    config.simulator_api_key = "123456789"
+    config.doc_intelligence_rps = 123
+    config.latency = LatencyConfig(
+        open_ai_completions=CompletionLatency(
+            LATENCY_OPENAI_COMPLETIONS_MEAN=0,
+            LATENCY_OPENAI_COMPLETIONS_STD_DEV=0.1,
         ),
-        openai_deployments=None,
-        generators=[],
-        doc_intelligence_rps=123,
-        latency=LatencyConfig(
-            open_ai_completions=NormalLatencyAmount(mean=0, std_dev=0.1),
-            open_ai_chat_completions=NormalLatencyAmount(mean=0, std_dev=0.1),
-            open_ai_embeddings=NormalLatencyAmount(mean=0, std_dev=0.1),
+        open_ai_chat_completions=ChatCompletionLatency(
+            LATENCY_OPENAI_CHAT_COMPLETIONS_MEAN=0,
+            LATENCY_OPENAI_CHAT_COMPLETIONS_STD_DEV=0.1,
+        ),
+        open_ai_embeddings=EmbeddingLatency(
+            LATENCY_OPENAI_EMBEDDINGS_MEAN=0,
+            LATENCY_OPENAI_EMBEDDINGS_STD_DEV=0.1,
         ),
     )
+
     server = UvicornTestServer(config)
     with server.run_in_thread():
         response = requests.get("http://localhost:8001/", timeout=10)

@@ -17,6 +17,7 @@ This repo is an exploration into creating a simulated API implementation for Azu
   - [Rate-limiting](#rate-limiting)
     - [OpenAI Rate-Limiting](#openai-rate-limiting)
     - [Document Intelligence Rate-Limiting](#document-intelligence-rate-limiting)
+  - [Config Endpoint](#config-endpoint)
   - [Current Status/Notes](#current-statusnotes)
     - [Replay Exploration](#replay-exploration)
     - [Using the simulator with restricted network access](#using-the-simulator-with-restricted-network-access)
@@ -293,6 +294,25 @@ Rate-limiting for Document Intelligence endpoints is a standard requests per sec
 This rate-limit only applies to the request submission endpoint and not to the results endpoint.
 
 To control the rate-limiting, set the `DOC_INTELLIGENCE_RPS` environment variable to the desired RPS limit.
+
+## Config Endpoint
+
+The simulator exposes a `/++/config` endpoint that returns the current configuration of the simulator and allow the configuration to be updated dynamically.
+
+A `GET` request to this endpoint will return a JSON object with the current configuration:
+
+```json
+{"simulator_mode":"generate","doc_intelligence_rps":15,"latency":{"open_ai_embeddings":{"mean":100.0,"std_dev":30.0},"open_ai_completions":{"mean":15.0,"std_dev":2.0},"open_ai_chat_completions":{"mean":19.0,"std_dev":6.0}},"openai_deployments":{"deployment1":{"tokens_per_minute":60000,"model":"gpt-3.5-turbo"},"gpt-35-turbo-1k-token":{"tokens_per_minute":1000,"model":"gpt-3.5-turbo"}}}
+```
+
+A `PATCH` request can be used to update the configuration
+The body of the request should be a JSON object with the configuration values to update.
+
+For example, the following request will update the mean latency for OpenAI embeddings to 1 second (1000ms):
+
+```json
+{"latency": {"open_ai_embeddings": {"mean": 1000}}}
+```
 
 ## Current Status/Notes
 
