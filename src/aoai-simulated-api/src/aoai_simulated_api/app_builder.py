@@ -228,7 +228,7 @@ async def catchall(request: Request, _: Annotated[bool, Depends(validate_api_key
             response = await record_replay_handler.handle_request(context)
 
         if not response:
-            logger.error("No response generated for request: %s", request.url.path)
+            logger.error("No response found for request: %s", request.url.path)
             return Response(status_code=500)
 
         # Apply limits here so that that they apply to record/replay as well as generate

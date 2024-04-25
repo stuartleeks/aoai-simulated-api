@@ -38,4 +38,4 @@ async def invoke_generators(
                 context.request.url,
                 exc_info=e,
             )
-    raise ValueError("No generator found for request")
+    return None
