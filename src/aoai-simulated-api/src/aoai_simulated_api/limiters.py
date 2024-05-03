@@ -37,7 +37,12 @@ def create_openai_limiter(
         tokens_per_10s = math.ceil(tokens_per_minute / 6)
         limit_tokens_per_10s = RateLimitItemPerSecond(tokens_per_10s, 10)
 
-        requests_per_10s = math.ceil(tokens_per_minute / (1000 * 6))
+        # Logical breakdown:
+        # requests_per_minute = (tokens_per_minute * 6) / 1000
+        # requests_per_10s = math.ceil(requests_per_minute / 6)
+        # i.e. requests_per_10s = math.ceil((tokens_per_minute * 6) / (1000 * 6))
+        # which simplifies to
+        requests_per_10s = math.ceil(tokens_per_minute / 1000)
         limit_requests_per_10s = RateLimitItemPerSecond(requests_per_10s, 10)
 
         deployment_limits[deployment] = OpenAILimits(
