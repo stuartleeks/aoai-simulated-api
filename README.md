@@ -24,6 +24,7 @@ This repo is an exploration into creating a simulated API implementation for Azu
       - [Unrestricted Network Access](#unrestricted-network-access)
       - [Semi-Restricted Network Access](#semi-restricted-network-access)
       - [Restricted Network Access](#restricted-network-access)
+  - [Changelog](#changelog)
 
 
 ## Rationale
@@ -363,3 +364,6 @@ Alternatively, you can download the [encoding file](https://openaipublic.blob.co
 
 To build the simulator in this mode, set the Docker build argument `network_type=restricted`. The simulator and the build process will then use the cached TikToken encoding file instead of retrieving it through the public internet. The build process will also set the required `TIKTOKEN_CACHE_DIR` environment variable to point to the cached TikToken encoding file. 
 
+## Changelog
+
+For a list of tagged versions and changes, see the [CHANGELOG.md](./CHANGELOG.md) file.
