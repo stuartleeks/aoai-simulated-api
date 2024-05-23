@@ -57,7 +57,7 @@ def get_model_name_from_deployment_name(context: RequestContext, deployment_name
     return default_model
 
 
-def _generate_embedding(index: int, embedding_size=default_embedding_size):
+def create_embedding_content(index: int, embedding_size=default_embedding_size):
     """Generates a random embedding"""
     return {
         "object": "embedding",
@@ -66,28 +66,19 @@ def _generate_embedding(index: int, embedding_size=default_embedding_size):
     }
 
 
-async def azure_openai_embedding(context: RequestContext) -> Response | None:
-    request = context.request
-    is_match, path_params = context.is_route_match(
-        request=request, path="/openai/deployments/{deployment}/embeddings", methods=["POST"]
-    )
-    if not is_match:
-        return None
-
-    deployment_name = path_params["deployment"]
-    request_body = await request.json()
-    model_name = get_model_name_from_deployment_name(context, deployment_name)
-    request_input = request_body["input"]
+def create_embeddings_response(
+    context: RequestContext, deployment_name: str, model_name: str, request_input: str | list
+):
     embeddings = []
     if isinstance(request_input, str):
         tokens = num_tokens_from_string(request_input, model_name)
-        embeddings.append(_generate_embedding(0))
+        embeddings.append(create_embedding_content(0))
     else:
         tokens = 0
         index = 0
         for i in request_input:
             tokens += num_tokens_from_string(i, model_name)
-            embeddings.append(_generate_embedding(index))
+            embeddings.append(create_embedding_content(index))
             index += 1
 
     response_data = {
@@ -112,24 +103,16 @@ async def azure_openai_embedding(context: RequestContext) -> Response | None:
     )
 
 
-async def azure_openai_completion(context: RequestContext) -> Response | None:
-    request = context.request
-    is_match, path_params = context.is_route_match(
-        request=request, path="/openai/deployments/{deployment}/completions", methods=["POST"]
-    )
-    if not is_match:
-        return None
-
-    deployment_name = path_params["deployment"]
-    model_name = get_model_name_from_deployment_name(context, deployment_name)
-    request_body = await request.json()
-    prompt_tokens = num_tokens_from_string(request_body["prompt"], model_name)
-
-    # TODO - determine the maxiumum tokens to use based on the model
-    max_tokens = request_body.get("max_tokens", 4096)
-
-    # TODO - randomise the finish reason (i.e. don't always use the full set of tokens)
-    words_to_generate = int(TOKEN_TO_WORD_FACTOR * max_tokens)
+def create_completion_response(
+    context: RequestContext,
+    deployment_name: str,
+    model_name: str,
+    prompt_tokens: int,
+    words_to_generate: int,
+):
+    """
+    Creates a Response object for a completion request and sets context values for the rate-limiter etc
+    """
     text = "".join(lorem.get_word(count=words_to_generate))
 
     completion_tokens = num_tokens_from_string(text, model_name)
@@ -171,26 +154,23 @@ async def azure_openai_completion(context: RequestContext) -> Response | None:
     )
 
 
-async def azure_openai_chat_completion(context: RequestContext) -> Response | None:
-    request = context.request
-    is_match, path_params = context.is_route_match(
-        request=request, path="/openai/deployments/{deployment}/chat/completions", methods=["POST"]
-    )
-    if not is_match:
-        return None
-
-    request_body = await request.json()
-    deployment_name = path_params["deployment"]
-    model_name = get_model_name_from_deployment_name(context, deployment_name)
-    prompt_tokens = num_tokens_from_messages(request_body["messages"], model_name)
-
-    # TODO - determine the maxiumum tokens to use based on the model
-    max_tokens = request_body.get("max_tokens", 4096)
-    # TODO - randomise the finish reason (i.e. don't always use the full set of tokens)
-    words_to_generate = int(TOKEN_TO_WORD_FACTOR * max_tokens)
+def create_chat_completion_response(
+    context: RequestContext,
+    deployment_name: str,
+    model_name: str,
+    streaming: bool,
+    words_to_generate: int,
+    prompt_messages: list,
+    finish_reason: str = "length",
+):
+    """
+    Creates a Response object for a chat completion request and sets context values for the rate-limiter etc.
+    Handles streaming vs non-streaming
+    """
     words = lorem.get_word(count=words_to_generate)
+    prompt_tokens = num_tokens_from_messages(prompt_messages, model_name)
 
-    if request_body.get("stream", False):
+    if streaming:
 
         async def send_words():
             space = ""
@@ -219,7 +199,6 @@ async def azure_openai_chat_completion(context: RequestContext) -> Response | No
                                         "violence": {"filtered": False, "severity": "safe"},
                                     },
                                 },
-                                "message": {"role": "assistant", "content": word},
                             },
                         ],
                     }
@@ -229,6 +208,38 @@ async def azure_openai_chat_completion(context: RequestContext) -> Response | No
                 yield "\n"
                 await asyncio.sleep(0.05)
                 space = " "
+
+            chunk_string = json.dumps(
+                {
+                    "id": "chatcmpl-" + nanoid.non_secure_generate(size=29),
+                    "object": "chat.completion.chunk",
+                    "created": int(time.time()),
+                    "model_name": model_name,
+                    "system_fingerprint": None,
+                    "choices": [
+                        {
+                            "delta": {
+                                "content": None,
+                                "function_call": None,
+                                "role": None,
+                                "tool_calls": None,
+                                "finish_reason": finish_reason,
+                                "index": 0,
+                                "logprobs": None,
+                                "content_filter_results": {
+                                    "hate": {"filtered": False, "severity": "safe"},
+                                    "self_harm": {"filtered": False, "severity": "safe"},
+                                    "sexual": {"filtered": False, "severity": "safe"},
+                                    "violence": {"filtered": False, "severity": "safe"},
+                                },
+                            },
+                        },
+                    ],
+                }
+            )
+
+            yield "data: " + chunk_string + "\n"
+            yield "\n"
             yield "[DONE]"
 
         return StreamingResponse(content=send_words())
@@ -255,7 +266,7 @@ async def azure_openai_chat_completion(context: RequestContext) -> Response | No
         ],
         "choices": [
             {
-                "finish_reason": "length",
+                "finish_reason": finish_reason,
                 "index": 0,
                 "message": {
                     "role": "assistant",
@@ -289,4 +300,81 @@ async def azure_openai_chat_completion(context: RequestContext) -> Response | No
             "Content-Type": "application/json",
         },
         status_code=200,
+    )
+
+
+async def azure_openai_embedding(context: RequestContext) -> Response | None:
+    request = context.request
+    is_match, path_params = context.is_route_match(
+        request=request, path="/openai/deployments/{deployment}/embeddings", methods=["POST"]
+    )
+    if not is_match:
+        return None
+
+    deployment_name = path_params["deployment"]
+    request_body = await request.json()
+    model_name = get_model_name_from_deployment_name(context, deployment_name)
+    request_input = request_body["input"]
+    return create_embeddings_response(
+        context=context,
+        deployment_name=deployment_name,
+        model_name=model_name,
+        request_input=request_input,
+    )
+
+
+async def azure_openai_completion(context: RequestContext) -> Response | None:
+    request = context.request
+    is_match, path_params = context.is_route_match(
+        request=request, path="/openai/deployments/{deployment}/completions", methods=["POST"]
+    )
+    if not is_match:
+        return None
+
+    deployment_name = path_params["deployment"]
+    model_name = get_model_name_from_deployment_name(context, deployment_name)
+    request_body = await request.json()
+    prompt_tokens = num_tokens_from_string(request_body["prompt"], model_name)
+
+    # TODO - determine the maxiumum tokens to use based on the model
+    max_tokens = request_body.get("max_tokens", 4096)
+
+    # TODO - randomise the finish reason (i.e. don't always use the full set of tokens)
+    words_to_generate = int(TOKEN_TO_WORD_FACTOR * max_tokens)
+
+    return create_completion_response(
+        context=context,
+        deployment_name=deployment_name,
+        model_name=model_name,
+        prompt_tokens=prompt_tokens,
+        words_to_generate=words_to_generate,
+    )
+
+
+async def azure_openai_chat_completion(context: RequestContext) -> Response | None:
+    request = context.request
+    is_match, path_params = context.is_route_match(
+        request=request, path="/openai/deployments/{deployment}/chat/completions", methods=["POST"]
+    )
+    if not is_match:
+        return None
+
+    request_body = await request.json()
+    deployment_name = path_params["deployment"]
+    model_name = get_model_name_from_deployment_name(context, deployment_name)
+    messages = request_body["messages"]
+
+    # TODO - determine the maxiumum tokens to use based on the model
+    max_tokens = request_body.get("max_tokens", 4096)
+    # TODO - randomise the finish reason (i.e. don't always use the full set of tokens)
+    words_to_generate = int(TOKEN_TO_WORD_FACTOR * max_tokens)
+
+    streaming = request_body.get("stream", False)
+    return create_chat_completion_response(
+        context=context,
+        deployment_name=deployment_name,
+        model_name=model_name,
+        streaming=streaming,
+        words_to_generate=words_to_generate,
+        prompt_messages=messages,
     )
