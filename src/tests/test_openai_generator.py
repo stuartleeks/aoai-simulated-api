@@ -2,6 +2,7 @@
 Test the OpenAI generator endpoints
 """
 
+from aoai_simulated_api.config_loader import load_extension
 from aoai_simulated_api.models import (
     Config,
     LatencyConfig,
@@ -80,6 +81,7 @@ async def test_openai_generator_chat_completion():
         assert len(response.choices) == 1
         assert response.choices[0].message.role == "assistant"
         assert len(response.choices[0].message.content) > 20
+        assert response.choices[0].finish_reason == "length"
 
 
 @pytest.mark.asyncio
@@ -103,3 +105,28 @@ async def test_openai_generator_embeddings():
         assert response.data[0].object == "embedding"
         assert response.data[0].index == 0
         assert len(response.data[0].embedding) == 1536
+
+
+@pytest.mark.asyncio
+async def test_openai_generator_chat_completion_with_custom_generator():
+    """
+    Ensure we can call the chat completion endpoint using a generator from an extension
+    """
+    config = _get_generator_config()
+    load_extension(config=config, extension_path="src/examples/generator_replace_chat_completion/generator_config.py")
+
+    server = UvicornTestServer(config)
+    with server.run_in_thread():
+        aoai_client = AzureOpenAI(
+            api_key=API_KEY,
+            api_version="2023-12-01-preview",
+            azure_endpoint="http://localhost:8001",
+            max_retries=0,
+        )
+        messages = [{"role": "user", "content": "What is the meaning of life?"}]
+        response = aoai_client.chat.completions.create(model="deployment1", messages=messages, max_tokens=50)
+
+        assert len(response.choices) == 1
+        assert response.choices[0].message.role == "assistant"
+        assert len(response.choices[0].message.content.split(" ")) == 1
+        assert response.choices[0].finish_reason == "stop"

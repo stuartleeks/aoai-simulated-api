@@ -154,7 +154,7 @@ def create_completion_response(
     )
 
 
-def create_chat_completion_response(
+def create_lorem_chat_completion_response(
     context: RequestContext,
     deployment_name: str,
     model_name: str,
@@ -164,17 +164,42 @@ def create_chat_completion_response(
     finish_reason: str = "length",
 ):
     """
-    Creates a Response object for a chat completion request and sets context values for the rate-limiter etc.
+    Creates a Response object for a chat completion request by generating lorem ipsum text and sets context values for the rate-limiter etc.
     Handles streaming vs non-streaming
     """
     words = lorem.get_word(count=words_to_generate)
+    return create_chat_completion_response(
+        context=context,
+        deployment_name=deployment_name,
+        model_name=model_name,
+        streaming=streaming,
+        prompt_messages=prompt_messages,
+        generated_content=words,
+        finish_reason=finish_reason,
+    )
+
+
+def create_chat_completion_response(
+    context: RequestContext,
+    deployment_name: str,
+    model_name: str,
+    streaming: bool,
+    prompt_messages: list,
+    generated_content: list[str],
+    finish_reason: str = "length",
+):
+    """
+    Creates a Response object for a chat completion request and sets context values for the rate-limiter etc.
+    Handles streaming vs non-streaming
+    """
+
     prompt_tokens = num_tokens_from_messages(prompt_messages, model_name)
 
     if streaming:
 
         async def send_words():
             space = ""
-            for word in words.split(" "):
+            for word in generated_content.split(" "):
                 chunk_string = json.dumps(
                     {
                         "id": "chatcmpl-" + nanoid.non_secure_generate(size=29),
@@ -244,7 +269,7 @@ def create_chat_completion_response(
 
         return StreamingResponse(content=send_words())
 
-    text = "".join(words)
+    text = "".join(generated_content)
     completion_tokens = num_tokens_from_string(text, model_name)
     total_tokens = prompt_tokens + completion_tokens
 
@@ -370,7 +395,7 @@ async def azure_openai_chat_completion(context: RequestContext) -> Response | No
     words_to_generate = int(TOKEN_TO_WORD_FACTOR * max_tokens)
 
     streaming = request_body.get("stream", False)
-    return create_chat_completion_response(
+    return create_lorem_chat_completion_response(
         context=context,
         deployment_name=deployment_name,
         model_name=model_name,
