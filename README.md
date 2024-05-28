@@ -3,7 +3,7 @@
 This repo is an exploration into creating a simulated API implementation for Azure OpenAI (AOAI). This is a work in progress!
 
 - [aoai-simulated-api](#aoai-simulated-api)
-  - [Rationale](#rationale)
+  - [What is the OpenAI Simulated API?](#what-is-the-openai-simulated-api)
   - [Overview](#overview)
   - [Getting Started](#getting-started)
   - [Running in Docker](#running-in-docker)
@@ -26,14 +26,11 @@ This repo is an exploration into creating a simulated API implementation for Azu
       - [Restricted Network Access](#restricted-network-access)
   - [Changelog](#changelog)
 
+## What is the OpenAI Simulated API?
 
-## Rationale
-
-When building solutions using Azure OpenAI there are points in the development process where you may want to test your solution against a simulated API.
-
-One example is working to integrate Open AI into your broader application. In this case you want to have representative responses to some known requests but don't need the "AI-ness" of the service (i.e. you don't need to be able to handle arbitrary user requests). A simulated API can provide these responses more cheaply and allow you an easy way to customise the responses to check different application behaviours.
-
-Another example is load testing. In this case you are more likely to want to be able to submit a large number of requests with representative latency and rate-limiting, but don't need the actual AI responses.
+The OpenAI Simulated API is a tool that allows you to easily deploy endpoints that simulate the OpenAI API.
+A common use-case for the OpenAI Simulated API is to test the behaviour your application under load.
+By using the simulated API, you can reduce the cost of running load tests against the OpenAI API and ensure that your application behaves as expected under different conditions.
 
 ## Overview
 
