@@ -130,7 +130,6 @@ class PatchableConfig(BaseSettings):
     simulator_api_key: str = Field(default=nanoid.generate(size=30), alias="SIMULATOR_API_KEY")
     recording: RecordingConfig = Field(default=RecordingConfig())
     openai_deployments: dict[str, "OpenAIDeployment"] | None = Field(default=None)
-    doc_intelligence_rps: int = Field(default=15, alias="DOC_INTELLIGENCE_RPS")
     latency: Annotated[LatencyConfig, Field(default=LatencyConfig())]
 
 

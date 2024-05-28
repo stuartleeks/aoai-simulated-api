@@ -52,7 +52,7 @@ async def test_load_extension_from_single_file():
     config = _get_config()
 
     initial_generator_count = len(config.generators)
-    load_extension(config=config, extension_path="src/examples/generator_config/generator_config.py")
+    load_extension(config=config, extension_path="src/examples/generator_echo/generator_config.py")
 
     # check that we have an additional generator
     assert len(config.generators) == initial_generator_count + 1
@@ -80,7 +80,7 @@ async def test_load_extension_from_directory():
     config = _get_config()
 
     initial_forwarder_count = len(config.recording.forwarders)
-    load_extension(config=config, extension_path="src/examples/forwarder_config")
+    load_extension(config=config, extension_path="src/examples/forwarder_doc_intelligence")
 
     # check that we have an additional generator
     assert len(config.recording.forwarders) == initial_forwarder_count + 1
@@ -96,7 +96,7 @@ async def test_load_extension_from_directory_init_py():
     config = _get_config()
 
     initial_forwarder_count = len(config.recording.forwarders)
-    load_extension(config=config, extension_path="src/examples/forwarder_config/__init__.py")
+    load_extension(config=config, extension_path="src/examples/forwarder_doc_intelligence/__init__.py")
 
     # check that we have an additional generator
     assert len(config.recording.forwarders) == initial_forwarder_count + 1

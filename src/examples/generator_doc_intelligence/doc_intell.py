@@ -1,4 +1,6 @@
 import datetime
+import logging
+import os
 import random
 import json
 import uuid
@@ -6,10 +8,17 @@ import lorem
 from fastapi import Response
 
 
+from aoai_simulated_api.auth import validate_api_key_header
 from aoai_simulated_api.constants import SIMULATOR_KEY_LIMITER
 from aoai_simulated_api.models import RequestContext
 
 document_analysis_config = {}
+
+logger = logging.getLogger(__name__)
+
+
+doc_intelligence_rps: int = int(os.getenv("DOC_INTELLIGENCE_RPS", "15"))
+logger.info("📝 Using Doc Intelligence RPS: %s", doc_intelligence_rps)
 
 
 def get_wait_time_for_result(content_length: int) -> float:
@@ -39,6 +48,12 @@ async def doc_intelligence_analyze(context: RequestContext) -> Response | None:
     )
     if not is_match:
         return None
+
+    # This is an example of how you can use the validate_api_key_header function
+    # This validates the "ocp-apim-subscription-key" header in the request against the configured API key
+    validate_api_key_header(
+        request=request, header_name="ocp-apim-subscription-key", allowed_key_value=context.config.simulator_api_key
+    )
 
     # Required parameters (modelId, api-version)
     model_id = path_params["modelId"]
@@ -94,6 +109,12 @@ async def doc_intelligence_analyze_result(context: RequestContext) -> Response |
     )
     if not is_match:
         return None
+
+    # This is an example of how you can use the validate_api_key_header function
+    # This validates the "ocp-apim-subscription-key" header in the request against the configured API key
+    validate_api_key_header(
+        request=request, header_name="ocp-apim-subscription-key", allowed_key_value=context.config.simulator_api_key
+    )
 
     result_id = path_params["result_id"]
     doc_config = document_analysis_config.get(result_id)

@@ -2,6 +2,7 @@
 # Generators can be sync or async methods
 
 
+from aoai_simulated_api.auth import validate_api_key_header
 from aoai_simulated_api.models import Config, RequestContext
 from aoai_simulated_api.generator.openai import (
     create_lorem_chat_completion_response,
@@ -32,12 +33,17 @@ async def custom_azure_openai_chat_completion(context: RequestContext) -> Respon
     """
     Custom generator for OpenAI chat completions that only generates a single word response and sets the finish_reason to "stop"
     """
+
     request = context.request
     is_match, path_params = context.is_route_match(
         request=request, path="/openai/deployments/{deployment}/chat/completions", methods=["POST"]
     )
     if not is_match:
         return None
+
+    # This is an example of how you can use the validate_api_key_header function
+    # This validates the "api-key" header in the request against the configured API key
+    validate_api_key_header(request=request, header_name="api-key", allowed_key_value=context.config.simulator_api_key)
 
     request_body = await request.json()
     deployment_name = path_params["deployment"]

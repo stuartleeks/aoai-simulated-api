@@ -63,7 +63,6 @@ async def test_root_message():
     config = Config(generators=[])
     config.simulator_mode = "generate"
     config.simulator_api_key = "123456789"
-    config.doc_intelligence_rps = 123
     config.latency = LatencyConfig(
         open_ai_completions=CompletionLatency(
             LATENCY_OPENAI_COMPLETIONS_MEAN=0,

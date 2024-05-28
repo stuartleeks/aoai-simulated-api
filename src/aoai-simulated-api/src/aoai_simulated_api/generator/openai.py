@@ -4,6 +4,7 @@ import logging
 import time
 import random
 
+from aoai_simulated_api.auth import validate_api_key_header
 import lorem
 import nanoid
 
@@ -23,7 +24,7 @@ from aoai_simulated_api.generator.openai_tokens import num_tokens_from_string, n
 # This file contains a default implementation of the openai generators
 # You can configure your own generators by creating a generator_config.py file and setting the
 # EXTENSION_PATH environment variable to the path of the file when running the API
-# See src/examples/generator_config for an example of how to define your own generators
+# See src/examples/generator_echo for an example of how to define your own generators
 
 logger = logging.getLogger(__name__)
 
@@ -328,6 +329,11 @@ def create_chat_completion_response(
     )
 
 
+def _validate_api_key_header(context: RequestContext):
+    request = context.request
+    validate_api_key_header(request=request, header_name="api-key", allowed_key_value=context.config.simulator_api_key)
+
+
 async def azure_openai_embedding(context: RequestContext) -> Response | None:
     request = context.request
     is_match, path_params = context.is_route_match(
@@ -335,6 +341,8 @@ async def azure_openai_embedding(context: RequestContext) -> Response | None:
     )
     if not is_match:
         return None
+
+    _validate_api_key_header(context)
 
     deployment_name = path_params["deployment"]
     request_body = await request.json()
@@ -355,6 +363,8 @@ async def azure_openai_completion(context: RequestContext) -> Response | None:
     )
     if not is_match:
         return None
+
+    _validate_api_key_header(context)
 
     deployment_name = path_params["deployment"]
     model_name = get_model_name_from_deployment_name(context, deployment_name)
@@ -383,6 +393,8 @@ async def azure_openai_chat_completion(context: RequestContext) -> Response | No
     )
     if not is_match:
         return None
+
+    _validate_api_key_header(context)
 
     request_body = await request.json()
     deployment_name = path_params["deployment"]

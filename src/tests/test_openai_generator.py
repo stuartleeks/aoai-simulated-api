@@ -11,7 +11,7 @@ from aoai_simulated_api.models import (
     EmbeddingLatency,
 )
 from aoai_simulated_api.generator.manager import get_default_generators
-from openai import AzureOpenAI
+from openai import AzureOpenAI, AuthenticationError
 import pytest
 
 from .test_uvicorn_server import UvicornTestServer
@@ -41,7 +41,31 @@ def _get_generator_config() -> Config:
 
 
 @pytest.mark.asyncio
-async def test_openai_generator_completion():
+async def test_openai_generator_completion_requires_auth():
+    """
+    Ensure we need the right API key to call the completion endpoint
+    """
+    config = _get_generator_config()
+    server = UvicornTestServer(config)
+    with server.run_in_thread():
+        aoai_client = AzureOpenAI(
+            api_key="wrong_key",
+            api_version="2023-12-01-preview",
+            azure_endpoint="http://localhost:8001",
+            max_retries=0,
+        )
+        prompt = "This is a test prompt"
+
+        try:
+            aoai_client.completions.create(model="deployment1", prompt=prompt, max_tokens=50)
+            assert False, "Expected an exception"
+        except AuthenticationError as e:
+            assert e.status_code == 401
+            assert e.message == "Error code: 401 - {'detail': 'Missing or incorrect API Key'}"
+
+
+@pytest.mark.asyncio
+async def test_openai_generator_completion_success():
     """
     Ensure we can call the completion endpoint using the generator
     """
@@ -62,7 +86,31 @@ async def test_openai_generator_completion():
 
 
 @pytest.mark.asyncio
-async def test_openai_generator_chat_completion():
+async def test_openai_generator_chat_completion_requires_auth():
+    """
+    Ensure we need the right API key to call the chat completion endpoint
+    """
+    config = _get_generator_config()
+    server = UvicornTestServer(config)
+    with server.run_in_thread():
+        aoai_client = AzureOpenAI(
+            api_key="wrong_key",
+            api_version="2023-12-01-preview",
+            azure_endpoint="http://localhost:8001",
+            max_retries=0,
+        )
+        messages = [{"role": "user", "content": "What is the meaning of life?"}]
+
+        try:
+            aoai_client.chat.completions.create(model="deployment1", messages=messages, max_tokens=50)
+            assert False, "Expected an exception"
+        except AuthenticationError as e:
+            assert e.status_code == 401
+            assert e.message == "Error code: 401 - {'detail': 'Missing or incorrect API Key'}"
+
+
+@pytest.mark.asyncio
+async def test_openai_generator_chat_completion_success():
     """
     Ensure we can call the chat completion endpoint using the generator
     """
@@ -85,7 +133,31 @@ async def test_openai_generator_chat_completion():
 
 
 @pytest.mark.asyncio
-async def test_openai_generator_embeddings():
+async def test_openai_generator_embeddings_requires_auth():
+    """
+    Ensure we need the right API key to call the embeddings endpoint
+    """
+    config = _get_generator_config()
+    server = UvicornTestServer(config)
+    with server.run_in_thread():
+        aoai_client = AzureOpenAI(
+            api_key="wrong_key",
+            api_version="2023-12-01-preview",
+            azure_endpoint="http://localhost:8001",
+            max_retries=0,
+        )
+        content = "This is some text to generate embeddings for"
+
+        try:
+            aoai_client.embeddings.create(model="deployment1", input=content)
+            assert False, "Expected an exception"
+        except AuthenticationError as e:
+            assert e.status_code == 401
+            assert e.message == "Error code: 401 - {'detail': 'Missing or incorrect API Key'}"
+
+
+@pytest.mark.asyncio
+async def test_openai_generator_embeddings_success():
     """
     Ensure we can call the embeddings endpoint using the generator
     """

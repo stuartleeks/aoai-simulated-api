@@ -1,9 +1,9 @@
 # Comment/uncomment to switch between Azure and local deployment
-@aoai_endpoint={{$dotenv AZURE_OPENAI_ENDPOINT}}
-@aoai_key={{$dotenv AZURE_OPENAI_KEY}}
+# @aoai_endpoint={{$dotenv AZURE_OPENAI_ENDPOINT}}
+# @aoai_key={{$dotenv AZURE_OPENAI_KEY}}
 
-# @aoai_endpoint=http://localhost:8000/
-# @aoai_key={{$dotenv SIMULATOR_API_KEY}}
+@aoai_endpoint=http://localhost:8000/
+@aoai_key={{$dotenv SIMULATOR_API_KEY}}
 
 @aoai_deployment={{$dotenv AZURE_OPENAI_DEPLOYMENT}}
 @aoai_embedding_deployment={{$dotenv AZURE_OPENAI_EMBEDDING_DEPLOYMENT}}
@@ -16,7 +16,7 @@
 
 POST {{aoai_endpoint}}openai/deployments/{{aoai_deployment}}/completions?api-version=2023-05-15
 Content-Type: application/json
-api-key: {{aoai_key}}
+api-key: {{aoai_key}}xx
 
 {
   "model": "gpt-5-turbo-1",

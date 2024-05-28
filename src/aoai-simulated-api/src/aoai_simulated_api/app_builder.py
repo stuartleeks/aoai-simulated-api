@@ -1,16 +1,15 @@
 import asyncio
 from dataclasses import dataclass
 import logging
-import secrets
 import time
 import traceback
 from typing import Annotated, Callable
-from fastapi import Depends, FastAPI, Request, Response, HTTPException, status
-from fastapi.security import APIKeyHeader
+from fastapi import Depends, FastAPI, Request, Response, HTTPException
 from limits import storage
 from opentelemetry import trace, metrics
 
 from aoai_simulated_api import constants
+from aoai_simulated_api.auth import validate_api_key_header
 from aoai_simulated_api.config_loader import get_config, set_config
 from aoai_simulated_api.generator.manager import invoke_generators
 from aoai_simulated_api.limiters import create_openai_limiter, create_doc_intelligence_limiter
@@ -60,28 +59,6 @@ app = FastAPI()
 
 simulator_metrics = _get_simulator_metrics()
 
-# api-key header for OpenAI
-# ocp-apim-subscription-key header for doc intelligence
-api_key_header_scheme = APIKeyHeader(name="api-key", auto_error=False)
-ocp_apim_subscription_key_header_scheme = APIKeyHeader(name="ocp-apim-subscription-key", auto_error=False)
-
-
-def validate_api_key(
-    api_key: Annotated[str, Depends(api_key_header_scheme)],
-    ocp_apim_subscription_key: Annotated[str, Depends(ocp_apim_subscription_key_header_scheme)],
-):
-    if api_key and secrets.compare_digest(api_key, get_config().simulator_api_key):
-        return True
-    if ocp_apim_subscription_key and secrets.compare_digest(ocp_apim_subscription_key, get_config().simulator_api_key):
-        return True
-
-    logger.warning("🔒 Missing or incorrect API Key provided")
-    raise HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Missing or incorrect API Key",
-    )
-
-
 # pylint: disable-next=invalid-name
 record_replay_handler = None
 limiters: dict[str, Callable[[RequestContext, Response], Response | None]] = {}
@@ -109,7 +86,6 @@ def initialize():
             autosave=get_config().recording.autosave,
         )
 
-    logger.info("📝 Using Doc Intelligence RPS: %s", get_config().doc_intelligence_rps)
     logger.info("📝 Using OpenAI deployments: %s", get_config().openai_deployments)
 
     openai_deployment_limits = (
@@ -125,10 +101,14 @@ def initialize():
     # Limiter returns Response object if request should be blocked or None otherwise
     limiters = {
         "openai": create_openai_limiter(memory_storage, openai_deployment_limits),
-        "docintelligence": create_doc_intelligence_limiter(
-            memory_storage, requests_per_second=get_config().doc_intelligence_rps
-        ),
+        # "docintelligence": create_doc_intelligence_limiter(
+        #     memory_storage, requests_per_second=get_config().doc_intelligence_rps
+        # ),
     }
+
+
+def _default_validate_api_key_header(request: Request):
+    validate_api_key_header(request=request, header_name="api-key", allowed_key_value=get_config().simulator_api_key)
 
 
 @app.get("/")
@@ -137,7 +117,7 @@ async def root():
 
 
 @app.post("/++/save-recordings")
-def save_recordings(_: Annotated[bool, Depends(validate_api_key)]):
+def save_recordings(_: Annotated[bool, Depends(_default_validate_api_key_header)]):
     if get_config().simulator_mode == "record":
         logger.info("📼 Saving recordings...")
         record_replay_handler.save_recordings()
@@ -149,12 +129,11 @@ def save_recordings(_: Annotated[bool, Depends(validate_api_key)]):
 
 
 @app.get("/++/config")
-def config_get(_: Annotated[bool, Depends(validate_api_key)]):
+def config_get(_: Annotated[bool, Depends(_default_validate_api_key_header)]):
     # return a subset of the config as not all properties make sense (e.g. generator functions)
     config = get_config()
     return {
         "simulator_mode": config.simulator_mode,
-        "doc_intelligence_rps": config.doc_intelligence_rps,
         "latency": {
             "open_ai_embeddings": {
                 "mean": config.latency.open_ai_embeddings.mean,
@@ -181,12 +160,12 @@ def config_get(_: Annotated[bool, Depends(validate_api_key)]):
 
 
 @app.patch("/++/config")
-def config_patch(config: dict, _: Annotated[bool, Depends(validate_api_key)]):
+def config_patch(config: dict, _: Annotated[bool, Depends(_default_validate_api_key_header)]):
     original_config = get_config()
 
     # Config is a nested settings class to enable setting env var names on child items
     # As a result we need to update each level independently
-    root_dict = {k: v for k, v in config.items() if k in ["simulator_mode", "doc_intelligence_rps"]}
+    root_dict = {k: v for k, v in config.items() if k in ["simulator_mode"]}
     new_config = original_config.model_copy(update=root_dict)
     if "latency" in config:
         if "open_ai_completions" in config["latency"]:
@@ -210,7 +189,7 @@ def config_patch(config: dict, _: Annotated[bool, Depends(validate_api_key)]):
 
 
 @app.api_route("/{full_path:path}", methods=["GET", "POST", "PUT", "DELETE"])
-async def catchall(request: Request, _: Annotated[bool, Depends(validate_api_key)]):
+async def catchall(request: Request):
     logger.debug("⚡ handling route: %s", request.url.path)
     # TODO check for traceparent in inbound request and propagate
     #      to allow for correlating load test with back-end data
@@ -232,7 +211,7 @@ async def catchall(request: Request, _: Annotated[bool, Depends(validate_api_key
             return Response(status_code=500)
 
         # Apply limits here so that that they apply to record/replay as well as generate
-        response = apply_limits(request, response, context)
+        response = apply_limits(context, response)
 
         # Add latency to successful responses
         base_end_time = time.perf_counter()
@@ -266,13 +245,15 @@ async def catchall(request: Request, _: Annotated[bool, Depends(validate_api_key
                 simulator_metrics.histogram_tokens_used.record(tokens_used, attributes={"deployment": deployment_name})
 
         return response
+    except HTTPException as he:
+        raise he
     # pylint: disable-next=broad-exception-caught
     except Exception as e:
         logger.error("Error: %s\n%s", e, traceback.format_exc())
         return Response(status_code=500)
 
 
-def apply_limits(request, response, context) -> Response:
+def apply_limits(context: RequestContext, response: Response) -> Response:
     limiter_name = context.values.get(constants.SIMULATOR_KEY_LIMITER)
     limiter = limiters.get(limiter_name) if limiter_name else None
     if limiter:
@@ -281,14 +262,14 @@ def apply_limits(request, response, context) -> Response:
             # replace response with limited response
             response = limit_response
     else:
-        logger.debug("No limiter found for response: %s", request.url.path)
+        logger.debug("No limiter found for response: %s", context.request.url.path)
     return response
 
 
 async def apply_latency(context, base_duration_s, status_code, tokens_used, completion_tokens):
     if status_code < 300:
         # Determine if we need to add extra latency to simulate the time it took to generate the response
-        # TODO - enable config and extensibility to control this
+        # TODO - enable config and extensibility to control this (consider splitting calculation from application and telemetry)
         extra_latency_s = None
         recorded_duration_ms = context.values.get(constants.RECORDED_DURATION_MS, None)
         if recorded_duration_ms:
@@ -300,11 +281,11 @@ async def apply_latency(context, base_duration_s, status_code, tokens_used, comp
                 # embeddings config returns latency value to use (in milliseconds)
                 extra_latency_s = get_config().latency.open_ai_embeddings.get_value() / 1000
             elif operation_name == "completions":
-                # completions config returns latencys per completion token in milliseconds
+                # completions config returns latency per completion token in milliseconds
                 ms_per_token = get_config().latency.open_ai_completions.get_value()
                 extra_latency_s = ms_per_token * completion_tokens / 1000
             elif operation_name == "chat-completions":
-                # chat completions config returns latencys per completion token in milliseconds
+                # chat completions config returns latency per completion token in milliseconds
                 ms_per_token = get_config().latency.open_ai_chat_completions.get_value()
                 extra_latency_s = ms_per_token * completion_tokens / 1000
 
