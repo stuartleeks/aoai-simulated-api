@@ -17,10 +17,6 @@ document_analysis_config = {}
 logger = logging.getLogger(__name__)
 
 
-doc_intelligence_rps: int = int(os.getenv("DOC_INTELLIGENCE_RPS", "15"))
-logger.info("📝 Using Doc Intelligence RPS: %s", doc_intelligence_rps)
-
-
 def get_wait_time_for_result(content_length: int) -> float:
     """
     Calculate the wait time for the result based on the content length.

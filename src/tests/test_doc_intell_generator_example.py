@@ -3,7 +3,6 @@ Test the OpenAI generator endpoints
 """
 
 import os
-from aoai_simulated_api.config_loader import load_extension
 from aoai_simulated_api.models import (
     Config,
     LatencyConfig,
@@ -15,7 +14,12 @@ from aoai_simulated_api.generator.manager import get_default_generators
 from azure.core.credentials import AzureKeyCredential
 from azure.core.exceptions import ClientAuthenticationError
 from azure.ai.formrecognizer import DocumentAnalysisClient
+
+
+import aiohttp
+import asyncio
 import pytest
+import requests
 
 from .test_uvicorn_server import UvicornTestServer
 
@@ -40,7 +44,7 @@ def _get_generator_config() -> Config:
             LATENCY_OPENAI_EMBEDDINGS_STD_DEV=0.1,
         ),
     )
-    load_extension(config=config, extension_path="src/examples/generator_doc_intelligence")
+    config.extension_path = "src/examples/generator_doc_intelligence"
 
     return config
 
@@ -84,10 +88,51 @@ async def test_gets_result():
         base_path = os.path.dirname(os.path.realpath(__file__))
         pdf_path = os.path.join(base_path, "../test-client/receipt.png")
 
-        print("Making request...")
         with open(pdf_path, "rb") as f:
             poller = document_analysis_client.begin_analyze_document("prebuilt-receipt", f)
 
-        print("Polling for result...")
         result = poller.result()
-        print("Poller result: ", result)
+        assert len(result.pages) == 1
+
+
+@pytest.mark.asyncio
+async def test_rate_limit():
+    """
+    Ensure we need the right API key to call the completion endpoint
+    """
+    config = _get_generator_config()
+    os.environ["DOC_INTELLIGENCE_RPS"] = "1"
+
+    async def make_request():
+        base_path = os.path.dirname(os.path.realpath(__file__))
+        pdf_path = os.path.join(base_path, "../test-client/receipt.png")
+        with open(pdf_path, "rb") as f:
+            payload = f.read()
+
+        url = "http://localhost:8001/formrecognizer/documentModels/prebuilt-receipt:analyze"
+        querystring = {"api-version": "2023-07-31"}
+        headers = {
+            "ocp-apim-subscription-key": API_KEY,
+            "content-type": "application/octet-stream",
+            "accept": "application/json",
+        }
+
+        # response = requests.request("POST", url, data=payload, headers=headers, params=querystring)
+        # print(response)
+
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, data=payload, headers=headers, params=querystring) as response:
+                return response
+
+    server = UvicornTestServer(config)
+
+    got_429 = False
+    with server.run_in_thread():
+        tasks = [make_request() for i in range(3)]
+        for task in tasks:
+            response = await task
+            if response.status == 429:
+                got_429 = True
+                # don't return here as we need to await all coroutines
+
+        assert got_429, "Should get 429 exception"

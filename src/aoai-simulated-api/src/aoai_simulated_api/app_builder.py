@@ -3,16 +3,15 @@ from dataclasses import dataclass
 import logging
 import time
 import traceback
-from typing import Annotated, Callable
+from typing import Annotated
 from fastapi import Depends, FastAPI, Request, Response, HTTPException
-from limits import storage
 from opentelemetry import trace, metrics
 
 from aoai_simulated_api import constants
 from aoai_simulated_api.auth import validate_api_key_header
 from aoai_simulated_api.config_loader import get_config, set_config
 from aoai_simulated_api.generator.manager import invoke_generators
-from aoai_simulated_api.limiters import create_openai_limiter, create_doc_intelligence_limiter
+from aoai_simulated_api.limiters import apply_limits
 from aoai_simulated_api.models import RequestContext
 from aoai_simulated_api.record_replay.handler import RecordReplayHandler
 from aoai_simulated_api.record_replay.persistence import YamlRecordingPersister
@@ -61,15 +60,13 @@ simulator_metrics = _get_simulator_metrics()
 
 # pylint: disable-next=invalid-name
 record_replay_handler = None
-limiters: dict[str, Callable[[RequestContext, Response], Response | None]] = {}
 
 
-def initialize():
+def apply_config():
     # pylint: disable-next=global-statement
-    global record_replay_handler, limiters
+    global record_replay_handler
 
     record_replay_handler = None
-    limiters = {}
 
     logger.info("🚀 Starting aoai-simulated-api in %s mode", get_config().simulator_mode)
     logger.info("🗝️ Simulator api-key        : %s", get_config().simulator_api_key)
@@ -87,24 +84,6 @@ def initialize():
         )
 
     logger.info("📝 Using OpenAI deployments: %s", get_config().openai_deployments)
-
-    openai_deployment_limits = (
-        {name: deployment.tokens_per_minute for name, deployment in get_config().openai_deployments.items()}
-        if get_config().openai_deployments
-        else {}
-    )
-
-    memory_storage = storage.MemoryStorage()
-    # Dictionary of limiters keyed by name
-    # Each limiter is a function that takes a response and returns a boolean indicating
-    # whether the request should be allowed
-    # Limiter returns Response object if request should be blocked or None otherwise
-    limiters = {
-        "openai": create_openai_limiter(memory_storage, openai_deployment_limits),
-        # "docintelligence": create_doc_intelligence_limiter(
-        #     memory_storage, requests_per_second=get_config().doc_intelligence_rps
-        # ),
-    }
 
 
 def _default_validate_api_key_header(request: Request):
@@ -183,7 +162,7 @@ def config_patch(config: dict, _: Annotated[bool, Depends(_default_validate_api_
 
     # Update the config and re-initialize
     set_config(new_config)
-    initialize()
+    apply_config()
 
     return config_get(_)
 
@@ -251,19 +230,6 @@ async def catchall(request: Request):
     except Exception as e:
         logger.error("Error: %s\n%s", e, traceback.format_exc())
         return Response(status_code=500)
-
-
-def apply_limits(context: RequestContext, response: Response) -> Response:
-    limiter_name = context.values.get(constants.SIMULATOR_KEY_LIMITER)
-    limiter = limiters.get(limiter_name) if limiter_name else None
-    if limiter:
-        limit_response = limiter(context, response)
-        if limit_response:
-            # replace response with limited response
-            response = limit_response
-    else:
-        logger.debug("No limiter found for response: %s", context.request.url.path)
-    return response
 
 
 async def apply_latency(context, base_duration_s, status_code, tokens_used, completion_tokens):

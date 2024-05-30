@@ -4,13 +4,13 @@ import logging
 import time
 import random
 
-from aoai_simulated_api.auth import validate_api_key_header
 import lorem
 import nanoid
 
 from fastapi import Response
 from fastapi.responses import StreamingResponse
 
+from aoai_simulated_api.auth import validate_api_key_header
 from aoai_simulated_api.models import RequestContext
 from aoai_simulated_api.constants import (
     SIMULATOR_KEY_DEPLOYMENT_NAME,

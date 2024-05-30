@@ -4,3 +4,4 @@ pytest-asyncio
 pytest-watch
 pytest-httpserver
 azure-ai-formrecognizer
+aiohttp

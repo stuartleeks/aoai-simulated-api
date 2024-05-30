@@ -5,6 +5,7 @@ import os
 
 import sys
 
+from aoai_simulated_api.limiters import get_default_limiters
 from aoai_simulated_api.models import Config, OpenAIDeployment
 from aoai_simulated_api.record_replay.handler import get_default_forwarders
 from aoai_simulated_api.generator.manager import get_default_generators
@@ -18,11 +19,16 @@ def get_config_from_env_vars(logger: logging.Logger) -> Config:
 
     config.recording.forwarders = get_default_forwarders()
     config.openai_deployments = _load_openai_deployments(logger)
-    extension_path = os.getenv("EXTENSION_PATH")
+
+    initialize_config(config)
+    return config
+
+
+def initialize_config(config: Config):
+    config.limiters = get_default_limiters(config)
 
     # load extension and invoke to update config (customise forwarders, generators, etc.)
-    load_extension(extension_path, config)
-    return config
+    load_extension(config)
 
 
 def _load_openai_deployments(logger: logging.Logger) -> dict[str, OpenAIDeployment]:
@@ -51,8 +57,9 @@ def _load_openai_deployments(logger: logging.Logger) -> dict[str, OpenAIDeployme
     return deployments
 
 
-def load_extension(extension_path: str, config: Config):
+def load_extension(config: Config):
 
+    extension_path = config.extension_path
     if not extension_path:
         return
 
@@ -87,4 +94,5 @@ def get_config() -> Config:
 def set_config(new_config: Config):
     # pylint: disable-next=global-statement
     global _config
+    initialize_config(new_config)
     _config = new_config

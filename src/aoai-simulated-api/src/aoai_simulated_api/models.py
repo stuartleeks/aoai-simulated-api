@@ -139,6 +139,8 @@ class Config(PatchableConfig):
     """
 
     generators: list[Callable[[RequestContext], Response | Awaitable[Response] | None]] = None
+    limiters: dict[str, Callable[[RequestContext, Response], Response | None]] = {}
+    extension_path: Annotated[str | None, Field(default=None, alias="EXTENSION_PATH")]
 
 
 @dataclass
