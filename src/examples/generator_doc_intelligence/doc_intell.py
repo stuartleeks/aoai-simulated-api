@@ -74,8 +74,11 @@ async def doc_intelligence_analyze(context: RequestContext) -> Response | None:
         f"{base_url}/formrecognizer/documentModels/{model_id}/analyzeResults/{result_id}?api-version={api_version}"
     )
 
-    # Set the HTTP response headers.
+    # Set the rate limiter key to "docintelligence" so that the
+    # custom rate limiter is used for this request.
     context.values[SIMULATOR_KEY_LIMITER] = "docintelligence"
+
+    # Set the HTTP response headers
     headers = {
         "Operation-Location": document_analysis_result_location,
     }

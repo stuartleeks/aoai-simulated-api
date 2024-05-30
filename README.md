@@ -340,6 +340,12 @@ This can be useful if you want to implement different rate limiting behaviour or
 
 An example of a custom generator can be found in the `src/examples/generator_doc_intelligence` folder.
 
+The simulator configuration stores a dictionary of rate limiters.
+The `RequestContext` associated with a request contains a `values` dictionary used to store information about the request.
+The value of the `Limiter` key in the `RequestContext.values` dictionary is used to look up the rate limiter in the rate limiters dictionary.
+
+Additionaly 
+
 ## Config Endpoint
 
 The simulator exposes a `/++/config` endpoint that returns the current configuration of the simulator and allow the configuration to be updated dynamically.
