@@ -30,7 +30,7 @@ def apply_limits(context: RequestContext, response: Response) -> Response:
         limit_response = limiter(context, response)
         return limit_response
 
-    logger.debug("No limiter found for response: %s", context.request.url.path)
+    logger.info("No limiter found for response: %s [limiter name: %s]", context.request.url.path, limiter_name)
     return response
 
 

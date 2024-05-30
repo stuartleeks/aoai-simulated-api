@@ -23,6 +23,7 @@ class YamlRecordingPersister:
                     "body": {"string": recorded_response.body},
                     "duration_ms": recorded_response.duration_ms,
                 },
+                "context_values": recorded_response.context_values,
             }
             interactions.append(interaction)
         recording_data = {"interactions": interactions, "version": 1}
@@ -66,12 +67,14 @@ class YamlRecordingPersister:
                     URL(uri_string).path,
                     request["body"],
                 )
+                context_values = interaction.get("context_values", {})
                 recording[request_hash] = RecordedResponse(
                     request_hash=request_hash,
                     status_code=response["status"]["code"],
                     status_message=response["status"]["message"],
                     headers=response["headers"],
                     body=response["body"]["string"],
+                    context_values=context_values,
                     full_request=request,
                     duration_ms=response.get("duration_ms", 0),  # didn't exist in earlier recordings so default to 0
                 )

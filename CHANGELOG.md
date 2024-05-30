@@ -5,6 +5,8 @@
 - Extensibility updates
   - Focussing core simulator on OpenAI (moved doc intelligence generator to example extension)
   - API authorization is now part of forwarders/generators. If you have custom forwarders/generators they need to be updated to handle this (see examples for implementation details)
+  - Enable adding custom rate limiters
+- Add rate-limiting for replayed requests
 
 
 ## v0.3 2024-05-03
