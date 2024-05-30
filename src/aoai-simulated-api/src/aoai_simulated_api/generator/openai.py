@@ -165,7 +165,8 @@ def create_lorem_chat_completion_response(
     finish_reason: str = "length",
 ):
     """
-    Creates a Response object for a chat completion request by generating lorem ipsum text and sets context values for the rate-limiter etc.
+    Creates a Response object for a chat completion request by generating
+    lorem ipsum text and sets context values for the rate-limiter etc.
     Handles streaming vs non-streaming
     """
     words = lorem.get_word(count=words_to_generate)

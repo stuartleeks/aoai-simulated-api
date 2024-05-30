@@ -8,7 +8,11 @@ from fastapi import Response
 
 def initialize(config: Config):
     """initialize is the entry point invoked by the simulator"""
-    config.generators.append(generate_echo_response)
+
+    # Add the generator to the config if not already present
+    # (NOTE: initialize may be called multiple times)
+    if generate_echo_response not in config.generators:
+        config.generators.append(generate_echo_response)
 
 async def generate_echo_response(context: RequestContext) -> Response | None:
     request = context.request

@@ -18,12 +18,17 @@ doc_intelligence_rps: int = int(os.getenv("DOC_INTELLIGENCE_RPS", "15"))
 logger.info("📝 Using Doc Intelligence RPS: %s", doc_intelligence_rps)
 
 
+memory_storage = storage.MemoryStorage()
+
+
 def initialize(config: Config):
     """initialize is the entry point invoked by the simulator"""
-    config.generators.append(doc_intelligence_analyze)
-    config.generators.append(doc_intelligence_analyze_result)
 
-    memory_storage = storage.MemoryStorage()
+    # Add the generators to the config if not already present
+    # (NOTE: initialize may be called multiple times)
+    if doc_intelligence_analyze not in config.generators:
+        config.generators.append(doc_intelligence_analyze)
+        config.generators.append(doc_intelligence_analyze_result)
 
     config.limiters["docintelligence"] = create_doc_intelligence_limiter(
         memory_storage, requests_per_second=doc_intelligence_rps
@@ -32,14 +37,20 @@ def initialize(config: Config):
 
 def create_doc_intelligence_limiter(
     limit_storage: storage.Storage, requests_per_second: int
-) -> Callable[[RequestContext, Response], Response | None]:
+) -> Callable[[RequestContext, Response], Response]:
+    """
+    Create a rate limiter for the Doc Intelligence generator.
+    A rate limiter is a function that takes a RequestContext and Response and returns a Response or None.
+    If a Response is returned, it will be used as the response to the request in place of the original response.
+    """
+
     moving_window = strategies.MovingWindowRateLimiter(limit_storage)
     limit = RateLimitItemPerSecond(requests_per_second, 1)
 
     if requests_per_second <= 0:
         return no_op_limiter
 
-    def limiter(_: RequestContext, __: Response) -> Response | None:
+    def limiter(_: RequestContext, response: Response) -> Response | None:
         if not moving_window.hit(limit):
             stats = moving_window.get_window_stats(limit)
             current_time = int(time.time())
@@ -56,6 +67,6 @@ def create_doc_intelligence_limiter(
                 content=json.dumps(content),
                 headers={"Retry-After": retry_after, "x-ratelimit-reset-requests": retry_after},
             )
-        return None
+        return response
 
     return limiter

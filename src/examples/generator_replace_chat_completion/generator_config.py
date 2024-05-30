@@ -23,10 +23,10 @@ def initialize(config: Config):
         if generator.__name__ == "azure_openai_chat_completion":
             default_generator_index = index
             break
-    if default_generator_index == -1:
-        raise ValueError("azure_openai_chat_completion generator not found in the config")
-
-    config.generators[default_generator_index] = custom_azure_openai_chat_completion
+    if default_generator_index != -1:
+        config.generators[default_generator_index] = custom_azure_openai_chat_completion
+    # no error if default generator is not found as initialize
+    # may be called multiple times and the generator may have already been replaced
 
 
 async def custom_azure_openai_chat_completion(context: RequestContext) -> Response | None:

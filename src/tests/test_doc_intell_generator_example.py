@@ -128,7 +128,7 @@ async def test_rate_limit():
 
     got_429 = False
     with server.run_in_thread():
-        tasks = [make_request() for i in range(3)]
+        tasks = [make_request() for i in range(2)]
         for task in tasks:
             response = await task
             if response.status == 429:

@@ -235,7 +235,8 @@ async def catchall(request: Request):
 async def apply_latency(context, base_duration_s, status_code, tokens_used, completion_tokens):
     if status_code < 300:
         # Determine if we need to add extra latency to simulate the time it took to generate the response
-        # TODO - enable config and extensibility to control this (consider splitting calculation from application and telemetry)
+        # TODO - enable config and extensibility to control this
+        #        (consider splitting calculation from application and telemetry)
         extra_latency_s = None
         recorded_duration_ms = context.values.get(constants.RECORDED_DURATION_MS, None)
         if recorded_duration_ms:

@@ -28,16 +28,17 @@ def apply_limits(context: RequestContext, response: Response) -> Response:
     limiter = context.config.limiters.get(limiter_name) if limiter_name else None
     if limiter:
         limit_response = limiter(context, response)
-        if limit_response:
-            # replace response with limited response
-            response = limit_response
-    else:
-        logger.debug("No limiter found for response: %s", context.request.url.path)
+        return limit_response
+
+    logger.debug("No limiter found for response: %s", context.request.url.path)
     return response
 
 
-def no_op_limiter(_: RequestContext, __: Response) -> None:
-    return None
+def no_op_limiter(_: RequestContext, response: Response) -> None:
+    return response
+
+
+deployment_warnings_issues: dict[str, bool] = {}
 
 
 def create_openai_limiter(
@@ -65,7 +66,7 @@ def create_openai_limiter(
             limit_requests_per_10s=limit_requests_per_10s,
         )
 
-    def limiter(context: RequestContext, _: Response) -> Response | None:
+    def limiter(context: RequestContext, response: Response) -> Response:
         token_cost = context.values.get(constants.SIMULATOR_KEY_OPENAI_TOTAL_TOKENS)
         deployment_name = context.values.get(constants.SIMULATOR_KEY_DEPLOYMENT_NAME)
 
@@ -74,8 +75,10 @@ def create_openai_limiter(
 
         limits = deployment_limits.get(deployment_name)
         if not limits:
-            # TODO: log (only log once per deployment, not every call)
-            return None
+            if not deployment_warnings_issues.get(deployment_name):
+                logger.warning("Deployment %s not found in limiters - not applying rate limits", deployment_name)
+                deployment_warnings_issues[deployment_name] = True
+            return response
 
         # TODO: revisit limiting logic: also track per minute limits? Allow burst?
 
@@ -111,7 +114,7 @@ def create_openai_limiter(
                 content=json.dumps(content),
                 headers={"Retry-After": retry_after, "x-ratelimit-reset-requests": retry_after},
             )
-        return None
+        return response
 
     return limiter
 
