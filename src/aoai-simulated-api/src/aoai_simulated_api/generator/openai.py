@@ -10,6 +10,7 @@ import nanoid
 from fastapi import Response
 from fastapi.responses import StreamingResponse
 
+from aoai_simulated_api import constants
 from aoai_simulated_api.auth import validate_api_key_header
 from aoai_simulated_api.models import RequestContext
 from aoai_simulated_api.constants import (
@@ -58,6 +59,32 @@ def get_model_name_from_deployment_name(context: RequestContext, deployment_name
     return default_model
 
 
+async def calculate_latency(context: RequestContext, status_code: int):
+    """Calculate additional latency that should be applied"""
+    if status_code >= 300:
+        return
+
+    # Determine the target latency for the request
+    completion_tokens = context.values.get(constants.SIMULATOR_KEY_OPENAI_COMPLETION_TOKENS)
+
+    if completion_tokens and completion_tokens > 0:
+        config = context.config
+        operation_name = context.values.get(constants.SIMULATOR_KEY_OPERATION_NAME)
+        target_duration_ms = None
+        if operation_name == "embeddings":
+            # embeddings config returns latency value to use (in milliseconds)
+            target_duration_ms = config.latency.open_ai_embeddings.get_value()
+        elif operation_name == "completions":
+            # completions config returns latency per completion token in milliseconds
+            target_duration_ms = config.latency.open_ai_completions.get_value()
+        elif operation_name == "chat-completions":
+            # chat completions config returns latency per completion token in milliseconds
+            target_duration_ms = config.latency.open_ai_chat_completions.get_value() * completion_tokens
+
+        if target_duration_ms:
+            context.values[constants.TARGET_DURATION_MS] = target_duration_ms
+
+
 def create_embedding_content(index: int, embedding_size=default_embedding_size):
     """Generates a random embedding"""
     return {
@@ -68,7 +95,10 @@ def create_embedding_content(index: int, embedding_size=default_embedding_size):
 
 
 def create_embeddings_response(
-    context: RequestContext, deployment_name: str, model_name: str, request_input: str | list
+    context: RequestContext,
+    deployment_name: str,
+    model_name: str,
+    request_input: str | list,
 ):
     embeddings = []
     if isinstance(request_input, str):
@@ -349,6 +379,10 @@ async def azure_openai_embedding(context: RequestContext) -> Response | None:
     request_body = await request.json()
     model_name = get_model_name_from_deployment_name(context, deployment_name)
     request_input = request_body["input"]
+
+    # calculate a simulated latency and store in context.values
+    await calculate_latency(context, 200)
+
     return create_embeddings_response(
         context=context,
         deployment_name=deployment_name,
@@ -377,6 +411,9 @@ async def azure_openai_completion(context: RequestContext) -> Response | None:
 
     # TODO - randomise the finish reason (i.e. don't always use the full set of tokens)
     words_to_generate = int(TOKEN_TO_WORD_FACTOR * max_tokens)
+
+    # calculate a simulated latency and store in context.values
+    await calculate_latency(context, 200)
 
     return create_completion_response(
         context=context,
@@ -408,6 +445,10 @@ async def azure_openai_chat_completion(context: RequestContext) -> Response | No
     words_to_generate = int(TOKEN_TO_WORD_FACTOR * max_tokens)
 
     streaming = request_body.get("stream", False)
+
+    # calculate a simulated latency and store in context.values
+    await calculate_latency(context, 200)
+
     return create_lorem_chat_completion_response(
         context=context,
         deployment_name=deployment_name,

@@ -5,6 +5,7 @@
 from aoai_simulated_api.auth import validate_api_key_header
 from aoai_simulated_api.models import Config, RequestContext
 from aoai_simulated_api.generator.openai import (
+    calculate_latency,
     create_lorem_chat_completion_response,
     get_model_name_from_deployment_name,
 )
@@ -57,7 +58,7 @@ async def custom_azure_openai_chat_completion(context: RequestContext) -> Respon
     finish_reason = "stop"
 
     streaming = request_body.get("stream", False)
-    return create_lorem_chat_completion_response(
+    response = create_lorem_chat_completion_response(
         context=context,
         deployment_name=deployment_name,
         model_name=model_name,
@@ -66,3 +67,8 @@ async def custom_azure_openai_chat_completion(context: RequestContext) -> Respon
         prompt_messages=messages,
         finish_reason=finish_reason,
     )
+
+    # calculate a simulated latency and store in context.values
+    calculate_latency(context, status_code=response.status_code)
+
+    return response

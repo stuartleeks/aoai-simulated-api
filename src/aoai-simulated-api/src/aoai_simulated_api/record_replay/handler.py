@@ -123,7 +123,7 @@ class RecordReplayHandler:
                 headers = {k: v[0] for k, v in response_info.headers.items()}
                 for key, value in response_info.context_values.items():
                     context.values[key] = value
-                context.values[constants.RECORDED_DURATION_MS] = response_info.duration_ms
+                context.values[constants.TARGET_DURATION_MS] = response_info.duration_ms
                 return fastapi.Response(
                     content=response_info.body, status_code=response_info.status_code, headers=headers
                 )
@@ -155,7 +155,7 @@ class RecordReplayHandler:
         if forwarded_response.persist_response:
             self.store_recorded_response(request, recorded_response)
 
-        context.values[constants.RECORDED_DURATION_MS] = elapsed_time_ms
+        context.values[constants.TARGET_DURATION_MS] = elapsed_time_ms
         return fastapi.Response(
             content=recorded_response.body,
             status_code=recorded_response.status_code,

@@ -53,8 +53,6 @@ class RequestContext:
                 and a dictionary of path parameters if the match is successful.
         """
 
-        # TODO - would a FastAPI router simplify this?
-
         route = Route(path=path, methods=methods, endpoint=_endpoint)
         path_to_match = self._strip_path_query(request.url.path)
         match, scopes = route.matches({"type": "http", "method": request.method, "path": path_to_match})

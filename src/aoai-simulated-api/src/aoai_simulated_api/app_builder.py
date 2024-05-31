@@ -1,62 +1,22 @@
-import asyncio
-from dataclasses import dataclass
 import logging
-import time
 import traceback
 from typing import Annotated
 from fastapi import Depends, FastAPI, Request, Response, HTTPException
-from opentelemetry import trace, metrics
 
-from aoai_simulated_api import constants
 from aoai_simulated_api.auth import validate_api_key_header
 from aoai_simulated_api.config_loader import get_config, set_config
 from aoai_simulated_api.generator.manager import invoke_generators
+from aoai_simulated_api.latency import LatencyGenerator
 from aoai_simulated_api.limiters import apply_limits
 from aoai_simulated_api.models import RequestContext
 from aoai_simulated_api.record_replay.handler import RecordReplayHandler
 from aoai_simulated_api.record_replay.persistence import YamlRecordingPersister
 
 
-@dataclass
-class SimulatorMetrics:
-    histogram_latency_base: metrics.Histogram
-    histogram_latency_full: metrics.Histogram
-    histogram_tokens_used: metrics.Histogram
-    histogram_tokens_requested: metrics.Histogram
-
-
-def _get_simulator_metrics() -> SimulatorMetrics:
-    meter = metrics.get_meter(__name__)
-    return SimulatorMetrics(
-        histogram_latency_base=meter.create_histogram(
-            name="aoai-simulator.latency.base",
-            description="Latency of handling the request (before adding simulated latency)",
-            unit="seconds",
-        ),
-        histogram_latency_full=meter.create_histogram(
-            name="aoai-simulator.latency.full",
-            description="Full latency of handling the request (including simulated latency)",
-            unit="seconds",
-        ),
-        histogram_tokens_used=meter.create_histogram(
-            name="aoai-simulator.tokens_used",
-            description="Number of tokens used per request",
-            unit="tokens",
-        ),
-        histogram_tokens_requested=meter.create_histogram(
-            name="aoai-simulator.tokens_requested",
-            description="Number of tokens across all requests (success or not)",
-            unit="tokens",
-        ),
-    )
-
-
 logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
-
-simulator_metrics = _get_simulator_metrics()
 
 # pylint: disable-next=invalid-name
 record_replay_handler = None
@@ -173,90 +133,34 @@ async def catchall(request: Request):
     # TODO check for traceparent in inbound request and propagate
     #      to allow for correlating load test with back-end data
 
-    start_time = time.perf_counter()  # N.B. this doesn't accound for the validate_api_key time
+    response = None
+    context = RequestContext(config=get_config(), request=request)
 
     try:
-        response = None
-        context = RequestContext(config=get_config(), request=request)
+        # LatencyGenerator adds simulated latency to response
+        # and emit associated metrics
+        async with LatencyGenerator(context) as latency_generator:
+            # Get response
+            if get_config().simulator_mode == "generate":
+                response = await invoke_generators(context, get_config().generators)
+            elif get_config().simulator_mode in ["record", "replay"]:
+                response = await record_replay_handler.handle_request(context)
 
-        # Get response
-        if get_config().simulator_mode == "generate":
-            response = await invoke_generators(context, get_config().generators)
-        elif get_config().simulator_mode in ["record", "replay"]:
-            response = await record_replay_handler.handle_request(context)
+            if not response:
+                logger.error("No response found for request: %s", request.url.path)
+                return Response(status_code=500)
 
-        if not response:
-            logger.error("No response found for request: %s", request.url.path)
-            return Response(status_code=500)
+            # Apply limits here so that that they apply to record/replay as well as generate
+            response = apply_limits(context, response)
 
-        # Apply limits here so that that they apply to record/replay as well as generate
-        response = apply_limits(context, response)
+            # pass the response to the latency generator
+            # so that it can determine the latency to add
+            latency_generator.set_response(response)
 
-        # Add latency to successful responses
-        base_end_time = time.perf_counter()
-        base_duration_s = base_end_time - start_time
-
-        status_code = response.status_code
-        deployment_name = context.values.get(constants.SIMULATOR_KEY_DEPLOYMENT_NAME)
-        tokens_used = context.values.get(constants.SIMULATOR_KEY_OPENAI_TOTAL_TOKENS)
-        completion_tokens = context.values.get(constants.SIMULATOR_KEY_OPENAI_COMPLETION_TOKENS)
-        await apply_latency(context, base_duration_s, status_code, tokens_used, completion_tokens)
-
-        full_end_time = time.perf_counter()
-        simulator_metrics.histogram_latency_base.record(
-            base_duration_s,
-            attributes={
-                "status_code": status_code,
-                "deployment": deployment_name,
-            },
-        )
-        simulator_metrics.histogram_latency_full.record(
-            (full_end_time - start_time),
-            attributes={
-                "status_code": status_code,
-                "deployment": deployment_name,
-            },
-        )
-        if tokens_used:
-            simulator_metrics.histogram_tokens_requested.record(tokens_used, attributes={"deployment": deployment_name})
-            if status_code < 300:
-                # only track tokens for successful requests
-                simulator_metrics.histogram_tokens_used.record(tokens_used, attributes={"deployment": deployment_name})
-
-        return response
+            return response
     except HTTPException as he:
         raise he
     # pylint: disable-next=broad-exception-caught
     except Exception as e:
         logger.error("Error: %s\n%s", e, traceback.format_exc())
         return Response(status_code=500)
-
-
-async def apply_latency(context, base_duration_s, status_code, tokens_used, completion_tokens):
-    if status_code < 300:
-        # Determine if we need to add extra latency to simulate the time it took to generate the response
-        # TODO - enable config and extensibility to control this
-        #        (consider splitting calculation from application and telemetry)
-        extra_latency_s = None
-        recorded_duration_ms = context.values.get(constants.RECORDED_DURATION_MS, None)
-        if recorded_duration_ms:
-            recorded_duration_s = recorded_duration_ms / 1000
-            extra_latency_s = recorded_duration_s - base_duration_s
-        elif tokens_used and tokens_used > 0:
-            operation_name = context.values.get(constants.SIMULATOR_KEY_OPERATION_NAME)
-            if operation_name == "embeddings":
-                # embeddings config returns latency value to use (in milliseconds)
-                extra_latency_s = get_config().latency.open_ai_embeddings.get_value() / 1000
-            elif operation_name == "completions":
-                # completions config returns latency per completion token in milliseconds
-                ms_per_token = get_config().latency.open_ai_completions.get_value()
-                extra_latency_s = ms_per_token * completion_tokens / 1000
-            elif operation_name == "chat-completions":
-                # chat completions config returns latency per completion token in milliseconds
-                ms_per_token = get_config().latency.open_ai_chat_completions.get_value()
-                extra_latency_s = ms_per_token * completion_tokens / 1000
-
-        if extra_latency_s and extra_latency_s > 0:
-            current_span = trace.get_current_span()
-            current_span.set_attribute("simulator.added_latency", extra_latency_s)
-            await asyncio.sleep(extra_latency_s)
