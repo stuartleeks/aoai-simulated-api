@@ -69,6 +69,6 @@ async def custom_azure_openai_chat_completion(context: RequestContext) -> Respon
     )
 
     # calculate a simulated latency and store in context.values
-    calculate_latency(context, status_code=response.status_code)
+    await calculate_latency(context, status_code=response.status_code)
 
     return response
