@@ -2,7 +2,13 @@
 
 ## vNext
 
-- TODO
+- Extensibility updates
+  - Focus core simulator on OpenAI (moved doc intelligence generator to example extension)
+  - API authorization is now part of forwarders/generators to allow extensions to add their own authentication schemes. NOTE: If you have custom forwarders/generators they need to be updated to handle this (see examples for implementation details)
+  - Enable adding custom rate limiters
+  - Move latency calculation to generators. This allows for extensions to customise latency values. NOTE: If you have custom generators they need to be updated to handle this (see examples for implementation details)
+- Add rate-limiting for replayed requests
+
 
 ## v0.3 2024-05-03
 

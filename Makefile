@@ -21,7 +21,7 @@ install-requirements:
 	pip install -r src/test-client-web/requirements.txt
 
 erase-recording:
-	rm -rf src/aoai-simulated-api/.recording
+	rm -rf "${makefile_dir}.recording"
 
 run-simulated-api:
 	gunicorn \

@@ -2,11 +2,10 @@ import inspect
 import logging
 from typing import Callable, Awaitable
 
-from fastapi import Response
+from fastapi import HTTPException, Response
 
 from aoai_simulated_api.models import RequestContext
 from .openai import azure_openai_embedding, azure_openai_completion, azure_openai_chat_completion
-from .doc_intell import doc_intelligence_analyze, doc_intelligence_analyze_result
 
 logger = logging.getLogger(__name__)
 
@@ -16,8 +15,6 @@ def get_default_generators() -> list[Callable[[RequestContext], Response | Await
         azure_openai_embedding,
         azure_openai_completion,
         azure_openai_chat_completion,
-        doc_intelligence_analyze,
-        doc_intelligence_analyze_result,
     ]
 
 
@@ -31,6 +28,8 @@ async def invoke_generators(
                 response = await response
             if response is not None:
                 return response
+        except HTTPException as he:
+            raise he  # pass through
         except Exception as e:  # pylint: disable=broad-except
             logger.error(
                 "Error generating response (name='%s', request='%s')",

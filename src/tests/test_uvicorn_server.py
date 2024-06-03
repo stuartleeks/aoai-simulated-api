@@ -10,12 +10,11 @@ import pytest
 import requests
 import uvicorn
 
-from aoai_simulated_api.app_builder import app, initialize
+from aoai_simulated_api.app_builder import app, apply_config
 from aoai_simulated_api.config_loader import set_config
 from aoai_simulated_api.models import (
     Config,
     LatencyConfig,
-    RecordingConfig,
     ChatCompletionLatency,
     CompletionLatency,
     EmbeddingLatency,
@@ -32,7 +31,7 @@ class UvicornTestServer(uvicorn.Server):
 
     def __init__(self, config: Config):
         set_config(config)
-        initialize()
+        apply_config()
         uvconfig = uvicorn.Config(app, host="127.0.0.1", port=8001, loop="asyncio")
 
         super().__init__(uvconfig)
@@ -63,7 +62,6 @@ async def test_root_message():
     config = Config(generators=[])
     config.simulator_mode = "generate"
     config.simulator_api_key = "123456789"
-    config.doc_intelligence_rps = 123
     config.latency = LatencyConfig(
         open_ai_completions=CompletionLatency(
             LATENCY_OPENAI_COMPLETIONS_MEAN=0,

@@ -6,7 +6,7 @@ from azure.monitor.opentelemetry import configure_azure_monitor
 # from opentelemetry import trace
 
 from aoai_simulated_api.config_loader import get_config_from_env_vars, set_config
-from aoai_simulated_api.app_builder import app as builder_app, initialize
+from aoai_simulated_api.app_builder import app as builder_app, apply_config
 
 log_level = os.getenv("LOG_LEVEL") or "INFO"
 
@@ -29,5 +29,5 @@ config = get_config_from_env_vars(logger)
 set_config(config)
 
 
-initialize()
+apply_config()
 app = builder_app  # expose to gunicorn

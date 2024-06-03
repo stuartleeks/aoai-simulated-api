@@ -3,20 +3,23 @@
 This repo is an exploration into creating a simulated API implementation for Azure OpenAI (AOAI). This is a work in progress!
 
 - [aoai-simulated-api](#aoai-simulated-api)
-  - [Rationale](#rationale)
+  - [What is the OpenAI Simulated API?](#what-is-the-openai-simulated-api)
   - [Overview](#overview)
   - [Getting Started](#getting-started)
   - [Running in Docker](#running-in-docker)
   - [Deploying to Azure Container Apps](#deploying-to-azure-container-apps)
   - [Extending the simulator](#extending-the-simulator)
+    - [Running with an extension](#running-with-an-extension)
     - [Creating a custom forwarder extension](#creating-a-custom-forwarder-extension)
     - [Creating a custom generator extension](#creating-a-custom-generator-extension)
-    - [Running with an extension](#running-with-an-extension)
+    - [Document Intelligence extensions](#document-intelligence-extensions)
+      - [Document Intelligence forwarder](#document-intelligence-forwarder)
+      - [Document Intelligence generator](#document-intelligence-generator)
   - [Large recordings](#large-recordings)
   - [Latency](#latency)
-  - [Rate-limiting](#rate-limiting)
-    - [OpenAI Rate-Limiting](#openai-rate-limiting)
-    - [Document Intelligence Rate-Limiting](#document-intelligence-rate-limiting)
+  - [Rate Limiting](#rate-limiting)
+    - [OpenAI Rate Limiting](#openai-rate-limiting)
+    - [Customising rate limiting](#customising-rate-limiting)
   - [Config Endpoint](#config-endpoint)
   - [Current Status/Notes](#current-statusnotes)
     - [Replay Exploration](#replay-exploration)
@@ -26,14 +29,11 @@ This repo is an exploration into creating a simulated API implementation for Azu
       - [Restricted Network Access](#restricted-network-access)
   - [Changelog](#changelog)
 
+## What is the OpenAI Simulated API?
 
-## Rationale
-
-When building solutions using Azure OpenAI there are points in the development process where you may want to test your solution against a simulated API.
-
-One example is working to integrate Open AI into your broader application. In this case you want to have representative responses to some known requests but don't need the "AI-ness" of the service (i.e. you don't need to be able to handle arbitrary user requests). A simulated API can provide these responses more cheaply and allow you an easy way to customise the responses to check different application behaviours.
-
-Another example is load testing. In this case you are more likely to want to be able to submit a large number of requests with representative latency and rate-limiting, but don't need the actual AI responses.
+The OpenAI Simulated API is a tool that allows you to easily deploy endpoints that simulate the OpenAI API.
+A common use-case for the OpenAI Simulated API is to test the behaviour your application under load.
+By using the simulated API, you can reduce the cost of running load tests against the OpenAI API and ensure that your application behaves as expected under different conditions.
 
 ## Overview
 
@@ -53,20 +53,19 @@ After cloning the repo, install dependencies using `make install-requirements`.
 
 When running the simulated API, there are a number of environment variables to configure:
 
-| Variable                        | Description                                                                                                                                                                                             |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `SIMULATOR_MODE`                | The mode the simulator should run in. Current options are `record`, `replay`, and `generate`.                                                                                                           |
-| `SIMULATOR_API_KEY`             | The API key used by the simulator to authenticate requests. If not specified a key is auto-generated (see the logs). It is recommended to set a deterministic key value in `.env`                       |
-| `RECORDING_DIR`                 | The directory to store the recorded requests and responses (defaults to `.recording`).                                                                                                                  |
-| `RECORDING_AUTOSAVE`            | If set to `True` (default), the simulator will save the recording after each request.                                                                                                                   |
-| `EXTENSION_PATH`                | The path to a Python file that contains the extension configuration. This can be a single python file or a package folder - see `src/examples`                                                          |
-| `AZURE_OPENAI_ENDPOINT`         | The endpoint for the Azure OpenAI service, e.g. `https://mysvc.openai.azure.com/`                                                                                                                       |
-| `AZURE_OPENAI_KEY`              | The API key for the Azure OpenAI service.                                                                                                                                                               |
-| `DOC_INTELLIGENCE_RPS`          | The rate limit for the Document Intelligence service. Defaults to 15 RPS. See [Doc Intelligence Rate-Limiting](#document-intelligence-rate-limiting). Set to a negative value to disable rate-limiting. |
-| `OPENAI_DEPLOYMENT_CONFIG_PATH` | The path to a JSON file that contains the deployment configuration. See [OpenAI Rate-Limiting](#openai-rate-limiting)                                                                                   |
-| `AZURE_OPENAI_DEPLOYMENT`       | Used by the test app to set the name of the deployed model in your Azure OpenAI service. Use a gpt-35-turbo-instruct deployment.                                                                        |
-| `LOG_LEVEL`                     | The log level for the simulator. Defaults to `INFO`.                                                                                                                                                    |
-| `LATENCY_OPENAI_*`              | The latency to add to the OpenAI service when using generated output. See [Latency](#latency) for more details.                                                                                         |
+| Variable                        | Description                                                                                                                                                                       |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SIMULATOR_MODE`                | The mode the simulator should run in. Current options are `record`, `replay`, and `generate`.                                                                                     |
+| `SIMULATOR_API_KEY`             | The API key used by the simulator to authenticate requests. If not specified a key is auto-generated (see the logs). It is recommended to set a deterministic key value in `.env` |
+| `RECORDING_DIR`                 | The directory to store the recorded requests and responses (defaults to `.recording`).                                                                                            |
+| `RECORDING_AUTOSAVE`            | If set to `True` (default), the simulator will save the recording after each request.                                                                                             |
+| `EXTENSION_PATH`                | The path to a Python file that contains the extension configuration. This can be a single python file or a package folder - see `src/examples`                                    |
+| `AZURE_OPENAI_ENDPOINT`         | The endpoint for the Azure OpenAI service, e.g. `https://mysvc.openai.azure.com/`                                                                                                 |
+| `AZURE_OPENAI_KEY`              | The API key for the Azure OpenAI service.                                                                                                                                         |
+| `OPENAI_DEPLOYMENT_CONFIG_PATH` | The path to a JSON file that contains the deployment configuration. See [OpenAI Rate-Limiting](#openai-rate-limiting)                                                             |
+| `AZURE_OPENAI_DEPLOYMENT`       | Used by the test app to set the name of the deployed model in your Azure OpenAI service. Use a gpt-35-turbo-instruct deployment.                                                  |
+| `LOG_LEVEL`                     | The log level for the simulator. Defaults to `INFO`.                                                                                                                              |
+| `LATENCY_OPENAI_*`              | The latency to add to the OpenAI service when using generated output. See [Latency](#latency) for more details.                                                                   |
 
 The examples below show passing environment variables to the API directly on the command line, but you can also set them via a `.env` file in the root directory for convenience (see the `sample.env` for a starting point).
 The `.http` files for testing the endpoints also use the `.env` file to set the environment variables for calling the API.
@@ -119,9 +118,27 @@ The file share can also be used for setting the OpenAI deployment configuration 
 
 The simulator allows extending some aspects of the behavior without modifying the original source code.
 
-The `EXTENSION_PATH` environment variable can be set to the path to an extension.
-This can be a single python file or a package folder.
+An extension can be either a single python file or a package folder.
 The extension should contain an `initialize` method that receives the simulator configuration and can modify it.
+
+The `initialize` method in an extension is psased the simulator configuration object.
+Through this an extension can add/remove forwarders, generators, and limiters, as well as modifying other aspects of the configuration.
+
+NOTE: the `initialize` method may be called multiple times, so ensure that any configuration changes are idempotent.
+
+### Running with an extension
+
+To run with an extension,  set the `EXTENSION_PATH` environment variable:
+
+```bash
+SIMULATOR_MODE=record EXTENSION_PATH=/path/to/extension.py make run-simulated-api
+```
+
+Or via Docker:
+
+```bash
+docker run -p 8000:8000 -e SIMULATOR_MODE=record -e EXTENSION_PATH=/mnt/extension.py -v /path/to/extension.py:/mnt/extension.py
+```
 
 ### Creating a custom forwarder extension
 
@@ -138,12 +155,25 @@ from typing import Callable
 from fastapi import Request
 import requests
 
-from aoai_simulated_api.models import Config
+from aoai_simulated_api.auth import validate_api_key_header
+from aoai_simulated_api.models import Config, RequestContext
 
-async def forward_to_my_host(request: Request) -> Response | None:
-	# build up the forwarded request from the incoming request
-	# you may need to modify the headers or other properties
-	url = "<build up target url>"
+async def forward_to_my_host(context: RequestContext) -> Response | None:
+    # Determine whether the request matches your forwarder
+    request = context.request
+    if not request.url.path.startswith("/your-base-path/"):
+        # not for us!
+        return None
+
+    # This is an example of how you can use the validate_api_key_header function
+    # This validates the "ocp-apim-subscription-key" header in the request against the configured API key
+    validate_api_key_header(
+        request=request, header_name="x-api-key", allowed_key_value=context.config.simulator_api_key
+    )
+
+    # build up the forwarded request from the incoming request
+    # you may need to modify the headers or other properties
+    url = "<build up target url>"
     body = await request.body()
     response = requests.request(
         request.method,
@@ -151,7 +181,7 @@ async def forward_to_my_host(request: Request) -> Response | None:
         headers=request.headers,
         data=body,
     )
-	return response
+    return response
 
 def initialize(config: Config):
     # initialize is the entry point invoked by the simulator
@@ -180,11 +210,16 @@ This can be useful if you need to be able to forward to multiple back-end APIs y
 
 ```python
 async def forward_to_my_host(request: Request) -> Response | None:
-	if not request.url.path.startswith("/my-api/"):
-		# assume not a request this forwarder can handle
-		# return None to allow another forwarder to try
-		return None
-	# rest of the implementation here...
+    if not request.url.path.startswith("/my-api/"):
+        # assume not a request this forwarder can handle
+        # return None to allow another forwarder to try
+        return None
+
+    # This is an example of how you can use the validate_api_key_header function
+    # This validates the "api-key" header in the request against the configured API key
+    validate_api_key_header(request=request, header_name="api-key", allowed_key_value=context.config.simulator_api_key)
+
+    # rest of the implementation here...
 ```
 
 ### Creating a custom generator extension
@@ -207,6 +242,11 @@ async def generate_echo_response(context: RequestContext) -> Response | None:
     request = context.request
     if request.url.path != "/echo" or request.method != "POST":
         return None
+
+    # This is an example of how you can use the validate_api_key_header function
+    # This validates the "api-key" header in the request against the configured API key
+    validate_api_key_header(request=request, header_name="api-key", allowed_key_value=context.config.simulator_api_key)
+
     request_body = await request.body()
     return Response(content=f"Echo: {request_body.decode("utf-8")}", status_code=200)
 ```
@@ -214,20 +254,29 @@ async def generate_echo_response(context: RequestContext) -> Response | None:
 If the generator function returns a `Response` object then that response is used as the response for the request.
 If the generator function returns `None` then the next generator function is called.
 
+### Document Intelligence extensions
 
-### Running with an extension
+The repo includes a couple of example extensions for Document Intelligence that are intended to server as  starter implmementations.
 
-To run with an extension,  set the `EXTENSION_PATH` environment variable:
+#### Document Intelligence forwarder
 
-```bash
-SIMULATOR_MODE=record EXTENSION_PATH=/path/to/extension.py make run-simulated-api
-```
+The document intelligence forwarder extension is in the `src/examples/forwarder_doc_intelligence` folder.
+This extension allows you to forward requests to the Document Intelligence service and record the responses for later replay. 
 
-Or via Docker:
+#### Document Intelligence generator
 
-```bash
-docker run -p 8000:8000 -e SIMULATOR_MODE=record -e EXTENSION_PATH=/mnt/extension.py -v /path/to/extension.py:/mnt/extension.py
-```
+The document intelligence generator extension is in the `src/examples/generator_doc_intelligence` folder.
+The extension includes a generator and custom rate-limiter.
+
+The generator will return the right shape of response using lorem ipsum text.
+You will likely want to make some tweaks to the example generator depending on the model that you use in your application and the aspects of the response that you use in your application.
+
+Rate-limiting for Document Intelligence endpoints is a standard requests per second (RPS) limit.
+The default limit for the simulator is 15 RPS based on the default for an S0 tier service (see https://learn.microsoft.com/en-us/azure/ai-services/document-intelligence/service-limits?view=doc-intel-4.0.0).
+
+This rate-limit only applies to the request submission endpoint and not to the results endpoint.
+
+To control the rate-limiting, set the `DOC_INTELLIGENCE_RPS` environment variable to the desired RPS limit (set to a negative number to disable rate-limiting).
 
 ## Large recordings
 
@@ -258,43 +307,43 @@ The default values are:
 | `LATENCY_OPENAI_COMPLETIONS`      | 15   | 2       |
 | `LATENCY_OPENAI_CHAT_COMPLETIONS` | 19   | 6       |
 
+## Rate Limiting
 
-## Rate-limiting
+### OpenAI Rate Limiting
 
-The rate-limiting implementation is configured differently depending on the type of request being handled.
-
-Rate-limiting is applied regardless of the mode the simulator is running in.
-
-### OpenAI Rate-Limiting
-
-Rate-limiting for OpenAI endpoints is still being implemented/tested. The current implementation is a combination of token- and request-based rate-limiting.
+The simulator contains built-in rate limiting for OpenAI endpoints but this is still being refined.
+The current implementation is a combination of token- and request-based rate-limiting.
 
 To control the rate-limiting, set the `OPENAI_DEPLOYMENT_CONFIG_PATH` environment variable to the path to a JSON config file that defines the deployments and associated models and token limits. An example config file is shown below.
 
 ```json
 {
-	"deployment1" : {
-		"model": "gpt-3.5-turbo",
-		"tokensPerMinute" : 60000
-	},
-	"gpt-35-turbo-2k-token" : {
-		"model": "gpt-3.5-turbo",
-		"tokensPerMinute" : 2000
-	},
-	"gpt-35-turbo-1k-token" : {
-		"model": "gpt-3.5-turbo",
-		"tokensPerMinute" : 1000
-	}
+    "deployment1" : {
+        "model": "gpt-3.5-turbo",
+        "tokensPerMinute" : 60000
+    },
+    "gpt-35-turbo-2k-token" : {
+        "model": "gpt-3.5-turbo",
+        "tokensPerMinute" : 2000
+    },
+    "gpt-35-turbo-1k-token" : {
+        "model": "gpt-3.5-turbo",
+        "tokensPerMinute" : 1000
+    }
 }
 ```
 
-### Document Intelligence Rate-Limiting
+### Customising rate limiting
 
-Rate-limiting for Document Intelligence endpoints is a standard requests per second (RPS) limit. The default limit for the simulator is 15 RPS based on the default for an S0 tier service (see https://learn.microsoft.com/en-us/azure/ai-services/document-intelligence/service-limits?view=doc-intel-4.0.0).
+The rate limiting behaviour can be customised by extensions.
+This can be useful if you want to implement different rate limiting behaviour or if you want to add rate limiting to a custom forwarder/generator.
 
-This rate-limit only applies to the request submission endpoint and not to the results endpoint.
+An example of a custom generator can be found in the `src/examples/generator_doc_intelligence` folder.
 
-To control the rate-limiting, set the `DOC_INTELLIGENCE_RPS` environment variable to the desired RPS limit.
+The simulator configuration stores a dictionary of rate limiters.
+The `RequestContext` associated with a request contains a `values` dictionary used to store information about the request.
+The value of the `Limiter` key in the `RequestContext.values` dictionary is used to look up the rate limiter in the rate limiters dictionary.
+
 
 ## Config Endpoint
 
@@ -303,7 +352,7 @@ The simulator exposes a `/++/config` endpoint that returns the current configura
 A `GET` request to this endpoint will return a JSON object with the current configuration:
 
 ```json
-{"simulator_mode":"generate","doc_intelligence_rps":15,"latency":{"open_ai_embeddings":{"mean":100.0,"std_dev":30.0},"open_ai_completions":{"mean":15.0,"std_dev":2.0},"open_ai_chat_completions":{"mean":19.0,"std_dev":6.0}},"openai_deployments":{"deployment1":{"tokens_per_minute":60000,"model":"gpt-3.5-turbo"},"gpt-35-turbo-1k-token":{"tokens_per_minute":1000,"model":"gpt-3.5-turbo"}}}
+{"simulator_mode":"generate","latency":{"open_ai_embeddings":{"mean":100.0,"std_dev":30.0},"open_ai_completions":{"mean":15.0,"std_dev":2.0},"open_ai_chat_completions":{"mean":19.0,"std_dev":6.0}},"openai_deployments":{"deployment1":{"tokens_per_minute":60000,"model":"gpt-3.5-turbo"},"gpt-35-turbo-1k-token":{"tokens_per_minute":1000,"model":"gpt-3.5-turbo"}}}
 ```
 
 A `PATCH` request can be used to update the configuration

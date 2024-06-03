@@ -3,11 +3,12 @@ import logging
 import os
 
 import fastapi
+from fastapi.datastructures import URL
 import requests
 
-from fastapi.datastructures import URL
 
 from aoai_simulated_api import constants
+from aoai_simulated_api.auth import validate_api_key_header
 from aoai_simulated_api.models import RequestContext
 
 #
@@ -48,7 +49,8 @@ doc_intelligence_response_headers_to_remove = [
     "apim-request-id",
     "x-content-type-options",
     "x-ms-region",
-    "x-envoy-upstream-service-time" "Content-Length",
+    "x-envoy-upstream-service-time",
+    "Content-Length",
     "Date",
     "Strict-Transport-Security",
 ]
@@ -61,6 +63,12 @@ async def forward_to_azure_document_intelligence(
     if not request.url.path.startswith("/formrecognizer/"):
         # assume not an Doc Intelligence request
         return None
+
+    # This is an example of how you can use the validate_api_key_header function
+    # This validates the "ocp-apim-subscription-key" header in the request against the configured API key
+    validate_api_key_header(
+        request=request, header_name="ocp-apim-subscription-key", allowed_key_value=context.config.simulator_api_key
+    )
 
     logger.debug("Forwarding Document Intelligence request: %s", request.url.path)
 

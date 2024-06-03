@@ -6,11 +6,12 @@ import random
 
 import lorem
 import nanoid
-import tiktoken
 
 from fastapi import Response
 from fastapi.responses import StreamingResponse
 
+from aoai_simulated_api import constants
+from aoai_simulated_api.auth import validate_api_key_header
 from aoai_simulated_api.models import RequestContext
 from aoai_simulated_api.constants import (
     SIMULATOR_KEY_DEPLOYMENT_NAME,
@@ -19,11 +20,12 @@ from aoai_simulated_api.constants import (
     SIMULATOR_KEY_LIMITER,
     SIMULATOR_KEY_OPERATION_NAME,
 )
+from aoai_simulated_api.generator.openai_tokens import num_tokens_from_string, num_tokens_from_messages
 
 # This file contains a default implementation of the openai generators
 # You can configure your own generators by creating a generator_config.py file and setting the
 # EXTENSION_PATH environment variable to the path of the file when running the API
-# See src/examples/generator_config for an example of how to define your own generators
+# See src/examples/generator_echo for an example of how to define your own generators
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +36,11 @@ TOKEN_TO_WORD_FACTOR = 0.72
 # API docs: https://learn.microsoft.com/en-gb/azure/ai-services/openai/reference
 
 missing_deployment_names = set()
+
+# pylint: disable-next=invalid-name
+default_embedding_size = (
+    1536  # text-embedding-3-small default (https://platform.openai.com/docs/guides/embeddings/what-are-embeddings)
+)
 
 
 def get_model_name_from_deployment_name(context: RequestContext, deployment_name: str) -> str:
@@ -52,104 +59,57 @@ def get_model_name_from_deployment_name(context: RequestContext, deployment_name
     return default_model
 
 
-# For details on the token counting, see https://cookbook.openai.com/examples/how_to_count_tokens_with_tiktoken
+async def calculate_latency(context: RequestContext, status_code: int):
+    """Calculate additional latency that should be applied"""
+    if status_code >= 300:
+        return
+
+    # Determine the target latency for the request
+    completion_tokens = context.values.get(constants.SIMULATOR_KEY_OPENAI_COMPLETION_TOKENS)
+
+    if completion_tokens and completion_tokens > 0:
+        config = context.config
+        operation_name = context.values.get(constants.SIMULATOR_KEY_OPERATION_NAME)
+        target_duration_ms = None
+        if operation_name == "embeddings":
+            # embeddings config returns latency value to use (in milliseconds)
+            target_duration_ms = config.latency.open_ai_embeddings.get_value()
+        elif operation_name == "completions":
+            # completions config returns latency per completion token in milliseconds
+            target_duration_ms = config.latency.open_ai_completions.get_value()
+        elif operation_name == "chat-completions":
+            # chat completions config returns latency per completion token in milliseconds
+            target_duration_ms = config.latency.open_ai_chat_completions.get_value() * completion_tokens
+
+        if target_duration_ms:
+            context.values[constants.TARGET_DURATION_MS] = target_duration_ms
 
 
-def num_tokens_from_string(string: str, model: str) -> int:
-    """Returns the number of tokens in a text string."""
-    try:
-        encoding = tiktoken.encoding_for_model(model)
-    except KeyError:
-        logger.warning("Warning: model not found. Using cl100k_base encoding.")
-        encoding = tiktoken.get_encoding("cl100k_base")
-    num_tokens = len(encoding.encode(string))
-    return num_tokens
-
-
-# pylint: disable=invalid-name
-gpt_35_turbo_warning_issued = False
-gpt_4_warning_issued = False
-# pylint: enable=invalid-name
-
-
-def num_tokens_from_messages(messages, model):
-    """Return the number of tokens used by a list of messages."""
-    # pylint: disable-next=global-statement
-    global gpt_35_turbo_warning_issued, gpt_4_warning_issued
-    try:
-        encoding = tiktoken.encoding_for_model(model)
-    except KeyError:
-        logger.warning("Warning: model not found. Using cl100k_base encoding.")
-        encoding = tiktoken.get_encoding("cl100k_base")
-    if model in {
-        "gpt-3.5-turbo-0613",
-        "gpt-3.5-turbo-16k-0613",
-        "gpt-4-0314",
-        "gpt-4-32k-0314",
-        "gpt-4-0613",
-        "gpt-4-32k-0613",
-    }:
-        tokens_per_message = 3
-        tokens_per_name = 1
-    elif model == "gpt-3.5-turbo-0301":
-        tokens_per_message = 4  # every message follows <|start|>{role/name}\n{content}<|end|>\n
-        tokens_per_name = -1  # if there's a name, the role is omitted
-    elif "gpt-3.5-turbo" in model:
-        if not gpt_35_turbo_warning_issued:
-            logger.warning(
-                "Warning: gpt-3.5-turbo may update over time. Returning num tokens assuming gpt-3.5-turbo-0613."
-            )
-            gpt_35_turbo_warning_issued = True
-        return num_tokens_from_messages(messages, model="gpt-3.5-turbo-0613")
-    elif "gpt-4" in model:
-        if not gpt_4_warning_issued:
-            logger.warning("Warning: gpt-4 may update over time. Returning num tokens assuming gpt-4-0613.")
-            gpt_4_warning_issued = True
-        return num_tokens_from_messages(messages, model="gpt-4-0613")
-    else:
-        raise NotImplementedError(
-            f"num_tokens_from_messages() is not implemented for model {model}. "
-            + "See https://github.com/openai/openai-python/blob/main/chatml.md for information "
-            + " on how messages are converted to tokens."
-        )
-    num_tokens = 0
-    for message in messages:
-        num_tokens += tokens_per_message
-        for key, value in message.items():
-            num_tokens += len(encoding.encode(value))
-            if key == "name":
-                num_tokens += tokens_per_name
-    num_tokens += 3  # every reply is primed with <|start|>assistant<|message|>
-    return num_tokens
-
-
-def _generate_embedding(index: int):
+def create_embedding_content(index: int, embedding_size=default_embedding_size):
     """Generates a random embedding"""
-    return {"object": "embedding", "index": index, "embedding": [(random.random() - 0.5) * 4 for _ in range(1536)]}
+    return {
+        "object": "embedding",
+        "index": index,
+        "embedding": [(random.random() - 0.5) * 4 for _ in range(embedding_size)],
+    }
 
 
-async def azure_openai_embedding(context: RequestContext) -> Response | None:
-    request = context.request
-    is_match, path_params = context.is_route_match(
-        request=request, path="/openai/deployments/{deployment}/embeddings", methods=["POST"]
-    )
-    if not is_match:
-        return None
-
-    deployment_name = path_params["deployment"]
-    request_body = await request.json()
-    model_name = get_model_name_from_deployment_name(context, deployment_name)
-    request_input = request_body["input"]
+def create_embeddings_response(
+    context: RequestContext,
+    deployment_name: str,
+    model_name: str,
+    request_input: str | list,
+):
     embeddings = []
     if isinstance(request_input, str):
         tokens = num_tokens_from_string(request_input, model_name)
-        embeddings.append(_generate_embedding(0))
+        embeddings.append(create_embedding_content(0))
     else:
         tokens = 0
         index = 0
         for i in request_input:
             tokens += num_tokens_from_string(i, model_name)
-            embeddings.append(_generate_embedding(index))
+            embeddings.append(create_embedding_content(index))
             index += 1
 
     response_data = {
@@ -174,24 +134,16 @@ async def azure_openai_embedding(context: RequestContext) -> Response | None:
     )
 
 
-async def azure_openai_completion(context: RequestContext) -> Response | None:
-    request = context.request
-    is_match, path_params = context.is_route_match(
-        request=request, path="/openai/deployments/{deployment}/completions", methods=["POST"]
-    )
-    if not is_match:
-        return None
-
-    deployment_name = path_params["deployment"]
-    model_name = get_model_name_from_deployment_name(context, deployment_name)
-    request_body = await request.json()
-    prompt_tokens = num_tokens_from_string(request_body["prompt"], model_name)
-
-    # TODO - determine the maxiumum tokens to use based on the model
-    max_tokens = request_body.get("max_tokens", 4096)
-
-    # TODO - randomise the finish reason (i.e. don't always use the full set of tokens)
-    words_to_generate = int(TOKEN_TO_WORD_FACTOR * max_tokens)
+def create_completion_response(
+    context: RequestContext,
+    deployment_name: str,
+    model_name: str,
+    prompt_tokens: int,
+    words_to_generate: int,
+):
+    """
+    Creates a Response object for a completion request and sets context values for the rate-limiter etc
+    """
     text = "".join(lorem.get_word(count=words_to_generate))
 
     completion_tokens = num_tokens_from_string(text, model_name)
@@ -233,30 +185,53 @@ async def azure_openai_completion(context: RequestContext) -> Response | None:
     )
 
 
-async def azure_openai_chat_completion(context: RequestContext) -> Response | None:
-    request = context.request
-    is_match, path_params = context.is_route_match(
-        request=request, path="/openai/deployments/{deployment}/chat/completions", methods=["POST"]
-    )
-    if not is_match:
-        return None
-
-    request_body = await request.json()
-    deployment_name = path_params["deployment"]
-    model_name = get_model_name_from_deployment_name(context, deployment_name)
-    prompt_tokens = num_tokens_from_messages(request_body["messages"], model_name)
-
-    # TODO - determine the maxiumum tokens to use based on the model
-    max_tokens = request_body.get("max_tokens", 4096)
-    # TODO - randomise the finish reason (i.e. don't always use the full set of tokens)
-    words_to_generate = int(TOKEN_TO_WORD_FACTOR * max_tokens)
+def create_lorem_chat_completion_response(
+    context: RequestContext,
+    deployment_name: str,
+    model_name: str,
+    streaming: bool,
+    words_to_generate: int,
+    prompt_messages: list,
+    finish_reason: str = "length",
+):
+    """
+    Creates a Response object for a chat completion request by generating
+    lorem ipsum text and sets context values for the rate-limiter etc.
+    Handles streaming vs non-streaming
+    """
     words = lorem.get_word(count=words_to_generate)
+    return create_chat_completion_response(
+        context=context,
+        deployment_name=deployment_name,
+        model_name=model_name,
+        streaming=streaming,
+        prompt_messages=prompt_messages,
+        generated_content=words,
+        finish_reason=finish_reason,
+    )
 
-    if request_body.get("stream", False):
+
+def create_chat_completion_response(
+    context: RequestContext,
+    deployment_name: str,
+    model_name: str,
+    streaming: bool,
+    prompt_messages: list,
+    generated_content: list[str],
+    finish_reason: str = "length",
+):
+    """
+    Creates a Response object for a chat completion request and sets context values for the rate-limiter etc.
+    Handles streaming vs non-streaming
+    """
+
+    prompt_tokens = num_tokens_from_messages(prompt_messages, model_name)
+
+    if streaming:
 
         async def send_words():
             space = ""
-            for word in words.split(" "):
+            for word in generated_content.split(" "):
                 chunk_string = json.dumps(
                     {
                         "id": "chatcmpl-" + nanoid.non_secure_generate(size=29),
@@ -281,7 +256,6 @@ async def azure_openai_chat_completion(context: RequestContext) -> Response | No
                                         "violence": {"filtered": False, "severity": "safe"},
                                     },
                                 },
-                                "message": {"role": "assistant", "content": word},
                             },
                         ],
                     }
@@ -291,11 +265,43 @@ async def azure_openai_chat_completion(context: RequestContext) -> Response | No
                 yield "\n"
                 await asyncio.sleep(0.05)
                 space = " "
+
+            chunk_string = json.dumps(
+                {
+                    "id": "chatcmpl-" + nanoid.non_secure_generate(size=29),
+                    "object": "chat.completion.chunk",
+                    "created": int(time.time()),
+                    "model_name": model_name,
+                    "system_fingerprint": None,
+                    "choices": [
+                        {
+                            "delta": {
+                                "content": None,
+                                "function_call": None,
+                                "role": None,
+                                "tool_calls": None,
+                                "finish_reason": finish_reason,
+                                "index": 0,
+                                "logprobs": None,
+                                "content_filter_results": {
+                                    "hate": {"filtered": False, "severity": "safe"},
+                                    "self_harm": {"filtered": False, "severity": "safe"},
+                                    "sexual": {"filtered": False, "severity": "safe"},
+                                    "violence": {"filtered": False, "severity": "safe"},
+                                },
+                            },
+                        },
+                    ],
+                }
+            )
+
+            yield "data: " + chunk_string + "\n"
+            yield "\n"
             yield "[DONE]"
 
         return StreamingResponse(content=send_words())
 
-    text = "".join(words)
+    text = "".join(generated_content)
     completion_tokens = num_tokens_from_string(text, model_name)
     total_tokens = prompt_tokens + completion_tokens
 
@@ -317,7 +323,7 @@ async def azure_openai_chat_completion(context: RequestContext) -> Response | No
         ],
         "choices": [
             {
-                "finish_reason": "length",
+                "finish_reason": finish_reason,
                 "index": 0,
                 "message": {
                     "role": "assistant",
@@ -351,4 +357,103 @@ async def azure_openai_chat_completion(context: RequestContext) -> Response | No
             "Content-Type": "application/json",
         },
         status_code=200,
+    )
+
+
+def _validate_api_key_header(context: RequestContext):
+    request = context.request
+    validate_api_key_header(request=request, header_name="api-key", allowed_key_value=context.config.simulator_api_key)
+
+
+async def azure_openai_embedding(context: RequestContext) -> Response | None:
+    request = context.request
+    is_match, path_params = context.is_route_match(
+        request=request, path="/openai/deployments/{deployment}/embeddings", methods=["POST"]
+    )
+    if not is_match:
+        return None
+
+    _validate_api_key_header(context)
+
+    deployment_name = path_params["deployment"]
+    request_body = await request.json()
+    model_name = get_model_name_from_deployment_name(context, deployment_name)
+    request_input = request_body["input"]
+
+    # calculate a simulated latency and store in context.values
+    await calculate_latency(context, 200)
+
+    return create_embeddings_response(
+        context=context,
+        deployment_name=deployment_name,
+        model_name=model_name,
+        request_input=request_input,
+    )
+
+
+async def azure_openai_completion(context: RequestContext) -> Response | None:
+    request = context.request
+    is_match, path_params = context.is_route_match(
+        request=request, path="/openai/deployments/{deployment}/completions", methods=["POST"]
+    )
+    if not is_match:
+        return None
+
+    _validate_api_key_header(context)
+
+    deployment_name = path_params["deployment"]
+    model_name = get_model_name_from_deployment_name(context, deployment_name)
+    request_body = await request.json()
+    prompt_tokens = num_tokens_from_string(request_body["prompt"], model_name)
+
+    # TODO - determine the maxiumum tokens to use based on the model
+    max_tokens = request_body.get("max_tokens", 4096)
+
+    # TODO - randomise the finish reason (i.e. don't always use the full set of tokens)
+    words_to_generate = int(TOKEN_TO_WORD_FACTOR * max_tokens)
+
+    # calculate a simulated latency and store in context.values
+    await calculate_latency(context, 200)
+
+    return create_completion_response(
+        context=context,
+        deployment_name=deployment_name,
+        model_name=model_name,
+        prompt_tokens=prompt_tokens,
+        words_to_generate=words_to_generate,
+    )
+
+
+async def azure_openai_chat_completion(context: RequestContext) -> Response | None:
+    request = context.request
+    is_match, path_params = context.is_route_match(
+        request=request, path="/openai/deployments/{deployment}/chat/completions", methods=["POST"]
+    )
+    if not is_match:
+        return None
+
+    _validate_api_key_header(context)
+
+    request_body = await request.json()
+    deployment_name = path_params["deployment"]
+    model_name = get_model_name_from_deployment_name(context, deployment_name)
+    messages = request_body["messages"]
+
+    # TODO - determine the maxiumum tokens to use based on the model
+    max_tokens = request_body.get("max_tokens", 4096)
+    # TODO - randomise the finish reason (i.e. don't always use the full set of tokens)
+    words_to_generate = int(TOKEN_TO_WORD_FACTOR * max_tokens)
+
+    streaming = request_body.get("stream", False)
+
+    # calculate a simulated latency and store in context.values
+    await calculate_latency(context, 200)
+
+    return create_lorem_chat_completion_response(
+        context=context,
+        deployment_name=deployment_name,
+        model_name=model_name,
+        streaming=streaming,
+        words_to_generate=words_to_generate,
+        prompt_messages=messages,
     )

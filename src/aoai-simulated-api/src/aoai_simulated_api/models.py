@@ -53,8 +53,6 @@ class RequestContext:
                 and a dictionary of path parameters if the match is successful.
         """
 
-        # TODO - would a FastAPI router simplify this?
-
         route = Route(path=path, methods=methods, endpoint=_endpoint)
         path_to_match = self._strip_path_query(request.url.path)
         match, scopes = route.matches({"type": "http", "method": request.method, "path": path_to_match})
@@ -130,7 +128,6 @@ class PatchableConfig(BaseSettings):
     simulator_api_key: str = Field(default=nanoid.generate(size=30), alias="SIMULATOR_API_KEY")
     recording: RecordingConfig = Field(default=RecordingConfig())
     openai_deployments: dict[str, "OpenAIDeployment"] | None = Field(default=None)
-    doc_intelligence_rps: int = Field(default=15, alias="DOC_INTELLIGENCE_RPS")
     latency: Annotated[LatencyConfig, Field(default=LatencyConfig())]
 
 
@@ -140,6 +137,8 @@ class Config(PatchableConfig):
     """
 
     generators: list[Callable[[RequestContext], Response | Awaitable[Response] | None]] = None
+    limiters: dict[str, Callable[[RequestContext, Response], Response | None]] = {}
+    extension_path: Annotated[str | None, Field(default=None, alias="EXTENSION_PATH")]
 
 
 @dataclass

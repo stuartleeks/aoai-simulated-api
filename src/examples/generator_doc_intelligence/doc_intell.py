@@ -1,4 +1,6 @@
 import datetime
+import logging
+import os
 import random
 import json
 import uuid
@@ -6,10 +8,13 @@ import lorem
 from fastapi import Response
 
 
+from aoai_simulated_api.auth import validate_api_key_header
 from aoai_simulated_api.constants import SIMULATOR_KEY_LIMITER
 from aoai_simulated_api.models import RequestContext
 
 document_analysis_config = {}
+
+logger = logging.getLogger(__name__)
 
 
 def get_wait_time_for_result(content_length: int) -> float:
@@ -40,6 +45,12 @@ async def doc_intelligence_analyze(context: RequestContext) -> Response | None:
     if not is_match:
         return None
 
+    # This is an example of how you can use the validate_api_key_header function
+    # This validates the "ocp-apim-subscription-key" header in the request against the configured API key
+    validate_api_key_header(
+        request=request, header_name="ocp-apim-subscription-key", allowed_key_value=context.config.simulator_api_key
+    )
+
     # Required parameters (modelId, api-version)
     model_id = path_params["modelId"]
     api_version = request.query_params.get("api-version")
@@ -63,8 +74,11 @@ async def doc_intelligence_analyze(context: RequestContext) -> Response | None:
         f"{base_url}/formrecognizer/documentModels/{model_id}/analyzeResults/{result_id}?api-version={api_version}"
     )
 
-    # Set the HTTP response headers.
+    # Set the rate limiter key to "docintelligence" so that the
+    # custom rate limiter is used for this request.
     context.values[SIMULATOR_KEY_LIMITER] = "docintelligence"
+
+    # Set the HTTP response headers
     headers = {
         "Operation-Location": document_analysis_result_location,
     }
@@ -94,6 +108,12 @@ async def doc_intelligence_analyze_result(context: RequestContext) -> Response |
     )
     if not is_match:
         return None
+
+    # This is an example of how you can use the validate_api_key_header function
+    # This validates the "ocp-apim-subscription-key" header in the request against the configured API key
+    validate_api_key_header(
+        request=request, header_name="ocp-apim-subscription-key", allowed_key_value=context.config.simulator_api_key
+    )
 
     result_id = path_params["result_id"]
     doc_config = document_analysis_config.get(result_id)

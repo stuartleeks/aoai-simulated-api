@@ -121,7 +121,9 @@ class RecordReplayHandler:
             response_info = recording.get(request_hash)
             if response_info:
                 headers = {k: v[0] for k, v in response_info.headers.items()}
-                context.values[constants.RECORDED_DURATION_MS] = response_info.duration_ms
+                for key, value in response_info.context_values.items():
+                    context.values[key] = value
+                context.values[constants.TARGET_DURATION_MS] = response_info.duration_ms
                 return fastapi.Response(
                     content=response_info.body, status_code=response_info.status_code, headers=headers
                 )
@@ -149,19 +151,22 @@ class RecordReplayHandler:
         elapsed_time = end_time - start_time
         elapsed_time_ms = int(elapsed_time * 1000)
 
-        recorded_response = await self.get_recorded_response(request, forwarded_response, elapsed_time_ms)
+        recorded_response = await self.get_recorded_response(context, forwarded_response, elapsed_time_ms)
         if forwarded_response.persist_response:
             self.store_recorded_response(request, recorded_response)
 
-        context.values[constants.RECORDED_DURATION_MS] = elapsed_time_ms
+        context.values[constants.TARGET_DURATION_MS] = elapsed_time_ms
         return fastapi.Response(
             content=recorded_response.body,
             status_code=recorded_response.status_code,
             headers=forwarded_response.response.headers,  # use original headers in returned content
         )
 
-    async def get_recorded_response(self, request, forwarded_response, elapsed_time_ms):
+    async def get_recorded_response(
+        self, context: RequestContext, forwarded_response: ForwardedResponse, elapsed_time_ms: int
+    ):
         response = forwarded_response.response
+        request = context.request
         request_body = await request.body()
         body = response.body
         # limit the request headers we persist - avoid persisting secrets and keep recording size low
@@ -184,6 +189,7 @@ class RecordReplayHandler:
             headers={k: [v] for k, v in dict(response.headers).items()},
             body=body,
             request_hash=hash_request_parts(request.method, request.url.path, request_body),
+            context_values=context.values,
             full_request={
                 "method": request.method,
                 "uri": str(request.url),
