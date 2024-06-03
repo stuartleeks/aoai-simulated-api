@@ -16,7 +16,10 @@ jobs:
       with:    
         # TODO - cache dev container image
         push: never
+        env: |
+          GITHUB_BASE_REF
         runCmd: |
+          echo -e "Running ci-build for ref:$GITHUB_BASE_REF\n\n"
           make install-requirements
 
           echo -e "\n\n--------------------------------------------------------------------------------\n\n"
