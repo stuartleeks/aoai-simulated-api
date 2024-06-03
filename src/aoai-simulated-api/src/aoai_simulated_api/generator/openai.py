@@ -20,7 +20,11 @@ from aoai_simulated_api.constants import (
     SIMULATOR_KEY_LIMITER,
     SIMULATOR_KEY_OPERATION_NAME,
 )
-from aoai_simulated_api.generator.openai_tokens import num_tokens_from_string, num_tokens_from_messages
+from aoai_simulated_api.generator.openai_tokens import (
+    get_max_completion_tokens,
+    num_tokens_from_string,
+    num_tokens_from_messages,
+)
 
 # This file contains a default implementation of the openai generators
 # You can configure your own generators by creating a generator_config.py file and setting the
@@ -28,10 +32,6 @@ from aoai_simulated_api.generator.openai_tokens import num_tokens_from_string, n
 # See src/examples/generator_echo for an example of how to define your own generators
 
 logger = logging.getLogger(__name__)
-
-# 0.72 is based on generating a bunch of lorem ipsum and counting the tokens
-# This was for a gpt-3.5 model
-TOKEN_TO_WORD_FACTOR = 0.72
 
 # API docs: https://learn.microsoft.com/en-gb/azure/ai-services/openai/reference
 
@@ -134,17 +134,34 @@ def create_embeddings_response(
     )
 
 
+def generate_lorem_text(max_tokens: int, model_name: str):
+    # The simplest approach to generating the compltion would
+    # be to add a word at a time and count the tokens until we reach the limit
+    # For large max_token values that will be slow, so we
+    # estimate the number of words to generate based on the max_tokens
+    # opting to stay below the limit (based on experimentation)
+    # and then top up
+    init_word_count = int(0.5 * max_tokens)
+    text = lorem.get_word(count=init_word_count)
+    while True:
+        new_text = text + " " + lorem.get_word()
+        if num_tokens_from_string(new_text, model_name) > max_tokens:
+            break
+        text = new_text
+    return text
+
+
 def create_completion_response(
     context: RequestContext,
     deployment_name: str,
     model_name: str,
     prompt_tokens: int,
-    words_to_generate: int,
+    max_tokens: int,
 ):
     """
     Creates a Response object for a completion request and sets context values for the rate-limiter etc
     """
-    text = "".join(lorem.get_word(count=words_to_generate))
+    text = generate_lorem_text(max_tokens=max_tokens, model_name=model_name)
 
     completion_tokens = num_tokens_from_string(text, model_name)
     total_tokens = prompt_tokens + completion_tokens
@@ -190,7 +207,7 @@ def create_lorem_chat_completion_response(
     deployment_name: str,
     model_name: str,
     streaming: bool,
-    words_to_generate: int,
+    max_tokens: int,
     prompt_messages: list,
     finish_reason: str = "length",
 ):
@@ -199,14 +216,16 @@ def create_lorem_chat_completion_response(
     lorem ipsum text and sets context values for the rate-limiter etc.
     Handles streaming vs non-streaming
     """
-    words = lorem.get_word(count=words_to_generate)
+
+    text = generate_lorem_text(max_tokens=max_tokens, model_name=model_name)
+
     return create_chat_completion_response(
         context=context,
         deployment_name=deployment_name,
         model_name=model_name,
         streaming=streaming,
         prompt_messages=prompt_messages,
-        generated_content=words,
+        generated_content=text,
         finish_reason=finish_reason,
     )
 
@@ -217,7 +236,7 @@ def create_chat_completion_response(
     model_name: str,
     streaming: bool,
     prompt_messages: list,
-    generated_content: list[str],
+    generated_content: str,
     finish_reason: str = "length",
 ):
     """
@@ -231,6 +250,7 @@ def create_chat_completion_response(
 
         async def send_words():
             space = ""
+            role = "assistant"
             for word in generated_content.split(" "):
                 chunk_string = json.dumps(
                     {
@@ -244,7 +264,7 @@ def create_chat_completion_response(
                                 "delta": {
                                     "content": space + word,
                                     "function_call": None,
-                                    "role": None,
+                                    "role": role,
                                     "tool_calls": None,
                                     "finish_reason": None,
                                     "index": 0,
@@ -260,6 +280,7 @@ def create_chat_completion_response(
                         ],
                     }
                 )
+                role = None
 
                 yield "data: " + chunk_string + "\n"
                 yield "\n"
@@ -406,11 +427,7 @@ async def azure_openai_completion(context: RequestContext) -> Response | None:
     request_body = await request.json()
     prompt_tokens = num_tokens_from_string(request_body["prompt"], model_name)
 
-    # TODO - determine the maxiumum tokens to use based on the model
-    max_tokens = request_body.get("max_tokens", 4096)
-
-    # TODO - randomise the finish reason (i.e. don't always use the full set of tokens)
-    words_to_generate = int(TOKEN_TO_WORD_FACTOR * max_tokens)
+    max_tokens = get_max_completion_tokens(request_body, model_name, prompt_tokens=prompt_tokens)
 
     # calculate a simulated latency and store in context.values
     await calculate_latency(context, 200)
@@ -420,7 +437,7 @@ async def azure_openai_completion(context: RequestContext) -> Response | None:
         deployment_name=deployment_name,
         model_name=model_name,
         prompt_tokens=prompt_tokens,
-        words_to_generate=words_to_generate,
+        max_tokens=max_tokens,
     )
 
 
@@ -438,11 +455,9 @@ async def azure_openai_chat_completion(context: RequestContext) -> Response | No
     deployment_name = path_params["deployment"]
     model_name = get_model_name_from_deployment_name(context, deployment_name)
     messages = request_body["messages"]
+    prompt_tokens = num_tokens_from_messages(messages, model_name)
 
-    # TODO - determine the maxiumum tokens to use based on the model
-    max_tokens = request_body.get("max_tokens", 4096)
-    # TODO - randomise the finish reason (i.e. don't always use the full set of tokens)
-    words_to_generate = int(TOKEN_TO_WORD_FACTOR * max_tokens)
+    max_tokens = get_max_completion_tokens(request_body, model_name, prompt_tokens=prompt_tokens)
 
     streaming = request_body.get("stream", False)
 
@@ -454,6 +469,6 @@ async def azure_openai_chat_completion(context: RequestContext) -> Response | No
         deployment_name=deployment_name,
         model_name=model_name,
         streaming=streaming,
-        words_to_generate=words_to_generate,
+        max_tokens=max_tokens,
         prompt_messages=messages,
     )

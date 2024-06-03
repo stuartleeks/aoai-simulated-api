@@ -11,7 +11,8 @@ from aoai_simulated_api.models import (
     OpenAIDeployment,
 )
 from aoai_simulated_api.generator.manager import get_default_generators
-from openai import AzureOpenAI, AuthenticationError, RateLimitError
+from openai import AzureOpenAI, AuthenticationError, RateLimitError, Stream
+from openai.types.chat import ChatCompletionChunk
 import pytest
 
 from .test_uvicorn_server import UvicornTestServer
@@ -83,10 +84,12 @@ async def test_openai_generator_completion_success():
             max_retries=0,
         )
         prompt = "This is a test prompt"
-        response = aoai_client.completions.create(model="deployment1", prompt=prompt, max_tokens=50)
+        max_tokens = 50
+        response = aoai_client.completions.create(model="deployment1", prompt=prompt, max_tokens=max_tokens)
 
         assert len(response.choices) == 1
         assert len(response.choices[0].text) > 50
+        assert response.usage.completion_tokens <= max_tokens
 
 
 @pytest.mark.asyncio
@@ -128,12 +131,72 @@ async def test_openai_generator_chat_completion_success():
             max_retries=0,
         )
         messages = [{"role": "user", "content": "What is the meaning of life?"}]
-        response = aoai_client.chat.completions.create(model="deployment1", messages=messages, max_tokens=50)
+        max_tokens = 50
+        response = aoai_client.chat.completions.create(model="deployment1", messages=messages, max_tokens=max_tokens)
 
         assert len(response.choices) == 1
         assert response.choices[0].message.role == "assistant"
         assert len(response.choices[0].message.content) > 20
         assert response.choices[0].finish_reason == "length"
+        assert response.usage.completion_tokens <= max_tokens
+
+
+@pytest.mark.asyncio
+async def test_openai_generator_chat_completion_max_tokens():
+    """
+    Ensure we can call the chat completion endpoint using the generator
+    """
+    config = _get_generator_config()
+    server = UvicornTestServer(config)
+    with server.run_in_thread():
+        aoai_client = AzureOpenAI(
+            api_key=API_KEY,
+            api_version="2023-12-01-preview",
+            azure_endpoint="http://localhost:8001",
+            max_retries=0,
+        )
+        messages = [{"role": "user", "content": "What is the meaning of life?"}]
+        max_tokens = 50
+
+        # Make repeated requests to ensure that none exceed max_tokens
+        for _ in range(1000):
+            response = aoai_client.chat.completions.create(
+                model="deployment1", messages=messages, max_tokens=max_tokens
+            )
+            assert response.usage.completion_tokens <= max_tokens
+
+
+@pytest.mark.asyncio
+async def test_openai_generator_chat_completion_stream_success():
+    """
+    Ensure we can call the chat completion endpoint using the generator with a streamed response
+    """
+    config = _get_generator_config()
+    server = UvicornTestServer(config)
+    with server.run_in_thread():
+        aoai_client = AzureOpenAI(
+            api_key=API_KEY,
+            api_version="2023-12-01-preview",
+            azure_endpoint="http://localhost:8001",
+            max_retries=0,
+        )
+        messages = [{"role": "user", "content": "What is the meaning of life?"}]
+        response: Stream[ChatCompletionChunk] = aoai_client.chat.completions.create(
+            model="deployment1", messages=messages, max_tokens=50, stream=True
+        )
+
+        is_first_chunk = True
+        count = 0
+        chunk: ChatCompletionChunk
+        for chunk in response:
+            if is_first_chunk:
+                is_first_chunk = False
+                assert chunk.choices[0].delta.role == "assistant"
+            assert len(chunk.choices) == 1
+            count += 1
+
+        assert count > 5
+        assert chunk.choices[0].delta.finish_reason == "length"
 
 
 @pytest.mark.asyncio
@@ -203,7 +266,7 @@ async def test_openai_generator_chat_completion_with_custom_generator():
 
         assert len(response.choices) == 1
         assert response.choices[0].message.role == "assistant"
-        assert len(response.choices[0].message.content.split(" ")) == 1
+        assert response.usage.completion_tokens <= 10, "Custom generator hard-codes max_tokens to 10"
         assert response.choices[0].finish_reason == "stop"
 
 
