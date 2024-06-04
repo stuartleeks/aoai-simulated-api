@@ -130,8 +130,6 @@ def config_patch(config: dict, _: Annotated[bool, Depends(_default_validate_api_
 @app.api_route("/{full_path:path}", methods=["GET", "POST", "PUT", "DELETE"])
 async def catchall(request: Request):
     logger.debug("⚡ handling route: %s", request.url.path)
-    # TODO check for traceparent in inbound request and propagate
-    #      to allow for correlating load test with back-end data
 
     response = None
     context = RequestContext(config=get_config(), request=request)

@@ -196,13 +196,12 @@ class RecordReplayHandler:
                 "headers": request_headers,
                 "body": request_body,
             },
-            status_message="n/a",
             duration_ms=elapsed_time_ms,
         )
 
         return recorded_response
 
-    def store_recorded_response(self, request, recorded_response):
+    def store_recorded_response(self, request: fastapi.Request, recorded_response: RecordedResponse):
         logger.info("📝 Storing recording for %s %s", request.method, request.url)
         recording = self._recordings.get(request.url.path)
         if not recording:

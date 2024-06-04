@@ -6,6 +6,19 @@ logger = logging.getLogger(__name__)
 # For details on the token counting, see https://cookbook.openai.com/examples/how_to_count_tokens_with_tiktoken
 
 
+def get_max_completion_tokens(request_body, model_name: str, prompt_tokens: int) -> int:
+    max_tokens = request_body.get("max_tokens")
+
+    # Based on https://platform.openai.com/docs/guides/text-generation/managing-tokens
+    default_max_tokens = 128000 if model_name == "gpt-4o" else 4097
+
+    upper_limit = default_max_tokens - prompt_tokens
+    if max_tokens is None or max_tokens > upper_limit:
+        max_tokens = upper_limit
+
+    return max_tokens
+
+
 def num_tokens_from_string(string: str, model: str) -> int:
     """Returns the number of tokens in a text string."""
     try:

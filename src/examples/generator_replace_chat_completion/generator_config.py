@@ -51,10 +51,10 @@ async def custom_azure_openai_chat_completion(context: RequestContext) -> Respon
     model_name = get_model_name_from_deployment_name(context, deployment_name)
     messages = request_body["messages"]
 
-    # Here we fix the number of words to generate to 1 and set the finish_reason to "stop".
+    # Here we fix the max_tokens 10 and set the finish_reason to "stop".
     # In a more realistic extension you would add logic to tailor the response sizes
     # or finish_reason based on the input messages observed in your system.
-    words_to_generate = 1
+    max_tokens = 10
     finish_reason = "stop"
 
     streaming = request_body.get("stream", False)
@@ -63,12 +63,12 @@ async def custom_azure_openai_chat_completion(context: RequestContext) -> Respon
         deployment_name=deployment_name,
         model_name=model_name,
         streaming=streaming,
-        words_to_generate=words_to_generate,
+        max_tokens=max_tokens,
         prompt_messages=messages,
         finish_reason=finish_reason,
     )
 
     # calculate a simulated latency and store in context.values
-    calculate_latency(context, status_code=response.status_code)
+    await calculate_latency(context, status_code=response.status_code)
 
     return response

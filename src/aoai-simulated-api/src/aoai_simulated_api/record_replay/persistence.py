@@ -18,7 +18,7 @@ class YamlRecordingPersister:
             interaction = {
                 "request": recorded_response.full_request,
                 "response": {
-                    "status": {"code": recorded_response.status_code, "message": recorded_response.status_message},
+                    "status": {"code": recorded_response.status_code},
                     "headers": recorded_response.headers,
                     "body": {"string": recorded_response.body},
                     "duration_ms": recorded_response.duration_ms,
@@ -38,7 +38,7 @@ class YamlRecordingPersister:
         if not os.path.exists(self._recording_dir):
             os.mkdir(self._recording_dir)
 
-    def get_recording_file_path(self, url):
+    def get_recording_file_path(self, url: str):
         query_start = url.find("?")
         if query_start != -1:
             url = url[:query_start]
@@ -71,7 +71,6 @@ class YamlRecordingPersister:
                 recording[request_hash] = RecordedResponse(
                     request_hash=request_hash,
                     status_code=response["status"]["code"],
-                    status_message=response["status"]["message"],
                     headers=response["headers"],
                     body=response["body"]["string"],
                     context_values=context_values,

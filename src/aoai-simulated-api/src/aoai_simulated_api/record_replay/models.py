@@ -6,7 +6,6 @@ from fastapi import Request
 class RecordedResponse:
     request_hash: int
     status_code: int
-    status_message: str
     headers: dict[str, list[str]]
     body: str
     duration_ms: int
