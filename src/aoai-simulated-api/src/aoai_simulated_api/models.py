@@ -129,6 +129,7 @@ class PatchableConfig(BaseSettings):
     recording: RecordingConfig = Field(default=RecordingConfig())
     openai_deployments: dict[str, "OpenAIDeployment"] | None = Field(default=None)
     latency: Annotated[LatencyConfig, Field(default=LatencyConfig())]
+    allow_undefined_openai_deployments: bool = Field(default=True, alias="ALLOW_UNDEFINED_OPENAI_DEPLOYMENTS")
 
 
 class Config(PatchableConfig):

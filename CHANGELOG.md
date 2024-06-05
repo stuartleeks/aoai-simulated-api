@@ -8,6 +8,7 @@
   - Enable adding custom rate limiters
   - Move latency calculation to generators. This allows for extensions to customise latency values. NOTE: If you have custom generators they need to be updated to handle this (see examples for implementation details)
 - Add rate-limiting for replayed requests
+- Add `ALLOW_UNDEFINED_OPENAI_DEPLOYMENTS ` configuration option to control whether the simulator will generate responses for any deployment or only known deployments
 
 
 ## v0.3 2024-05-03

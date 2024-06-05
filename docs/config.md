@@ -1,11 +1,11 @@
 # Configuring the simulator
 
 - [Configuring the simulator](#configuring-the-simulator)
-	- [Environment variables](#environment-variables)
-	- [Latency](#latency)
-	- [Rate Limiting](#rate-limiting)
-	- [Large recordings](#large-recordings)
-	- [Config API Endpoint](#config-api-endpoint)
+  - [Environment variables](#environment-variables)
+  - [Latency](#latency)
+  - [Rate Limiting](#rate-limiting)
+  - [Large recordings](#large-recordings)
+  - [Config API Endpoint](#config-api-endpoint)
 
 There are a number of [environment variables](#environment-variables) that can be used to configure the simulator.
 Additionally, some configuration can be changed while the simulator is running using the [config endpoint](#config-endpoint).
@@ -20,6 +20,7 @@ When running the simulated API, there are a number of environment variables to c
 | `SIMULATOR_API_KEY`             | The API key used by the simulator to authenticate requests. If not specified a key is auto-generated (see the logs). It is recommended to set a deterministic key value in `.env` |
 | `RECORDING_DIR`                 | The directory to store the recorded requests and responses (defaults to `.recording`).                                                                                            |
 | `OPENAI_DEPLOYMENT_CONFIG_PATH` | The path to a JSON file that contains the deployment configuration. See [OpenAI Rate-Limiting](#rate-limiting)                                                             |
+| `ALLOW_UNDEFINED_OPENAI_DEPLOYMENTS`| If set to `True` (default), the simulator will generate OpenAI responses for any deployment. If set to `False`, the simulator will only generate responses for known deployments. |
 | `AZURE_OPENAI_ENDPOINT`         | The endpoint for the Azure OpenAI service, e.g. `https://mysvc.openai.azure.com/`. Used when forwarding requests.                                                                 |
 | `AZURE_OPENAI_KEY`              | The API key for the Azure OpenAI service. Used when forwarding requests                                                                                                           |
 | `LOG_LEVEL`                     | The log level for the simulator. Defaults to `INFO`.                                                                                                                              |

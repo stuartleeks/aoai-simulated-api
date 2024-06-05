@@ -16,7 +16,7 @@
 
 POST {{aoai_endpoint}}openai/deployments/{{aoai_deployment}}/completions?api-version=2023-05-15
 Content-Type: application/json
-api-key: {{aoai_key}}xx
+api-key: {{aoai_key}}
 
 {
   "model": "gpt-5-turbo-1",

@@ -1,6 +1,7 @@
 # This file is an example of how you can define your generators
 # Generators can be sync or async methods
 
+import json
 
 from aoai_simulated_api.auth import validate_api_key_header
 from aoai_simulated_api.models import Config, RequestContext
@@ -49,6 +50,14 @@ async def custom_azure_openai_chat_completion(context: RequestContext) -> Respon
     request_body = await request.json()
     deployment_name = path_params["deployment"]
     model_name = get_model_name_from_deployment_name(context, deployment_name)
+    if model_name is None:
+        return Response(
+            status_code=404,
+            content=json.dumps({"error": f"Deployment {deployment_name} not found"}),
+            headers={
+                "Content-Type": "application/json",
+            },
+        )
     messages = request_body["messages"]
 
     # Here we fix the max_tokens 10 and set the finish_reason to "stop".
