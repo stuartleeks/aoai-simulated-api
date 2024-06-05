@@ -43,20 +43,37 @@ default_embedding_size = (
 )
 
 
-def get_model_name_from_deployment_name(context: RequestContext, deployment_name: str) -> str:
+def get_model_name_from_deployment_name(context: RequestContext, deployment_name: str) -> str | None:
+    """
+    Gets the model name for the specified deployment.
+    If the deployment is not in the configured deployments then either a default model is returned (if )
+    """
     deployments = context.config.openai_deployments
     if deployments:
         deployment = deployments.get(deployment_name)
         if deployment:
             return deployment.model
 
-    default_model = "gpt-3.5-turbo-0613"
+    if context.config.allow_undefined_openai_deployments:
+        default_model = "gpt-3.5-turbo-0613"
 
-    # Output warning for missing deployment name (only the first time we encounter it)
-    if deployment_name not in missing_deployment_names:
-        missing_deployment_names.add(deployment_name)
-        logger.warning("Deployment %s not found in config, using default model %s", deployment_name, default_model)
-    return default_model
+        # Output warning for missing deployment name (only the first time we encounter it)
+        if deployment_name not in missing_deployment_names:
+            missing_deployment_names.add(deployment_name)
+            logger.warning(
+                "Deployment %s not found in config and allow_undefined_openai_deployments is True. Using default model %s",
+                deployment_name,
+                default_model,
+            )
+        return default_model
+    else:
+        # Output warning for missing deployment name (only the first time we encounter it)
+        if deployment_name not in missing_deployment_names:
+            missing_deployment_names.add(deployment_name)
+            logger.warning(
+                "Deployment %s not found in config and allow_undefined_openai_deployments is False", deployment_name
+            )
+        return None
 
 
 async def calculate_latency(context: RequestContext, status_code: int):
@@ -399,6 +416,14 @@ async def azure_openai_embedding(context: RequestContext) -> Response | None:
     deployment_name = path_params["deployment"]
     request_body = await request.json()
     model_name = get_model_name_from_deployment_name(context, deployment_name)
+    if model_name is None:
+        return Response(
+            status_code=404,
+            content=json.dumps({"error": f"Deployment {deployment_name} not found"}),
+            headers={
+                "Content-Type": "application/json",
+            },
+        )
     request_input = request_body["input"]
 
     # calculate a simulated latency and store in context.values
@@ -424,6 +449,14 @@ async def azure_openai_completion(context: RequestContext) -> Response | None:
 
     deployment_name = path_params["deployment"]
     model_name = get_model_name_from_deployment_name(context, deployment_name)
+    if model_name is None:
+        return Response(
+            status_code=404,
+            content=json.dumps({"error": f"Deployment {deployment_name} not found"}),
+            headers={
+                "Content-Type": "application/json",
+            },
+        )
     request_body = await request.json()
     prompt_tokens = num_tokens_from_string(request_body["prompt"], model_name)
 
@@ -454,6 +487,14 @@ async def azure_openai_chat_completion(context: RequestContext) -> Response | No
     request_body = await request.json()
     deployment_name = path_params["deployment"]
     model_name = get_model_name_from_deployment_name(context, deployment_name)
+    if model_name is None:
+        return Response(
+            status_code=404,
+            content=json.dumps({"error": f"Deployment {deployment_name} not found"}),
+            headers={
+                "Content-Type": "application/json",
+            },
+        )
     messages = request_body["messages"]
     prompt_tokens = num_tokens_from_messages(messages, model_name)
 

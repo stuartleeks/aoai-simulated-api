@@ -19,6 +19,9 @@ def get_config_from_env_vars(logger: logging.Logger) -> Config:
 
     config.recording.forwarders = get_default_forwarders()
     config.openai_deployments = _load_openai_deployments(logger)
+    if not config.openai_deployments:
+        logger.info("OpenAI deployments not set - using default OpenAI deployments")
+        config.openai_deployments = _default_openai_deployments()
 
     initialize_config(config)
     return config
@@ -55,6 +58,37 @@ def _load_openai_deployments(logger: logging.Logger) -> dict[str, OpenAIDeployme
             tokens_per_minute=deployment["tokensPerMinute"],
         )
     return deployments
+
+
+def _default_openai_deployments() -> dict[str, OpenAIDeployment]:
+    # Default set of OpenAI deployment configurations for when none are provided
+    return {
+        "embedding": OpenAIDeployment(name="embedding", model="text-embedding-ada-002", tokens_per_minute=10000),
+        "gpt-35-turbo-1k-token": OpenAIDeployment(
+            name="gpt-35-turbo-1k-token", model="gpt-3.5-turbo", tokens_per_minute=1000
+        ),
+        "gpt-35-turbo-2k-token": OpenAIDeployment(
+            name="gpt-35-turbo-2k-token", model="gpt-3.5-turbo", tokens_per_minute=2000
+        ),
+        "gpt-35-turbo-5k-token": OpenAIDeployment(
+            name="gpt-35-turbo-5k-token", model="gpt-3.5-turbo", tokens_per_minute=5000
+        ),
+        "gpt-35-turbo-10k-token": OpenAIDeployment(
+            name="gpt-35-turbo-10k-token", model="gpt-3.5-turbo", tokens_per_minute=10000
+        ),
+        "gpt-35-turbo-20k-token": OpenAIDeployment(
+            name="gpt-35-turbo-20k-token", model="gpt-3.5-turbo", tokens_per_minute=20000
+        ),
+        "gpt-35-turbo-50k-token": OpenAIDeployment(
+            name="gpt-35-turbo-50k-token", model="gpt-3.5-turbo", tokens_per_minute=50000
+        ),
+        "gpt-35-turbo-100k-token": OpenAIDeployment(
+            name="gpt-35-turbo-100k-token", model="gpt-3.5-turbo", tokens_per_minute=100000
+        ),
+        "gpt-35-turbo-100m-token": OpenAIDeployment(
+            name="gpt-35-turbo-100m-token", model="gpt-3.5-turbo", tokens_per_minute=100000000
+        ),
+    }
 
 
 def load_extension(config: Config):

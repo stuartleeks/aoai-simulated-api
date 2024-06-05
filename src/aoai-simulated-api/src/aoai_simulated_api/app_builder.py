@@ -29,11 +29,11 @@ def apply_config():
     record_replay_handler = None
 
     logger.info("🚀 Starting aoai-simulated-api in %s mode", get_config().simulator_mode)
-    logger.info("🗝️ Simulator api-key        : %s", get_config().simulator_api_key)
+    logger.info("🗝️ Simulator api-key                       : %s", get_config().simulator_api_key)
 
     if get_config().simulator_mode in ["record", "replay"]:
-        logger.info("📼 Recording directory      : %s", get_config().recording.dir)
-        logger.info("📼 Recording auto-save      : %s", get_config().recording.autosave)
+        logger.info("📼 Recording directory                     : %s", get_config().recording.dir)
+        logger.info("📼 Recording auto-save                     : %s", get_config().recording.autosave)
         persister = YamlRecordingPersister(get_config().recording.dir)
 
         record_replay_handler = RecordReplayHandler(
@@ -42,8 +42,10 @@ def apply_config():
             forwarders=get_config().recording.forwarders,
             autosave=get_config().recording.autosave,
         )
+    else:
+        logger.info("📝 allow_undefined_openai_deployments      : %s", get_config().allow_undefined_openai_deployments)
 
-    logger.info("📝 Using OpenAI deployments: %s", get_config().openai_deployments)
+    logger.info("📝 Using OpenAI deployments                : %s", get_config().openai_deployments)
 
 
 def _default_validate_api_key_header(request: Request):
@@ -104,7 +106,7 @@ def config_patch(config: dict, _: Annotated[bool, Depends(_default_validate_api_
 
     # Config is a nested settings class to enable setting env var names on child items
     # As a result we need to update each level independently
-    root_dict = {k: v for k, v in config.items() if k in ["simulator_mode"]}
+    root_dict = {k: v for k, v in config.items() if k in ["simulator_mode", "allow_undefined_openai_deployments"]}
     new_config = original_config.model_copy(update=root_dict)
     if "latency" in config:
         if "open_ai_completions" in config["latency"]:
@@ -149,7 +151,8 @@ async def catchall(request: Request):
                 return Response(status_code=500)
 
             # Apply limits here so that that they apply to record/replay as well as generate
-            response = apply_limits(context, response)
+            if response.status_code < 300:
+                response = apply_limits(context, response)
 
             # pass the response to the latency generator
             # so that it can determine the latency to add

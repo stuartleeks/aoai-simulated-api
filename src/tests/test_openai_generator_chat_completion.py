@@ -11,7 +11,7 @@ from aoai_simulated_api.models import (
     OpenAIDeployment,
 )
 from aoai_simulated_api.generator.manager import get_default_generators
-from openai import AzureOpenAI, AuthenticationError, RateLimitError, Stream
+from openai import AzureOpenAI, AuthenticationError, NotFoundError, RateLimitError, Stream
 from openai.types.chat import ChatCompletionChunk
 import pytest
 
@@ -46,54 +46,7 @@ def _get_generator_config(extension_path: str | None = None) -> Config:
 
 
 @pytest.mark.asyncio
-async def test_openai_generator_completion_requires_auth():
-    """
-    Ensure we need the right API key to call the completion endpoint
-    """
-    config = _get_generator_config()
-    server = UvicornTestServer(config)
-    with server.run_in_thread():
-        aoai_client = AzureOpenAI(
-            api_key="wrong_key",
-            api_version="2023-12-01-preview",
-            azure_endpoint="http://localhost:8001",
-            max_retries=0,
-        )
-        prompt = "This is a test prompt"
-
-        try:
-            aoai_client.completions.create(model="deployment1", prompt=prompt, max_tokens=50)
-            assert False, "Expected an exception"
-        except AuthenticationError as e:
-            assert e.status_code == 401
-            assert e.message == "Error code: 401 - {'detail': 'Missing or incorrect API Key'}"
-
-
-@pytest.mark.asyncio
-async def test_openai_generator_completion_success():
-    """
-    Ensure we can call the completion endpoint using the generator
-    """
-    config = _get_generator_config()
-    server = UvicornTestServer(config)
-    with server.run_in_thread():
-        aoai_client = AzureOpenAI(
-            api_key=API_KEY,
-            api_version="2023-12-01-preview",
-            azure_endpoint="http://localhost:8001",
-            max_retries=0,
-        )
-        prompt = "This is a test prompt"
-        max_tokens = 50
-        response = aoai_client.completions.create(model="deployment1", prompt=prompt, max_tokens=max_tokens)
-
-        assert len(response.choices) == 1
-        assert len(response.choices[0].text) > 50
-        assert response.usage.completion_tokens <= max_tokens
-
-
-@pytest.mark.asyncio
-async def test_openai_generator_chat_completion_requires_auth():
+async def test_requires_auth():
     """
     Ensure we need the right API key to call the chat completion endpoint
     """
@@ -117,7 +70,7 @@ async def test_openai_generator_chat_completion_requires_auth():
 
 
 @pytest.mark.asyncio
-async def test_openai_generator_chat_completion_success():
+async def test_success():
     """
     Ensure we can call the chat completion endpoint using the generator
     """
@@ -142,7 +95,56 @@ async def test_openai_generator_chat_completion_success():
 
 
 @pytest.mark.asyncio
-async def test_openai_generator_chat_completion_max_tokens():
+async def test_requires_known_deployment_when_config_set():
+    """
+    Test that the generator requires a known deployment when the ALLOW_UNDEFINED_OPENAI_DEPLOYMENTS config is set to False
+    """
+    config = _get_generator_config()
+    config.allow_undefined_openai_deployments = False
+    server = UvicornTestServer(config)
+    with server.run_in_thread():
+        aoai_client = AzureOpenAI(
+            api_key=API_KEY,
+            api_version="2023-12-01-preview",
+            azure_endpoint="http://localhost:8001",
+            max_retries=0,
+        )
+        messages = [{"role": "user", "content": "What is the meaning of life?"}]
+        max_tokens = 50
+        try:
+            aoai_client.chat.completions.create(model="_unknown_deployment_", messages=messages, max_tokens=max_tokens)
+            assert False, "Expected 404 error"
+        except NotFoundError as e:
+            assert e.status_code == 404
+            assert e.message == "Error code: 404 - {'error': 'Deployment _unknown_deployment_ not found'}"
+
+
+@pytest.mark.asyncio
+async def test_allows_unknown_deployment_when_config_not_set():
+    """
+    Test that the generator allows an unknown deployment when the ALLOW_UNDEFINED_OPENAI_DEPLOYMENTS config is set to True
+    """
+    config = _get_generator_config()
+    config.allow_undefined_openai_deployments = True
+    server = UvicornTestServer(config)
+    with server.run_in_thread():
+        aoai_client = AzureOpenAI(
+            api_key=API_KEY,
+            api_version="2023-12-01-preview",
+            azure_endpoint="http://localhost:8001",
+            max_retries=0,
+        )
+        messages = [{"role": "user", "content": "What is the meaning of life?"}]
+        max_tokens = 50
+        response = aoai_client.chat.completions.create(
+            model="_unknown_deployment_", messages=messages, max_tokens=max_tokens
+        )
+
+        assert len(response.choices) == 1
+
+
+@pytest.mark.asyncio
+async def test_max_tokens():
     """
     Ensure we can call the chat completion endpoint using the generator
     """
@@ -167,7 +169,7 @@ async def test_openai_generator_chat_completion_max_tokens():
 
 
 @pytest.mark.asyncio
-async def test_openai_generator_chat_completion_stream_success():
+async def test_stream_success():
     """
     Ensure we can call the chat completion endpoint using the generator with a streamed response
     """
@@ -200,54 +202,7 @@ async def test_openai_generator_chat_completion_stream_success():
 
 
 @pytest.mark.asyncio
-async def test_openai_generator_embeddings_requires_auth():
-    """
-    Ensure we need the right API key to call the embeddings endpoint
-    """
-    config = _get_generator_config()
-    server = UvicornTestServer(config)
-    with server.run_in_thread():
-        aoai_client = AzureOpenAI(
-            api_key="wrong_key",
-            api_version="2023-12-01-preview",
-            azure_endpoint="http://localhost:8001",
-            max_retries=0,
-        )
-        content = "This is some text to generate embeddings for"
-
-        try:
-            aoai_client.embeddings.create(model="deployment1", input=content)
-            assert False, "Expected an exception"
-        except AuthenticationError as e:
-            assert e.status_code == 401
-            assert e.message == "Error code: 401 - {'detail': 'Missing or incorrect API Key'}"
-
-
-@pytest.mark.asyncio
-async def test_openai_generator_embeddings_success():
-    """
-    Ensure we can call the embeddings endpoint using the generator
-    """
-    config = _get_generator_config()
-    server = UvicornTestServer(config)
-    with server.run_in_thread():
-        aoai_client = AzureOpenAI(
-            api_key=API_KEY,
-            api_version="2023-12-01-preview",
-            azure_endpoint="http://localhost:8001",
-            max_retries=0,
-        )
-        content = "This is some text to generate embeddings for"
-        response = aoai_client.embeddings.create(model="deployment1", input=content)
-
-        assert len(response.data) == 1
-        assert response.data[0].object == "embedding"
-        assert response.data[0].index == 0
-        assert len(response.data[0].embedding) == 1536
-
-
-@pytest.mark.asyncio
-async def test_openai_generator_chat_completion_with_custom_generator():
+async def test_custom_generator():
     """
     Ensure we can call the chat completion endpoint using a generator from an extension
     """
@@ -268,39 +223,3 @@ async def test_openai_generator_chat_completion_with_custom_generator():
         assert response.choices[0].message.role == "assistant"
         assert response.usage.completion_tokens <= 10, "Custom generator hard-codes max_tokens to 10"
         assert response.choices[0].finish_reason == "stop"
-
-
-@pytest.mark.asyncio
-async def test_openai_generator_embeddings_limit_reached():
-    """
-    Ensure we can call the chat completions endpoint multiple times using the generator to trigger rate-limiting
-    """
-    config = _get_generator_config()
-    server = UvicornTestServer(config)
-    with server.run_in_thread():
-        aoai_client = AzureOpenAI(
-            api_key=API_KEY,
-            api_version="2023-12-01-preview",
-            azure_endpoint="http://localhost:8001",
-            max_retries=0,
-        )
-        messages = [{"role": "user", "content": "What is the meaning of life?"}]
-        response = aoai_client.chat.completions.create(model="low_limit", messages=messages, max_tokens=50)
-
-        assert len(response.choices) == 1
-        assert response.choices[0].message.role == "assistant"
-        assert len(response.choices[0].message.content) > 20
-        assert response.choices[0].finish_reason == "length"
-
-        # The total token count for the request is roughly 60 tokens
-        # "low_limit" deployment has a rate limit of 600 tokens per minute
-        # Which is 100 every 10s, so our second request should trigger the rate-limiting
-        try:
-            aoai_client.chat.completions.create(model="low_limit", messages=messages, max_tokens=50)
-            assert False, "Expect to be rate-limited"
-        except RateLimitError as e:
-            assert e.status_code == 429
-            assert (
-                e.message
-                == "Error code: 429 - {'error': {'code': '429', 'message': 'Requests to the OpenAI API Simulator have exceeded call rate limit. Please retry after 10 seconds.'}}"
-            )
