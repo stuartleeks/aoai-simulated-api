@@ -14,7 +14,7 @@ if [[ ! -f "$script_dir/../infra/output.json" ]]; then
   exit 1
 fi
 
-api_fqdn=$(cat $script_dir/../infra/output.json  | jq -r .apiSimFqdn)
+api_fqdn=$(jq -r .apiSimFqdn)
 if [[ -z "$api_fqdn" ]]; then
   echo "API endpoint (apiSimFqdn) not found in output.json"
   exit 1
@@ -22,4 +22,4 @@ fi
 
 echo "== Running test-client against simulator at https://$api_fqdn"
 cd src/test-client
-AZURE_OPENAI_KEY=${SIMULATOR_API_KEY} AZURE_OPENAI_ENDPOINT=https://$api_fqdn AZURE_FORM_RECOGNIZER_ENDPOINT=https://$api_fqdn python app.py
+AZURE_OPENAI_KEY="${SIMULATOR_API_KEY}" AZURE_OPENAI_ENDPOINT="https://$api_fqdn" AZURE_FORM_RECOGNIZER_ENDPOINT="https://$api_fqdn" python app.py

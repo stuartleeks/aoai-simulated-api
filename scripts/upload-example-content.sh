@@ -20,13 +20,13 @@ if [[ ! -f "$script_dir/../infra/output.json" ]]; then
   exit 1
 fi
 
-storage_account_name=$(cat $script_dir/../infra/output.json  | jq -r .storageAccountName)
+storage_account_name=$(jq -r .storageAccountName)
 if [[ -z "$storage_account_name" ]]; then
   echo "Storage account name (storageAccountName) not found in output.json"
   exit 1
 fi
 
-file_share_name=$(cat $script_dir/../infra/output.json  | jq -r .fileShareName)
+file_share_name=$(jq -r .fileShareName < "$script_dir/../infra/output.json")
 if [[ -z "$file_share_name" ]]; then
   echo "File share name (fileShareName) not found in output.json"
   exit 1
