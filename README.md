@@ -8,25 +8,10 @@ This repo is an exploration into creating a simulated API implementation for Azu
   - [Getting Started](#getting-started)
   - [Running in Docker](#running-in-docker)
   - [Deploying to Azure Container Apps](#deploying-to-azure-container-apps)
-  - [Extending the simulator](#extending-the-simulator)
-    - [Running with an extension](#running-with-an-extension)
-    - [Creating a custom forwarder extension](#creating-a-custom-forwarder-extension)
-    - [Creating a custom generator extension](#creating-a-custom-generator-extension)
-    - [Document Intelligence extensions](#document-intelligence-extensions)
-      - [Document Intelligence forwarder](#document-intelligence-forwarder)
-      - [Document Intelligence generator](#document-intelligence-generator)
-  - [Large recordings](#large-recordings)
-  - [Latency](#latency)
-  - [Rate Limiting](#rate-limiting)
-    - [OpenAI Rate Limiting](#openai-rate-limiting)
-    - [Customising rate limiting](#customising-rate-limiting)
-  - [Config Endpoint](#config-endpoint)
-  - [Current Status/Notes](#current-statusnotes)
-    - [Replay Exploration](#replay-exploration)
-    - [Using the simulator with restricted network access](#using-the-simulator-with-restricted-network-access)
-      - [Unrestricted Network Access](#unrestricted-network-access)
-      - [Semi-Restricted Network Access](#semi-restricted-network-access)
-      - [Restricted Network Access](#restricted-network-access)
+  - [Using the simulator with restricted network access](#using-the-simulator-with-restricted-network-access)
+    - [Unrestricted Network Access](#unrestricted-network-access)
+    - [Semi-Restricted Network Access](#semi-restricted-network-access)
+    - [Restricted Network Access](#restricted-network-access)
   - [Changelog](#changelog)
 
 ## What is the OpenAI Simulated API?
@@ -43,53 +28,16 @@ With record/replay, the API can be run in record mode to act as a proxy between 
 
 The simulated API can also be run in generator mode, where responses are generated on the fly. This is useful for load testing scenarios where it would be costly/impractical to record the full set of responses.
 
-The default generator is a simple example 
+
+There are a range of [configuration options](./docs/config.md) that can be applied to control the simulator behavior.
+
+The simulated API supports [extensions](./docs/extensions.md) that allow you to customise the behaviour of the API. Extensions can be used to modify the request/response, add latency, or even generate responses.
 
 ## Getting Started
 
 This repo is configured with a Visual Studio Code [dev container](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers) that sets up a Python environment ready to work in.
 
 After cloning the repo, install dependencies using `make install-requirements`.
-
-When running the simulated API, there are a number of environment variables to configure:
-
-| Variable                        | Description                                                                                                                                                                       |
-| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `SIMULATOR_MODE`                | The mode the simulator should run in. Current options are `record`, `replay`, and `generate`.                                                                                     |
-| `SIMULATOR_API_KEY`             | The API key used by the simulator to authenticate requests. If not specified a key is auto-generated (see the logs). It is recommended to set a deterministic key value in `.env` |
-| `RECORDING_DIR`                 | The directory to store the recorded requests and responses (defaults to `.recording`).                                                                                            |
-| `RECORDING_AUTOSAVE`            | If set to `True` (default), the simulator will save the recording after each request.                                                                                             |
-| `EXTENSION_PATH`                | The path to a Python file that contains the extension configuration. This can be a single python file or a package folder - see `src/examples`                                    |
-| `AZURE_OPENAI_ENDPOINT`         | The endpoint for the Azure OpenAI service, e.g. `https://mysvc.openai.azure.com/`                                                                                                 |
-| `AZURE_OPENAI_KEY`              | The API key for the Azure OpenAI service.                                                                                                                                         |
-| `OPENAI_DEPLOYMENT_CONFIG_PATH` | The path to a JSON file that contains the deployment configuration. See [OpenAI Rate-Limiting](#openai-rate-limiting)                                                             |
-| `AZURE_OPENAI_DEPLOYMENT`       | Used by the test app to set the name of the deployed model in your Azure OpenAI service. Use a gpt-35-turbo-instruct deployment.                                                  |
-| `LOG_LEVEL`                     | The log level for the simulator. Defaults to `INFO`.                                                                                                                              |
-| `LATENCY_OPENAI_*`              | The latency to add to the OpenAI service when using generated output. See [Latency](#latency) for more details.                                                                   |
-
-The examples below show passing environment variables to the API directly on the command line, but you can also set them via a `.env` file in the root directory for convenience (see the `sample.env` for a starting point).
-The `.http` files for testing the endpoints also use the `.env` file to set the environment variables for calling the API.
-
-> Note: when running the simulator it will auto-generate an API. This needs to be passed to the API when making requests. To avoid the API Key changing each time the simulator is run, set the `SIMULATOR_API_KEY` environment variable to a fixed value.
-
-To run the simulated API, run `make run-simulated-api` from the repo root directory using the environment variables above to configure.
-
-For example, to use the API in record/replay mode:
-
-```bash
-# Run the API in record mode
-SIMULATOR_MODE=record AZURE_OPENAI_ENDPOINT=https://mysvc.openai.azure.com/ AZURE_OPENAI_KEY=your-api-key make run-simulated-api
-
-# Run the API in replay mode
-SIMULATOR_MODE=replay make run-simulated-api
-```
-
-To run the API in generator mode, you can set the `SIMULATOR_MODE` environment variable to `generate` and run the API as above.
-
-```bash
-# Run the API in generator mode
-SIMULATOR_MODE=generate make run-simulated-api
-```
 
 ## Running in Docker
 
@@ -114,277 +62,8 @@ If no value is specified for `RECORDING_DIR`, the simulator will use `/mnt/simul
 
 The file share can also be used for setting the OpenAI deployment configuration or for any forwarder/generator config.
 
-## Extending the simulator
 
-The simulator allows extending some aspects of the behavior without modifying the original source code.
-
-An extension can be either a single python file or a package folder.
-The extension should contain an `initialize` method that receives the simulator configuration and can modify it.
-
-The `initialize` method in an extension is psased the simulator configuration object.
-Through this an extension can add/remove forwarders, generators, and limiters, as well as modifying other aspects of the configuration.
-
-NOTE: the `initialize` method may be called multiple times, so ensure that any configuration changes are idempotent.
-
-### Running with an extension
-
-To run with an extension,  set the `EXTENSION_PATH` environment variable:
-
-```bash
-SIMULATOR_MODE=record EXTENSION_PATH=/path/to/extension.py make run-simulated-api
-```
-
-Or via Docker:
-
-```bash
-docker run -p 8000:8000 -e SIMULATOR_MODE=record -e EXTENSION_PATH=/mnt/extension.py -v /path/to/extension.py:/mnt/extension.py
-```
-
-### Creating a custom forwarder extension
-
-When running in `record` mode, the simulator forwards requests on to a backend API and records the request/response information for later replay.
-
-The default implementation uses the `AZURE_OPENAI_ENDPOINT` and `AZURE_OPENAI_KEY` environment variables to forward requests on to Azure OpenAI.
-
-To forward requests on to a different backend API, you can create a custom forwarder extension.
-
-An extension needs to have an `initialize` method as shown below:
-
-```python
-from typing import Callable
-from fastapi import Request
-import requests
-
-from aoai_simulated_api.auth import validate_api_key_header
-from aoai_simulated_api.models import Config, RequestContext
-
-async def forward_to_my_host(context: RequestContext) -> Response | None:
-    # Determine whether the request matches your forwarder
-    request = context.request
-    if not request.url.path.startswith("/your-base-path/"):
-        # not for us!
-        return None
-
-    # This is an example of how you can use the validate_api_key_header function
-    # This validates the "ocp-apim-subscription-key" header in the request against the configured API key
-    validate_api_key_header(
-        request=request, header_name="x-api-key", allowed_key_value=context.config.simulator_api_key
-    )
-
-    # build up the forwarded request from the incoming request
-    # you may need to modify the headers or other properties
-    url = "<build up target url>"
-    body = await request.body()
-    response = requests.request(
-        request.method,
-        url,
-        headers=request.headers,
-        data=body,
-    )
-    return response
-
-def initialize(config: Config):
-    # initialize is the entry point invoked by the simulator
-    # here we append the custom forwarder to the list of forwarders
-    config.recording.forwarders.append(forward_to_my_host)
-```
-
-The `initialize` method receives the simulator config and can manipulate it to change the simulator behavior.
-
-The `config.recording.forwarders` property is a list of functions that are called in order to forward requests on to the backend API.
-Each function can by sync or async and can return a number of options:
-
-- A `Response` object from the `fastapi` package
-- A `Response` object from the `requests` package
-- A `dict` object (see below for details)
-- `None`
-
-If a forwarding function returns a `Response` object then that response is used as the response for the request and is added to the recording.
-
-If a forwarding function returns a `dict` object, it should contain a `response` property and a `persist` property.
-The `response` can be from either `fastapi` or `requests`. The `persist` value is a boolean indicating whether the request/response should be persisted.
-This can be useful if you are forwarding to an API that uses the [async pattern](https://learn.microsoft.com/en-us/azure/architecture/patterns/async-request-reply) as you can skip recording the intermediate responses while polling for completion and only save the final response with the completed value.
-
-If a forwarding function returns `None` then the next forwarding function is called.
-This can be useful if you need to be able to forward to multiple back-end APIs you can include logic in each forwarding function to determine whether it should take actions.
-
-```python
-async def forward_to_my_host(request: Request) -> Response | None:
-    if not request.url.path.startswith("/my-api/"):
-        # assume not a request this forwarder can handle
-        # return None to allow another forwarder to try
-        return None
-
-    # This is an example of how you can use the validate_api_key_header function
-    # This validates the "api-key" header in the request against the configured API key
-    validate_api_key_header(request=request, header_name="api-key", allowed_key_value=context.config.simulator_api_key)
-
-    # rest of the implementation here...
-```
-
-### Creating a custom generator extension
-
-If you want to add custom logic to generate responses in `generate` mode, you can create a custom generator extension.
-This allows you to replace the default lorem ipsum responses with responses that are more relevant to your scenario, or are based on the input request.
-
-An extension needs to have an `initialize` method as shown below:
-
-```python
-from aoai_simulated_api.models import Config, RequestContext
-from fastapi import Response
-
-def initialize(config: Config):
-    # initialize is the entry point invoked by the simulator
-    # here we append the custom generator to the list of generators
-    config.generators.append(generate_echo_response)
-
-async def generate_echo_response(context: RequestContext) -> Response | None:
-    request = context.request
-    if request.url.path != "/echo" or request.method != "POST":
-        return None
-
-    # This is an example of how you can use the validate_api_key_header function
-    # This validates the "api-key" header in the request against the configured API key
-    validate_api_key_header(request=request, header_name="api-key", allowed_key_value=context.config.simulator_api_key)
-
-    request_body = await request.body()
-    return Response(content=f"Echo: {request_body.decode("utf-8")}", status_code=200)
-```
-
-If the generator function returns a `Response` object then that response is used as the response for the request.
-If the generator function returns `None` then the next generator function is called.
-
-### Document Intelligence extensions
-
-The repo includes a couple of example extensions for Document Intelligence that are intended to server as  starter implmementations.
-
-#### Document Intelligence forwarder
-
-The document intelligence forwarder extension is in the `src/examples/forwarder_doc_intelligence` folder.
-This extension allows you to forward requests to the Document Intelligence service and record the responses for later replay. 
-
-#### Document Intelligence generator
-
-The document intelligence generator extension is in the `src/examples/generator_doc_intelligence` folder.
-The extension includes a generator and custom rate-limiter.
-
-The generator will return the right shape of response using lorem ipsum text.
-You will likely want to make some tweaks to the example generator depending on the model that you use in your application and the aspects of the response that you use in your application.
-
-Rate-limiting for Document Intelligence endpoints is a standard requests per second (RPS) limit.
-The default limit for the simulator is 15 RPS based on the default for an S0 tier service (see https://learn.microsoft.com/en-us/azure/ai-services/document-intelligence/service-limits?view=doc-intel-4.0.0).
-
-This rate-limit only applies to the request submission endpoint and not to the results endpoint.
-
-To control the rate-limiting, set the `DOC_INTELLIGENCE_RPS` environment variable to the desired RPS limit (set to a negative number to disable rate-limiting).
-
-## Large recordings
-
-By default, the simulator saves the recording file after each new recorded request in `record` mode.
-If you need to create a large recording, you may want to turn off the autosave feature to improve performance.
-
-With autosave off, you can save the recording manually by sending a `POST` request to `/++/save-recordings` to save the recordings files once you have made all the requests you want to capture. You can do this using ` curl localhost:8000/++/save-recordings -X POST`. 
-
-## Latency
-
-When running in `record` mode, the simulator captures the duration of the forwarded response.
-This is stored in the recording file and used to add latency to requests in `replay` mode.
-
-When running in `generate` mode, the simulator can add latency to the response based on the `LATENCY_OPENAI_*` environment variables.
-
-| Variable Prefix                   | Description                                                                                                                                                                        |
-| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `LATENCY_OPENAI_EMBEDDINGS`       | Speficy the latency to add to embeddings requests in milliseconds using `LATENCY_OPENAI_EMBEDDINGS_MEAN` and `LATENCY_OPENAI_EMBEDDINGS_STD_DEV`                                   |
-| `LATENCY_OPENAI_COMPLETIONS`      | Specify the latency to add to completions _per completion token_ in milliseconds using `LATENCY_OPEN_AI_COMPLETIONS_MEAN` and `LATENCY_OPEN_AI_COMPLETIONS_STD_DEV`                |
-| `LATENCY_OPENAI_CHAT_COMPLETIONS` | Specify the latency to add to chat completions _per completion token_ in milliseconds using `LATENCY_OPEN_AI_CHAT_COMPLETIONS_MEAN` and `LATENCY_OPEN_AI_CHAT_COMPLETIONS_STD_DEV` |
-
-
-The default values are:
-
-| Prefix                            | Mean | Std Dev |
-| --------------------------------- | ---- | ------- |
-| `LATENCY_OPENAI_EMBEDDINGS`       | 100  | 30      |
-| `LATENCY_OPENAI_COMPLETIONS`      | 15   | 2       |
-| `LATENCY_OPENAI_CHAT_COMPLETIONS` | 19   | 6       |
-
-## Rate Limiting
-
-### OpenAI Rate Limiting
-
-The simulator contains built-in rate limiting for OpenAI endpoints but this is still being refined.
-The current implementation is a combination of token- and request-based rate-limiting.
-
-To control the rate-limiting, set the `OPENAI_DEPLOYMENT_CONFIG_PATH` environment variable to the path to a JSON config file that defines the deployments and associated models and token limits. An example config file is shown below.
-
-```json
-{
-    "deployment1" : {
-        "model": "gpt-3.5-turbo",
-        "tokensPerMinute" : 60000
-    },
-    "gpt-35-turbo-2k-token" : {
-        "model": "gpt-3.5-turbo",
-        "tokensPerMinute" : 2000
-    },
-    "gpt-35-turbo-1k-token" : {
-        "model": "gpt-3.5-turbo",
-        "tokensPerMinute" : 1000
-    }
-}
-```
-
-### Customising rate limiting
-
-The rate limiting behaviour can be customised by extensions.
-This can be useful if you want to implement different rate limiting behaviour or if you want to add rate limiting to a custom forwarder/generator.
-
-An example of a custom generator can be found in the `src/examples/generator_doc_intelligence` folder.
-
-The simulator configuration stores a dictionary of rate limiters.
-The `RequestContext` associated with a request contains a `values` dictionary used to store information about the request.
-The value of the `Limiter` key in the `RequestContext.values` dictionary is used to look up the rate limiter in the rate limiters dictionary.
-
-
-## Config Endpoint
-
-The simulator exposes a `/++/config` endpoint that returns the current configuration of the simulator and allow the configuration to be updated dynamically.
-
-A `GET` request to this endpoint will return a JSON object with the current configuration:
-
-```json
-{"simulator_mode":"generate","latency":{"open_ai_embeddings":{"mean":100.0,"std_dev":30.0},"open_ai_completions":{"mean":15.0,"std_dev":2.0},"open_ai_chat_completions":{"mean":19.0,"std_dev":6.0}},"openai_deployments":{"deployment1":{"tokens_per_minute":60000,"model":"gpt-3.5-turbo"},"gpt-35-turbo-1k-token":{"tokens_per_minute":1000,"model":"gpt-3.5-turbo"}}}
-```
-
-A `PATCH` request can be used to update the configuration
-The body of the request should be a JSON object with the configuration values to update.
-
-For example, the following request will update the mean latency for OpenAI embeddings to 1 second (1000ms):
-
-```json
-{"latency": {"open_ai_embeddings": {"mean": 1000}}}
-```
-
-## Current Status/Notes
-
-### Replay Exploration
-
-The initial implementation of the simulator used VCR.py and was very quick to code up and had good perf for small recordings.
-
-The custom implementation loads the YAML once and then does a lookup using a dictionary based on a hash of the request data (method, URL, and body).
-This still uses the same serialisation format as VCR.py (YAML) for convenience.
-
-The custom implementation with `yaml.CLoader` is the same as the custom implementation but uses the `yaml.CLoader` to load the YAML file, which improves the load perf!
-This is the current implementation used in the project.
-
-Timings for replay exploration are below. Results are in the format `initial time (repeat time)` 
-
-| # Interactions | YAML Size | Time/request with VCR | Time/request with custom | Time/request with custom + yaml.CLoader |
-| -------------- | --------- | --------------------- | ------------------------ | --------------------------------------- |
-| 1000           | 1.4 MB    | 0.8s (0.8s)           | 3.4s (0.6s)              | 0.8s (0.6s)                             |
-| 10,000         | 14 MB     | 4s (4s)               | 25s (0.6s)               | 4s (0.6s)                               |
-| 100,000        | 140 MB    | 44s (44s)             | 4m26s (0.7s)             | 44s (0.7s)                              |
-
-### Using the simulator with restricted network access
+## Using the simulator with restricted network access
 
 During initialization, TikToken attempts to download an OpenAI encoding file from a public blob storage account managed by OpenAI. When running the simulator in an environment with restricted network access, this can cause the simulator to fail to start.  
   
@@ -395,17 +74,17 @@ The simulator supports three networking scenarios with different levels of acces
 - Restricted network access  
 
 Different build arguments can be used to build the simulator for each of these scenarios.
-#### Unrestricted Network Access  
+### Unrestricted Network Access  
   
 In this mode, the simulator operates normally, with TikToken downloading the OpenAI encoding file from OpenAI's public blob storage account. This scenario assumes that the Docker container can access the public internet during runtime.
 This is the default build mode.
   
-#### Semi-Restricted Network Access  
+### Semi-Restricted Network Access  
   
 The semi-restricted network access scenario applies when the build machine has access to the public internet but the runtime environment does not. In this scenario,
  the simulator can be built using the Docker build argument `network_type=semi-restricted`. This will download the TikToken encoding file during the Docker image build process and cache it within the Docker image. The build process will also set the required `TIKTOKEN_CACHE_DIR` environment variable to point to the cached TikToken encoding file. 
   
-#### Restricted Network Access  
+### Restricted Network Access  
 The restricted network access scenario applies when both the build machine and the runtime environment do not have access to the public internet. In this scenario, the simulator can be built using a pre-downloaded TikToken encoding file that must be included in a specific location. 
 
 This can be done by running the [setup_tiktoken.py](./scripts/setup_tiktoken.py) script. 
