@@ -14,7 +14,7 @@ if [[ ! -f "$script_dir/../infra/output.json" ]]; then
   exit 1
 fi
 
-api_fqdn=$(cat $script_dir/../infra/output.json  | jq -r .apiSimFqdn)
+api_fqdn=$(jq -r .apiSimFqdn < "$script_dir/../infra/output.json")
 if [[ -z "$api_fqdn" ]]; then
   echo "API endpoint (apiSimFqdn) not found in output.json"
   exit 1
@@ -24,6 +24,6 @@ echo "=="
 echo "== Testing API is up and running at https://$api_fqdn"
 echo "=="
 
-curl -s --max-time 30 -w "\nGot response: %{http_code}" https://$api_fqdn/ || echo -e "\nTimed out"
+curl -s --max-time 30 -w "\nGot response: %{http_code}" "https://$api_fqdn/" || echo -e "\nTimed out"
 
 echo -e "\n\n"

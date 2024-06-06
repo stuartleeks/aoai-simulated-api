@@ -16,7 +16,8 @@
 				"ms-python.black-formatter",
 				"yzhang.markdown-all-in-one",
 				"ms-python.pylint",
-				"ms-azuretools.vscode-bicep"
+				"ms-azuretools.vscode-bicep",
+				"timonwong.shellcheck"
 			]
 		}
 	},
