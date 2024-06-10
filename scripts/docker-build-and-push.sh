@@ -20,7 +20,7 @@ if [[ -z "$acr_login_server" ]]; then
   exit 1
 fi
 acr_login_server=$(jq -r .containerRegistryLoginServer < "$script_dir/../infra/output.json")
-acr_name=$(jq -r .containerRegistryName)
+acr_name=$(jq -r .containerRegistryName < "$script_dir/../infra/output.json")
 if [[ -z "$acr_name" ]]; then
   echo "Container registry name not found in output.json"
   exit 1
