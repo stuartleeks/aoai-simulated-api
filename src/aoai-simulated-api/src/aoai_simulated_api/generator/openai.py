@@ -198,21 +198,47 @@ def create_embeddings_response(
     )
 
 
+def get_lorem_factor(max_tokens: int):
+    # Use a sliding factor for the number of words to generate based on the max_tokens
+    if max_tokens > 500:
+        return 0.72
+    if max_tokens > 100:
+        return 0.6
+    return 0.5
+
+
 def generate_lorem_text(max_tokens: int, model_name: str):
     # The simplest approach to generating the compltion would
     # be to add a word at a time and count the tokens until we reach the limit
     # For large max_token values that will be slow, so we
     # estimate the number of words to generate based on the max_tokens
-    # opting to stay below the limit (based on experimentation)
-    # and then top up
-    init_word_count = int(0.5 * max_tokens)
-    text = lorem.get_word(count=init_word_count)
+    # and then measure the number of tokens in that text
+    # Then we repeat for the remaining token count
+    # (allowing for some degree of error as tokens don't exactly combine that way )
+    target = max_tokens
+    full_text = ""
+    sep = ""
+    while target > 5:
+        factor = get_lorem_factor(target)
+        init_word_count = int(factor * target)
+        text = lorem.get_word(count=init_word_count)
+        used = num_tokens_from_string(text, model_name)
+        if used > target:
+            break
+        full_text += sep + text
+        sep = " "
+        target -= used
+        target -= 2  # allow for space and error margin in token count addition
+
+    # Now top up the text to the max_tokens
+    # by adding a word at a time
     while True:
-        new_text = text + " " + lorem.get_word()
+        new_text = full_text + " " + lorem.get_word()
         if num_tokens_from_string(new_text, model_name) > max_tokens:
             break
-        text = new_text
-    return text
+        full_text = new_text
+
+    return full_text
 
 
 def create_completion_response(
