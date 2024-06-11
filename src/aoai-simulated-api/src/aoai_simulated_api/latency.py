@@ -73,26 +73,23 @@ class LatencyGenerator:
     async def apply_latency(self):
         """Apply additional latency to the request if required"""
 
-        # Only adding latency to succesful responses
         if not self.__response:
+            # if we haven't been assigned a response, skip adding latency and emitting metrics
             return
 
-        status_code = self.__response.status_code
-        if status_code >= 300:
-            return
-
+        extra_latency_s = 0
         base_end_time = time.perf_counter()
         base_duration_s = base_end_time - self.__start_time
 
         deployment_name = self.__context.values.get(constants.SIMULATOR_KEY_DEPLOYMENT_NAME)
         tokens_used = self.__context.values.get(constants.SIMULATOR_KEY_OPENAI_TOTAL_TOKENS)
 
-        target_duration_ms = self.__context.values.get(constants.TARGET_DURATION_MS, None)
-        if not target_duration_ms:
-            return
-
-        target_duration_s = target_duration_ms / 1000
-        extra_latency_s = target_duration_s - base_duration_s
+        status_code = self.__response.status_code
+        if status_code < 300:
+            target_duration_ms = self.__context.values.get(constants.TARGET_DURATION_MS, None)
+            if target_duration_ms:
+                target_duration_s = target_duration_ms / 1000
+                extra_latency_s = target_duration_s - base_duration_s
 
         if extra_latency_s and extra_latency_s > 0:
             current_span = trace.get_current_span()

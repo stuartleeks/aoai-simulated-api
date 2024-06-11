@@ -46,6 +46,7 @@ def apply_config():
         logger.info("📝 allow_undefined_openai_deployments      : %s", get_config().allow_undefined_openai_deployments)
 
     logger.info("📝 Using OpenAI deployments                : %s", get_config().openai_deployments)
+    logger.info("📝 Using latencies                         : %s", get_config().latency)
 
 
 def _default_validate_api_key_header(request: Request):
