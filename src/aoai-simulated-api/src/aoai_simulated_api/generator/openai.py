@@ -3,9 +3,11 @@ import json
 import logging
 import time
 import random
+from typing import Tuple
 
 import lorem
 import nanoid
+
 
 from fastapi import Response
 from fastapi.responses import StreamingResponse
@@ -207,7 +209,67 @@ def get_lorem_factor(max_tokens: int):
     return 0.5
 
 
+class LoremReference:
+    """
+    Generating large amounts of lorem text can be slow, so we pre-generate a set of reference values.
+    These are then combined to generate the required amount of text for API requests
+    """
+
+    model_name: str
+    values: dict[int, list[str]]
+    token_sizes: list[int]
+
+    def __init__(self, model_name: str, reference_values: dict[int, list[str]]):
+        self.model_name = model_name
+        self.values = reference_values
+        self.token_sizes = sorted(reference_values.keys(), reverse=True)
+
+    def get_value_for_size(self, size: int) -> Tuple[str, int] | None:
+        for token_size in self.token_sizes:
+            if token_size <= size:
+                values = self.values[token_size]
+                value = random.choice(values)
+                return (value, token_size)
+        return None
+
+
+lorem_reference_values: dict[str, LoremReference] = {}
+
+
+def generate_lorem_reference_text_values(token_values: list[int], model_name: str):
+    value_count = 5  # number of reference values of each size to generate
+    values = {}
+    for max_tokens in token_values:
+        generated_texts = [raw_generate_lorem_text(max_tokens, model_name) for _ in range(value_count)]
+        values[max_tokens] = generated_texts
+    return LoremReference(model_name, values)
+
+
 def generate_lorem_text(max_tokens: int, model_name: str):
+    text = ""
+    target = max_tokens
+
+    if model_name not in lorem_reference_values:
+        logger.info("Generating lorem reference values for model %s...", model_name)
+        start_time = time.perf_counter()
+        lorem_reference_values[model_name] = generate_lorem_reference_text_values(
+            [2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 4000], model_name
+        )
+        duration = time.perf_counter() - start_time
+        logger.info("Generated lorem reference values for model %s (took %ss)", model_name, duration)
+    reference_values = lorem_reference_values[model_name]
+
+    while target > 0:
+        value = reference_values.get_value_for_size(target)
+        if value is None:
+            break
+        new_text, size = value
+        text += " " + new_text
+        target -= size
+    return text
+
+
+def raw_generate_lorem_text(max_tokens: int, model_name: str) -> str:
     # The simplest approach to generating the compltion would
     # be to add a word at a time and count the tokens until we reach the limit
     # For large max_token values that will be slow, so we

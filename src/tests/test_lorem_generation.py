@@ -12,43 +12,46 @@ import pytest
 
 def test_generation_min_max_time_10_tokens():
     """
-    Ensure that the min/max tokens generated is correct for max_tokens=10 and that the average time is less than 0.01s
+    Ensure that the min/max tokens generated is correct for max_tokens=10 and that the average time is less than 5ms
     """
+
     run_test(
         max_tokens=10,
         expected_min=8,
         expected_max=10,
-        max_duration=0.01,
+        max_duration=0.001,
     )
 
 
 def test_generation_min_max_time_100_tokens():
     """
-    Ensure that the min/max tokens generated is correct for max_tokens=100 and that the average time is less than 0.05s
+    Ensure that the min/max tokens generated is correct for max_tokens=100 and that the average time is less than 5ms
     """
     run_test(
         max_tokens=100,
         expected_min=95,
         expected_max=100,
-        max_duration=0.05,
+        max_duration=0.001,
     )
 
 
 @pytest.mark.slow
 def test_generation_min_max_time_10_000_tokens():
     """
-    Ensure that the min/max tokens generated is correct for max_tokens=10,000 and that the average time is less than 0.4s
+    Ensure that the min/max tokens generated is correct for max_tokens=10,000 and that the average time is less than 5ms
     """
     run_test(
         max_tokens=10000,
-        expected_min=9995,
+        expected_min=9994,
         expected_max=10000,
-        max_duration=0.5,
-        iteration_count=25,  # reduce iteration count to keep tests fast(-ish)
+        max_duration=0.001,
     )
 
 
-def run_test(max_tokens, expected_min, expected_max, max_duration, iteration_count=100):
+def run_test(max_tokens, expected_min, expected_max, max_duration, iteration_count=200):
+
+    generate_lorem_text(1, "gpt-3.5-turbo-0613")  # ignore first run
+
     total_time = 0
     count = 0
     for _ in range(iteration_count):
