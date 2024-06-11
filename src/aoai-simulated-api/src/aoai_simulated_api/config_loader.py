@@ -6,7 +6,7 @@ import os
 import sys
 
 from aoai_simulated_api.limiters import get_default_limiters
-from aoai_simulated_api.models import Config, OpenAIDeployment
+from aoai_simulated_api.models import Config, OpenAIDeployment, OpenAIEmbeddingDeployment
 from aoai_simulated_api.record_replay.handler import get_default_forwarders
 from aoai_simulated_api.generator.manager import get_default_generators
 
@@ -16,12 +16,21 @@ def get_config_from_env_vars(logger: logging.Logger) -> Config:
     Load configuration from environment variables
     """
     config = Config(generators=get_default_generators())
-
     config.recording.forwarders = get_default_forwarders()
     config.openai_deployments = _load_openai_deployments(logger)
+    config.openai_embedding_deployments = \
+        _load_openai_embedding_deployments(logger)
+
     if not config.openai_deployments:
         logger.info("OpenAI deployments not set - using default OpenAI deployments")
         config.openai_deployments = _default_openai_deployments()
+
+    # If there are no OpenAI embedding deployments, use the default model
+    if not config.openai_embedding_deployments:
+        logger.info("OpenAI embedding deployments not set - "
+                    "using default OpenAI embedding deployments")
+        config.openai_embedding_deployments = \
+            _default_openai_embedding_deployments()
 
     initialize_config(config)
     return config
@@ -59,6 +68,53 @@ def _load_openai_deployments(logger: logging.Logger) -> dict[str, OpenAIDeployme
         )
     return deployments
 
+def _load_openai_embedding_deployments(logger: logging.Logger) -> dict[str, OpenAIDeployment]:
+    """
+    Load OpenAI deployment configurations from json file at location
+    specified by OPENAI_EMBEDDING_DEPLOYMENT_CONFIG_PATH environment variable.
+
+    Args:
+        logger: Logger instance to log messages
+
+    Returns:
+        dict: OpenAI deployment configurations
+    """
+    openai_embedding_deployment_config_path = \
+        os.getenv("OPENAI_EMBEDDING_DEPLOYMENT_CONFIG_PATH")
+
+    if not openai_embedding_deployment_config_path:
+        logger.info("No OpenAI embedding deployment configuration found")
+        return None
+
+    if not os.path.isabs(openai_embedding_deployment_config_path):
+        logger.error("OpenAI embedding deployment "
+                     "configuration file not found: %s",
+                     openai_deployment_config_path)
+        return None
+        
+    deployments = {}
+    for model_name, size in config_json.items():
+        deployments[model_name] = OpenAIEmbeddingDeployment(
+            name=deployment_name,
+            size=size
+        )
+    return deployments
+    
+
+def _default_openai_embedding_deployments() \
+        -> dict[str, OpenAIEmbeddingDeployment]:
+    """
+    Returns the default set of OpenAI embedding deployment configurations
+
+    Returns:
+        dict: OpenAI embedding deployment configurations
+    """
+
+    return {
+        "text-embedding-ada-002": OpenAIEmbeddingDeployment(
+            name="text-embedding-ada-002", size=1536
+        ),
+    }
 
 def _default_openai_deployments() -> dict[str, OpenAIDeployment]:
     # Default set of OpenAI deployment configurations for when none are provided

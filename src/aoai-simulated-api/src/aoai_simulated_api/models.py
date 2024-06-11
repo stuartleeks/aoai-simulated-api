@@ -128,6 +128,7 @@ class PatchableConfig(BaseSettings):
     simulator_api_key: str = Field(default=nanoid.generate(size=30), alias="SIMULATOR_API_KEY")
     recording: RecordingConfig = Field(default=RecordingConfig())
     openai_deployments: dict[str, "OpenAIDeployment"] | None = Field(default=None)
+    openai_embedding_deployments: dict[str, "OpenAIEmbeddingDeployment"] | None = Field(default=None)
     latency: Annotated[LatencyConfig, Field(default=LatencyConfig())]
     allow_undefined_openai_deployments: bool = Field(default=True, alias="ALLOW_UNDEFINED_OPENAI_DEPLOYMENTS")
 
@@ -148,6 +149,11 @@ class OpenAIDeployment:
     model: str
     tokens_per_minute: int
 
+
+@dataclass
+class OpenAIEmbeddingDeployment:
+    name: str
+    size: int
 
 # re-using Starlette's Route class to define a route
 # endpoint to pass to Route

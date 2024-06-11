@@ -9,6 +9,7 @@ from aoai_simulated_api.models import (
     CompletionLatency,
     EmbeddingLatency,
     OpenAIDeployment,
+    OpenAIEmbeddingDeployment,
 )
 from aoai_simulated_api.generator.manager import get_default_generators
 from openai import AzureOpenAI, AuthenticationError, NotFoundError, RateLimitError, Stream
@@ -40,6 +41,10 @@ def _get_generator_config(extension_path: str | None = None) -> Config:
     )
     config.openai_deployments = {
         "low_limit": OpenAIDeployment(name="low_limit", model="gpt-3.5-turbo", tokens_per_minute=64 * 6)
+    }
+    config.openai_embedding_deployments = {
+        "deployment1": OpenAIEmbeddingDeployment(name="text-embedding-ada-002", size=1536),
+        "deployment2": OpenAIEmbeddingDeployment(name="text-embedding-ada-001", size=768),
     }
     config.extension_path = extension_path
     return config
@@ -83,13 +88,22 @@ async def test_success():
             azure_endpoint="http://localhost:8001",
             max_retries=0,
         )
+
+        # Check with deployment1
         content = "This is some text to generate embeddings for"
         response = aoai_client.embeddings.create(model="deployment1", input=content)
-
         assert len(response.data) == 1
         assert response.data[0].object == "embedding"
         assert response.data[0].index == 0
         assert len(response.data[0].embedding) == 1536
+
+        # Check with deployment 2
+        content = "This is some text to generate embeddings for"
+        response = aoai_client.embeddings.create(model="deployment2", input=content)
+        assert len(response.data) == 1
+        assert response.data[0].object == "embedding"
+        assert response.data[0].index == 0
+        assert len(response.data[0].embedding) == 768
 
 
 @pytest.mark.asyncio
