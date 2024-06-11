@@ -12,3 +12,5 @@ __pycache__
 azuredeploy.parameters.json
 infra/output.json
 __azurite_db_table__.json
+
+.idea/
