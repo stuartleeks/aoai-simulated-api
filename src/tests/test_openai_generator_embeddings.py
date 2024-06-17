@@ -9,7 +9,6 @@ from aoai_simulated_api.models import (
     CompletionLatency,
     EmbeddingLatency,
     OpenAIDeployment,
-    OpenAIEmbeddingDeployment,
 )
 from aoai_simulated_api.generator.manager import get_default_generators
 from openai import AzureOpenAI, AuthenticationError, NotFoundError, RateLimitError, Stream
@@ -40,11 +39,13 @@ def _get_generator_config(extension_path: str | None = None) -> Config:
         ),
     )
     config.openai_deployments = {
-        "low_limit": OpenAIDeployment(name="low_limit", model="gpt-3.5-turbo", tokens_per_minute=64 * 6)
-    }
-    config.openai_embedding_deployments = {
-        "deployment1": OpenAIEmbeddingDeployment(name="text-embedding-ada-002", size=1536),
-        "deployment2": OpenAIEmbeddingDeployment(name="text-embedding-ada-001", size=768),
+        "low_limit": OpenAIDeployment(name="low_limit", model="gpt-3.5-turbo", tokens_per_minute=64 * 6),
+        "deployment1": OpenAIDeployment(
+            name="text-embedding-ada-002", model="text-embedding-ada-002", embedding_size=1536, tokens_per_minute=10000
+        ),
+        "deployment2": OpenAIDeployment(
+            name="text-embedding-ada-001", model="text-embedding-ada-001", embedding_size=768, tokens_per_minute=10000
+        ),
     }
     config.extension_path = extension_path
     return config
@@ -138,7 +139,7 @@ async def test_limit_reached():
             assert e.status_code == 429
             assert (
                 e.message
-                == "Error code: 429 - {'error': {'code': '429', 'message': 'Requests to the OpenAI API Simulator have exceeded call rate limit. Please retry after 10 seconds.'}}"
+                == "Error code: 429 - {'error': {'code': '429', 'message': 'Requests to the OpenAI API Simulator have exceeded call rate limit. Please retry after 0 seconds.'}}"
             )
 
 
