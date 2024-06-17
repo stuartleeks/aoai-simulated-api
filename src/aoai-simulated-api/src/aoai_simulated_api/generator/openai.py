@@ -12,7 +12,7 @@ from fastapi.responses import StreamingResponse
 
 from aoai_simulated_api import constants
 from aoai_simulated_api.auth import validate_api_key_header
-from aoai_simulated_api.models import RequestContext, OpenAIEmbeddingDeployment
+from aoai_simulated_api.models import RequestContext, OpenAIDeployment
 from aoai_simulated_api.constants import (
     SIMULATOR_KEY_DEPLOYMENT_NAME,
     SIMULATOR_KEY_OPENAI_COMPLETION_TOKENS,
@@ -37,14 +37,16 @@ logger = logging.getLogger(__name__)
 
 missing_deployment_names = set()
 missing_embedding_deployment_names = set()
-default_openai_embedding_model = OpenAIEmbeddingDeployment(
-    name="text-embedding-ada-002",
-    size=1536,
+default_openai_embedding_model = OpenAIDeployment(
+    name="embedding",
+    model="text-embedding-ada-002",
+    tokens_per_minute=10000,
+    embedding_size=1536
 )
 
 def get_embedding_model_from_deployment_name(
     context: RequestContext, deployment_name: str
-) -> OpenAIEmbeddingDeployment | None:
+) -> OpenAIDeployment | None:
     """
     Gets the model name for the specified embedding deployment. If
     the deployment is not in the configured deployments then the
@@ -55,10 +57,9 @@ def get_embedding_model_from_deployment_name(
         deployment_name: Name of the deployment
 
     Returns:
-        OpenAIEmbeddingDeployment | None: Instance of OpenAIEmbeddingDeployment
+        OpenAIDeployment | None: Instance of OpenAIDeployment
     """
-
-    deployments = context.config.openai_embedding_deployments
+    deployments = context.config.openai_deployments
 
     if deployments:
         deployment = deployments.get(deployment_name)
@@ -67,7 +68,7 @@ def get_embedding_model_from_deployment_name(
             return deployment
 
     if context.config.allow_undefined_openai_deployments:
-        default_model_name = "text-embedding-ada-002"
+        default_model_name = "embedding"
 
         # Output warning for missing embedding deployment name (only the
         # first time we encounter it)
@@ -164,14 +165,14 @@ def create_embedding_content(index: int, embedding_size):
 def create_embeddings_response(
     context: RequestContext,
     deployment_name: str,
-    model: OpenAIEmbeddingDeployment,
+    model: OpenAIDeployment,
     request_input: str | list,
 ):
     embeddings = []
     if isinstance(request_input, str):
         tokens = num_tokens_from_string(request_input, model.name)
         embeddings.append(
-            create_embedding_content(0, embedding_size=model.size)
+            create_embedding_content(0, embedding_size=model.embedding_size)
         )
     else:
         tokens = 0
@@ -179,7 +180,9 @@ def create_embeddings_response(
         for i in request_input:
             tokens += num_tokens_from_string(i, model.name)
             embeddings.append(
-                create_embedding_content(index, embedding_size=model.size)
+                create_embedding_content(
+                    index, embedding_size=model.embedding_size
+                )
             )
             index += 1
 
