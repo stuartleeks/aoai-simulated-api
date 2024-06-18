@@ -35,6 +35,7 @@ fi
 LOCUST_USERS=${LOCUST_USERS:-20}
 LOCUST_RUN_TIME=${LOCUST_RUN_TIME:-3m}
 LOCUST_SPAWN_RATE=${LOCUST_SPAWN_RATE:-0.5}
+MAX_TOKENS=${MAX_TOKENS:-100}
 
 if [[ ! -f "$script_dir/../infra/output.json" ]]; then
   # call error_exit function

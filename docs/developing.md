@@ -46,3 +46,12 @@ To run this test, run `./scripts/run-load-test-no-latency-no-limits.sh`.
 The test sends requests to the simulator as fast as possible with no latency and no rate limiting.
 This test is useful for validating the base latency and understanding the maximum throughput of the simulator.
 
+
+#### Load test: 1s latency, no limits
+
+To run this test, run `./scripts/run-load-test-1s-latency-no-limits.sh`.
+
+The test sends requests to the simulator as fast as possible with 1s latency and no rate limiting.
+This test is useful for validating the simulated latency behavior.
+
+
