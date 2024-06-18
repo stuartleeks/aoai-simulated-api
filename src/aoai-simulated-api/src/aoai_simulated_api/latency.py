@@ -30,12 +30,12 @@ def _get_simulator_metrics() -> SimulatorMetrics:
             unit="seconds",
         ),
         histogram_tokens_used=meter.create_histogram(
-            name="aoai-simulator.tokens_used",
+            name="aoai-simulator.tokens.used",
             description="Number of tokens used per request",
             unit="tokens",
         ),
         histogram_tokens_requested=meter.create_histogram(
-            name="aoai-simulator.tokens_requested",
+            name="aoai-simulator.tokens.requested",
             description="Number of tokens across all requests (success or not)",
             unit="tokens",
         ),
@@ -82,7 +82,8 @@ class LatencyGenerator:
         base_duration_s = base_end_time - self.__start_time
 
         deployment_name = self.__context.values.get(constants.SIMULATOR_KEY_DEPLOYMENT_NAME)
-        tokens_used = self.__context.values.get(constants.SIMULATOR_KEY_OPENAI_TOTAL_TOKENS)
+        prompt_tokens_used = self.__context.values.get(constants.SIMULATOR_KEY_OPENAI_PROMPT_TOKENS, 0)
+        completion_tokens_used = self.__context.values.get(constants.SIMULATOR_KEY_OPENAI_COMPLETION_TOKENS, 0)
 
         status_code = self.__response.status_code
         if status_code < 300:
@@ -111,8 +112,40 @@ class LatencyGenerator:
                 "deployment": deployment_name,
             },
         )
-        if tokens_used:
-            simulator_metrics.histogram_tokens_requested.record(tokens_used, attributes={"deployment": deployment_name})
-            if status_code < 300:
-                # only track tokens for successful requests
-                simulator_metrics.histogram_tokens_used.record(tokens_used, attributes={"deployment": deployment_name})
+
+        # Token metrics
+        if prompt_tokens_used > 0:
+            simulator_metrics.histogram_tokens_requested.record(
+                prompt_tokens_used,
+                attributes={
+                    "deployment": deployment_name,
+                    "token_type": "prompt",
+                },
+            )
+        if completion_tokens_used > 0:
+            simulator_metrics.histogram_tokens_requested.record(
+                completion_tokens_used,
+                attributes={
+                    "deployment": deployment_name,
+                    "token_type": "completion",
+                },
+            )
+
+        if status_code < 300:
+            # only track tokens used for successful requests
+            if prompt_tokens_used > 0:
+                simulator_metrics.histogram_tokens_used.record(
+                    prompt_tokens_used,
+                    attributes={
+                        "deployment": deployment_name,
+                        "token_type": "prompt",
+                    },
+                )
+            if completion_tokens_used > 0:
+                simulator_metrics.histogram_tokens_used.record(
+                    completion_tokens_used,
+                    attributes={
+                        "deployment": deployment_name,
+                        "token_type": "completion",
+                    },
+                )

@@ -76,6 +76,23 @@ AppMetrics
     validation_func=validate_request_latency,
 )
 
+query_processor.add_query(
+    title="Completion tokens per request",
+    query=f"""
+AppMetrics
+| where TimeGenerated >= datetime({test_start_time.strftime('%Y-%m-%dT%H:%M:%SZ')})
+    and TimeGenerated <= datetime({test_stop_time.strftime('%Y-%m-%dT%H:%M:%SZ')})
+    and Name == "aoai-simulator.tokens.used"
+    | extend token_type = tostring(Properties["token_type"])
+| where token_type == "completion"
+| summarize Sum=sum(Sum),  Count = sum(ItemCount)
+| project avg_tokens_per_request=Sum/Count
+""".strip(),
+    timespan=timespan,
+    show_query=True,
+    include_link=True,
+)
+
 
 query_processor.add_query(
     title="RPS over time",

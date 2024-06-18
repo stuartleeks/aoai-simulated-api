@@ -13,6 +13,9 @@ SIMULATOR_KEY_DEPLOYMENT_NAME = "Deployment-Name"
 # but this allows additional limiters to be added via extensions
 SIMULATOR_KEY_LIMITER = "Limiter"
 
+# SIMULATOR_KEY_OPENAI_PROMPT_TOKENS stores the number of tokens used for the prompt
+SIMULATOR_KEY_OPENAI_PROMPT_TOKENS = "XOpenAI-Tokens-Prompt"
+
 # SIMULATOR_KEY_OPENAI_COMPLETION_TOKENS stores the number of tokens used for the completion (i.e. generated tokens)
 SIMULATOR_KEY_OPENAI_COMPLETION_TOKENS = "XOpenAI-Tokens-Completion"
 

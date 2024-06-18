@@ -17,6 +17,7 @@ from aoai_simulated_api.auth import validate_api_key_header
 from aoai_simulated_api.models import RequestContext, OpenAIDeployment
 from aoai_simulated_api.constants import (
     SIMULATOR_KEY_DEPLOYMENT_NAME,
+    SIMULATOR_KEY_OPENAI_PROMPT_TOKENS,
     SIMULATOR_KEY_OPENAI_COMPLETION_TOKENS,
     SIMULATOR_KEY_OPENAI_TOTAL_TOKENS,
     SIMULATOR_KEY_LIMITER,
@@ -189,6 +190,7 @@ def create_embeddings_response(
     context.values[SIMULATOR_KEY_LIMITER] = "openai"
     context.values[SIMULATOR_KEY_OPERATION_NAME] = "embeddings"
     context.values[SIMULATOR_KEY_DEPLOYMENT_NAME] = deployment_name
+    context.values[SIMULATOR_KEY_OPENAI_PROMPT_TOKENS] = tokens
     context.values[SIMULATOR_KEY_OPENAI_TOTAL_TOKENS] = tokens
 
     return Response(
@@ -342,6 +344,7 @@ def create_completion_response(
     context.values[SIMULATOR_KEY_LIMITER] = "openai"
     context.values[SIMULATOR_KEY_OPERATION_NAME] = "completions"
     context.values[SIMULATOR_KEY_DEPLOYMENT_NAME] = deployment_name
+    context.values[SIMULATOR_KEY_OPENAI_PROMPT_TOKENS] = prompt_tokens
     context.values[SIMULATOR_KEY_OPENAI_COMPLETION_TOKENS] = completion_tokens
     context.values[SIMULATOR_KEY_OPENAI_TOTAL_TOKENS] = total_tokens
 
@@ -397,6 +400,18 @@ def create_chat_completion_response(
     """
 
     prompt_tokens = num_tokens_from_messages(prompt_messages, model_name)
+
+    text = "".join(generated_content)
+    completion_tokens = num_tokens_from_string(text, model_name)
+    total_tokens = prompt_tokens + completion_tokens
+
+    # store values in the context for use by the rate-limiter etc
+    context.values[SIMULATOR_KEY_LIMITER] = "openai"
+    context.values[SIMULATOR_KEY_OPERATION_NAME] = "chat-completions"
+    context.values[SIMULATOR_KEY_DEPLOYMENT_NAME] = deployment_name
+    context.values[SIMULATOR_KEY_OPENAI_PROMPT_TOKENS] = prompt_tokens
+    context.values[SIMULATOR_KEY_OPENAI_COMPLETION_TOKENS] = completion_tokens
+    context.values[SIMULATOR_KEY_OPENAI_TOTAL_TOKENS] = total_tokens
 
     if streaming:
 
@@ -474,10 +489,6 @@ def create_chat_completion_response(
 
         return StreamingResponse(content=send_words())
 
-    text = "".join(generated_content)
-    completion_tokens = num_tokens_from_string(text, model_name)
-    total_tokens = prompt_tokens + completion_tokens
-
     response_body = {
         "id": "chatcmpl-" + nanoid.non_secure_generate(size=29),
         "object": "chat.completion",
@@ -516,13 +527,6 @@ def create_chat_completion_response(
             "total_tokens": total_tokens,
         },
     }
-
-    # store values in the context for use by the rate-limiter etc
-    context.values[SIMULATOR_KEY_LIMITER] = "openai"
-    context.values[SIMULATOR_KEY_OPERATION_NAME] = "chat-completions"
-    context.values[SIMULATOR_KEY_DEPLOYMENT_NAME] = deployment_name
-    context.values[SIMULATOR_KEY_OPENAI_COMPLETION_TOKENS] = completion_tokens
-    context.values[SIMULATOR_KEY_OPENAI_TOTAL_TOKENS] = total_tokens
 
     return Response(
         content=json.dumps(response_body),
