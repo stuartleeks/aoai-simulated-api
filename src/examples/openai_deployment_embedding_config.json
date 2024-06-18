@@ -1,0 +1,26 @@
+{
+    "text-embedding-3-small": {
+        "model": "text-embedding-3-small",
+        "size": "512"
+    },
+    "text-embedding-3-medium": {
+        "model": "text-embedding-3-medium",
+        "size": "768"
+    },
+    "text-embedding-3-large": {
+        "model": "text-embedding-3-large",
+        "size": "1024"
+    },
+    "text-embedding-3-xlarge": {
+        "model": "text-embedding-3-xlarge",
+        "size": "1536"
+    },
+    "text-embedding-ada-001": {
+        "model": "text-embedding-ada-001",
+        "size": "768"
+    },
+    "text-embedding-ada-002": {
+        "model": "text-embedding-ada-002",
+        "size": "1536"
+    }
+}

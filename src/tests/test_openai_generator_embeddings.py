@@ -39,7 +39,13 @@ def _get_generator_config(extension_path: str | None = None) -> Config:
         ),
     )
     config.openai_deployments = {
-        "low_limit": OpenAIDeployment(name="low_limit", model="gpt-3.5-turbo", tokens_per_minute=64 * 6)
+        "low_limit": OpenAIDeployment(name="low_limit", model="gpt-3.5-turbo", tokens_per_minute=64 * 6),
+        "deployment1": OpenAIDeployment(
+            name="text-embedding-ada-002", model="text-embedding-ada-002", embedding_size=1536, tokens_per_minute=10000
+        ),
+        "deployment2": OpenAIDeployment(
+            name="text-embedding-ada-001", model="text-embedding-ada-001", embedding_size=768, tokens_per_minute=10000
+        ),
     }
     config.extension_path = extension_path
     return config
@@ -83,13 +89,22 @@ async def test_success():
             azure_endpoint="http://localhost:8001",
             max_retries=0,
         )
+
+        # Check with deployment1
         content = "This is some text to generate embeddings for"
         response = aoai_client.embeddings.create(model="deployment1", input=content)
-
         assert len(response.data) == 1
         assert response.data[0].object == "embedding"
         assert response.data[0].index == 0
         assert len(response.data[0].embedding) == 1536
+
+        # Check with deployment 2
+        content = "This is some text to generate embeddings for"
+        response = aoai_client.embeddings.create(model="deployment2", input=content)
+        assert len(response.data) == 1
+        assert response.data[0].object == "embedding"
+        assert response.data[0].index == 0
+        assert len(response.data[0].embedding) == 768
 
 
 @pytest.mark.asyncio
@@ -124,7 +139,7 @@ async def test_limit_reached():
             assert e.status_code == 429
             assert (
                 e.message
-                == "Error code: 429 - {'error': {'code': '429', 'message': 'Requests to the OpenAI API Simulator have exceeded call rate limit. Please retry after 10 seconds.'}}"
+                == "Error code: 429 - {'error': {'code': '429', 'message': 'Requests to the OpenAI API Simulator have exceeded call rate limit. Please retry after 0 seconds.'}}"
             )
 
 

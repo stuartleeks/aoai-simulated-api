@@ -16,9 +16,9 @@ def get_config_from_env_vars(logger: logging.Logger) -> Config:
     Load configuration from environment variables
     """
     config = Config(generators=get_default_generators())
-
     config.recording.forwarders = get_default_forwarders()
     config.openai_deployments = _load_openai_deployments(logger)
+
     if not config.openai_deployments:
         logger.info("OpenAI deployments not set - using default OpenAI deployments")
         config.openai_deployments = _default_openai_deployments()
@@ -63,7 +63,12 @@ def _load_openai_deployments(logger: logging.Logger) -> dict[str, OpenAIDeployme
 def _default_openai_deployments() -> dict[str, OpenAIDeployment]:
     # Default set of OpenAI deployment configurations for when none are provided
     return {
-        "embedding": OpenAIDeployment(name="embedding", model="text-embedding-ada-002", tokens_per_minute=10000),
+        "embedding": OpenAIDeployment(
+            name="embedding",
+            model="text-embedding-ada-002",
+            tokens_per_minute=20000,
+            embedding_size=1536
+        ),
         "gpt-35-turbo-1k-token": OpenAIDeployment(
             name="gpt-35-turbo-1k-token", model="gpt-3.5-turbo", tokens_per_minute=1000
         ),

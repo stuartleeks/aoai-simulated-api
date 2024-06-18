@@ -146,8 +146,8 @@ class Config(PatchableConfig):
 class OpenAIDeployment:
     name: str
     model: str
-    tokens_per_minute: int
-
+    tokens_per_minute: int = 0
+    embedding_size: int = 0
 
 # re-using Starlette's Route class to define a route
 # endpoint to pass to Route
