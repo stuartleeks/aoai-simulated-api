@@ -75,6 +75,7 @@ async def test_requires_auth():
 
 
 @pytest.mark.asyncio
+@pytest.mark.slow
 async def test_gets_result():
     """
     Ensure we need the right API key to call the completion endpoint

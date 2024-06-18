@@ -18,6 +18,13 @@
             ],
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}/src/aoai-simulated-api"
+        },
+        {
+            "name": "Python Debugger: Current File",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal"
         }
     ]
 }
