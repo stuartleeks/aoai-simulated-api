@@ -38,15 +38,11 @@ logger = logging.getLogger(__name__)
 missing_deployment_names = set()
 missing_embedding_deployment_names = set()
 default_openai_embedding_model = OpenAIDeployment(
-    name="embedding",
-    model="text-embedding-ada-002",
-    tokens_per_minute=10000,
-    embedding_size=1536
+    name="embedding", model="text-embedding-ada-002", tokens_per_minute=10000, embedding_size=1536
 )
 
-def get_embedding_model_from_deployment_name(
-    context: RequestContext, deployment_name: str
-) -> OpenAIDeployment | None:
+
+def get_embedding_model_from_deployment_name(context: RequestContext, deployment_name: str) -> OpenAIDeployment | None:
     """
     Gets the model name for the specified embedding deployment. If
     the deployment is not in the configured deployments then the
@@ -82,16 +78,15 @@ def get_embedding_model_from_deployment_name(
                 default_model_name,
             )
         return default_openai_embedding_model
-    else:
-        # Output warning for missing embedding deployment name
-        # (only the first time we encounter it)
-        if deployment_name not in missing_deployment_names:
-            missing_deployment_names.add(deployment_name)
-            logger.warning(
-                "Deployment %s not found in config and "
-                "allow_undefined_openai_deployments is False", deployment_name
-            )
-        return None
+
+    # Output warning for missing embedding deployment name
+    # (only the first time we encounter it)
+    if deployment_name not in missing_deployment_names:
+        missing_deployment_names.add(deployment_name)
+        logger.warning(
+            "Deployment %s not found in config and allow_undefined_openai_deployments is False", deployment_name
+        )
+    return None
 
 
 def get_model_name_from_deployment_name(context: RequestContext, deployment_name: str) -> str | None:
@@ -112,19 +107,20 @@ def get_model_name_from_deployment_name(context: RequestContext, deployment_name
         if deployment_name not in missing_deployment_names:
             missing_deployment_names.add(deployment_name)
             logger.warning(
-                "Deployment %s not found in config and allow_undefined_openai_deployments is True. Using default model %s",
+                "Deployment %s not found in config and allow_undefined_openai_deployments is True."
+                + " Using default model %s",
                 deployment_name,
                 default_model,
             )
         return default_model
-    else:
-        # Output warning for missing deployment name (only the first time we encounter it)
-        if deployment_name not in missing_deployment_names:
-            missing_deployment_names.add(deployment_name)
-            logger.warning(
-                "Deployment %s not found in config and allow_undefined_openai_deployments is False", deployment_name
-            )
-        return None
+
+    # Output warning for missing deployment name (only the first time we encounter it)
+    if deployment_name not in missing_deployment_names:
+        missing_deployment_names.add(deployment_name)
+        logger.warning(
+            "Deployment %s not found in config and allow_undefined_openai_deployments is False", deployment_name
+        )
+    return None
 
 
 async def calculate_latency(context: RequestContext, status_code: int):
@@ -171,19 +167,13 @@ def create_embeddings_response(
     embeddings = []
     if isinstance(request_input, str):
         tokens = num_tokens_from_string(request_input, model.name)
-        embeddings.append(
-            create_embedding_content(0, embedding_size=model.embedding_size)
-        )
+        embeddings.append(create_embedding_content(0, embedding_size=model.embedding_size))
     else:
         tokens = 0
         index = 0
         for i in request_input:
             tokens += num_tokens_from_string(i, model.name)
-            embeddings.append(
-                create_embedding_content(
-                    index, embedding_size=model.embedding_size
-                )
-            )
+            embeddings.append(create_embedding_content(index, embedding_size=model.embedding_size))
             index += 1
 
     response_data = {
@@ -471,9 +461,7 @@ async def azure_openai_embedding(context: RequestContext) -> Response | None:
     _validate_api_key_header(context)
     deployment_name = path_params["deployment"]
     request_body = await request.json()
-    model = get_embedding_model_from_deployment_name(
-        context, deployment_name
-    )
+    model = get_embedding_model_from_deployment_name(context, deployment_name)
 
     if model is None:
         return Response(
