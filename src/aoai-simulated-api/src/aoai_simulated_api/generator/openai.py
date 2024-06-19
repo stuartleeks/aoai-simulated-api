@@ -565,15 +565,18 @@ async def azure_openai_embedding(context: RequestContext) -> Response | None:
         )
     request_input = request_body["input"]
 
-    # calculate a simulated latency and store in context.values
-    await calculate_latency(context, 200)
-
-    return create_embeddings_response(
+    response = create_embeddings_response(
         context=context,
         deployment_name=deployment_name,
         model=model,
         request_input=request_input,
     )
+
+    # calculate a simulated latency and store in context.values
+    # needs to be called after the response has been created
+    await calculate_latency(context, 200)
+
+    return response
 
 
 async def azure_openai_completion(context: RequestContext) -> Response | None:
@@ -601,16 +604,19 @@ async def azure_openai_completion(context: RequestContext) -> Response | None:
 
     max_tokens = get_max_completion_tokens(request_body, model_name, prompt_tokens=prompt_tokens)
 
-    # calculate a simulated latency and store in context.values
-    await calculate_latency(context, 200)
-
-    return create_completion_response(
+    response = create_completion_response(
         context=context,
         deployment_name=deployment_name,
         model_name=model_name,
         prompt_tokens=prompt_tokens,
         max_tokens=max_tokens,
     )
+
+    # calculate a simulated latency and store in context.values
+    # needs to be called after the response has been created
+    await calculate_latency(context, 200)
+
+    return response
 
 
 async def azure_openai_chat_completion(context: RequestContext) -> Response | None:
@@ -641,10 +647,7 @@ async def azure_openai_chat_completion(context: RequestContext) -> Response | No
 
     streaming = request_body.get("stream", False)
 
-    # calculate a simulated latency and store in context.values
-    await calculate_latency(context, 200)
-
-    return create_lorem_chat_completion_response(
+    response = create_lorem_chat_completion_response(
         context=context,
         deployment_name=deployment_name,
         model_name=model_name,
@@ -652,3 +655,9 @@ async def azure_openai_chat_completion(context: RequestContext) -> Response | No
         max_tokens=max_tokens,
         prompt_messages=messages,
     )
+
+    # calculate a simulated latency and store in context.values
+    # needs to be called after the response has been created
+    await calculate_latency(context, 200)
+
+    return response
