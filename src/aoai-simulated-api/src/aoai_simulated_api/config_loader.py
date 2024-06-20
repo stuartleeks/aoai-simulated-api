@@ -56,6 +56,7 @@ def _load_openai_deployments(logger: logging.Logger) -> dict[str, OpenAIDeployme
             name=deployment_name,
             model=deployment["model"],
             tokens_per_minute=deployment["tokensPerMinute"],
+            embedding_size=deployment.get("embeddingSize", 1536),
         )
     return deployments
 
@@ -64,10 +65,7 @@ def _default_openai_deployments() -> dict[str, OpenAIDeployment]:
     # Default set of OpenAI deployment configurations for when none are provided
     return {
         "embedding": OpenAIDeployment(
-            name="embedding",
-            model="text-embedding-ada-002",
-            tokens_per_minute=20000,
-            embedding_size=1536
+            name="embedding", model="text-embedding-ada-002", tokens_per_minute=20000, embedding_size=1536
         ),
         "gpt-35-turbo-1k-token": OpenAIDeployment(
             name="gpt-35-turbo-1k-token", model="gpt-3.5-turbo", tokens_per_minute=1000
