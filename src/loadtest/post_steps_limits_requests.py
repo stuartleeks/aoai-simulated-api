@@ -53,6 +53,11 @@ query_processor.wait_for_non_zero_count(check_results_query)
 timespan = (datetime.now(UTC) - timedelta(days=1), datetime.now(UTC))
 
 
+####################################################################
+# Ensure the base latency remains low with rate-limiting in place
+#
+
+
 def validate_request_latency(table: Table):
     mean_latency = table.rows[0][0]
     if mean_latency > 10:
@@ -76,48 +81,138 @@ AppMetrics
     validation_func=validate_request_latency,
 )
 
+
+####################################################################
+# Ensure the rate-limiting allows the expected number of requests per second
+#
+
+
+def validate_mean_sucess_rps(table: Table):
+    # Check if the mean RPS is within the expected range
+    # The deployment for the tests has 100,000 Tokens Per Minute (TPM) limit
+    # That equates to 600 Requests Per Minute (RPM) or 10 Requests Per Second (RPS)
+    mean_rps = table.rows[0][0]
+    if mean_rps > 11:
+        return f"Mean RPS is too high: {mean_rps}"
+    if mean_rps < 9:
+        return f"Mean RPS is too low: {mean_rps}"
+    return None
+
+
 query_processor.add_query(
-    title="Completion tokens per request",
+    title="Mean RPS (successful requests)",
     query=f"""
-AppMetrics
+let results = AppMetrics
 | where TimeGenerated >= datetime({test_start_time.strftime('%Y-%m-%dT%H:%M:%SZ')})
     and TimeGenerated <= datetime({test_stop_time.strftime('%Y-%m-%dT%H:%M:%SZ')})
-    and Name == "aoai-simulator.tokens.used"
-    | extend token_type = tostring(Properties["token_type"])
-| where token_type == "completion"
-| summarize Sum=sum(Sum),  Count = sum(ItemCount)
-| project avg_tokens_per_request=Sum/Count
+    and Name == "aoai-simulator.latency.base"
+| extend status_code = Properties["status_code"]
+| where status_code == 200
+| summarize RPS = sum(ItemCount)/60.0 by bin(TimeGenerated, 1m);
+let n = toscalar(results | count);
+results
+// Ignore the first and last minutes of the test
+| order by TimeGenerated desc | take n-1
+| order by  TimeGenerated asc | take n-2
+| summarize avg(RPS)
 """.strip(),
     timespan=timespan,
     show_query=True,
     include_link=True,
+    validation_func=validate_mean_sucess_rps,
 )
 
 
+####################################################################
+# Ensure that we _do_ get 429 responses as expected
+#
+
+
+def validate_429_count(table: Table):
+    # With the level of user load targetting the deployment, we expect a high number of 429 responses
+    number_of_429_responses = table.rows[0][0]
+    if number_of_429_responses < 100:
+        return f"The number of 429 responses is too low: {number_of_429_responses}"
+    return None
+
+
 query_processor.add_query(
-    title="RPS over time",
+    title="Number of 429 responses (should be high)",
     query=f"""
 AppMetrics
 | where TimeGenerated >= datetime({test_start_time.strftime('%Y-%m-%dT%H:%M:%SZ')})
     and TimeGenerated <= datetime({test_stop_time.strftime('%Y-%m-%dT%H:%M:%SZ')})
     and Name == "aoai-simulator.latency.base"
-| summarize RPS = sum(ItemCount)/10 by bin(TimeGenerated, 10s)
-| project TimeGenerated, RPS
+| extend status_code = Properties["status_code"]
+| where status_code == 429
+| summarize ItemCount=sum(ItemCount)
+""".strip(),
+    timespan=timespan,
+    show_query=True,
+    include_link=True,
+    validation_func=validate_429_count,
+)
+
+
+####################################################################
+# Show the RPS over time
+#
+
+query_processor.add_query(
+    title="RPS over time (successful - yellow, 429 - blue)",
+    query=f"""
+AppMetrics
+| where TimeGenerated >= datetime({test_start_time.strftime('%Y-%m-%dT%H:%M:%SZ')})
+    and TimeGenerated <= datetime({test_stop_time.strftime('%Y-%m-%dT%H:%M:%SZ')})
+    and Name == "aoai-simulator.latency.base"
+| extend status_code = tostring(Properties["status_code"])
+| summarize rps = sum(ItemCount)/10 by bin(TimeGenerated, 10s), status_code
+| project TimeGenerated, rps, status_code
+| evaluate pivot(status_code, sum(rps))
+| render timechart 
 """.strip(),
     is_chart=True,
-    columns=["RPS"],
+    columns=["200", "429"],
     chart_config={
         "height": 15,
         "min": 0,
         "colors": [
             asciichart.yellow,
+            asciichart.blue,
         ],
     },
     timespan=timespan,
     show_query=True,
     include_link=True,
 )
+# query_processor.add_query(
+#     title="RPS over time",
+#     query=f"""
+# AppMetrics
+# | where TimeGenerated >= datetime({test_start_time.strftime('%Y-%m-%dT%H:%M:%SZ')})
+#     and TimeGenerated <= datetime({test_stop_time.strftime('%Y-%m-%dT%H:%M:%SZ')})
+#     and Name == "aoai-simulator.latency.base"
+# | summarize RPS = sum(ItemCount)/10 by bin(TimeGenerated, 10s)
+# | project TimeGenerated, RPS
+# """.strip(),
+#     is_chart=True,
+#     columns=["RPS"],
+#     chart_config={
+#         "height": 15,
+#         "min": 0,
+#         "colors": [
+#             asciichart.yellow,
+#         ],
+#     },
+#     timespan=timespan,
+#     show_query=True,
+#     include_link=True,
+# )
 
+
+####################################################################
+# Show the RPS over time
+#
 
 query_processor.add_query(
     title="Latency (base) over time in ms (mean - yellow, max - blue)",

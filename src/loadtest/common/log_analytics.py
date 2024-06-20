@@ -188,6 +188,7 @@ class QueryProcessor:
         Returns None if all validators passed, otherwise returns a list of error messages.
         """
         query_errors = []
+        query_error_count = 0
         for query_index, (
             title,
             query,

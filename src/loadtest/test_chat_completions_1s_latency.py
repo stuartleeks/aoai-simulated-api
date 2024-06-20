@@ -10,7 +10,10 @@ from common.locust_app_insights import (
 )
 
 max_tokens = 100
-deployment_name = "gpt-35-turbo-no-limit"  # uses an undefined deployment, i.e no limiting applied
+deployment_name = os.getenv("DEPLOYMENT_NAME", None)
+
+if deployment_name is None:
+    raise ValueError("DEPLOYMENT_NAME environment variable must be set")
 
 
 @events.init.add_listener

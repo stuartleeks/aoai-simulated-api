@@ -36,6 +36,11 @@ LOCUST_USERS=${LOCUST_USERS:-20}
 LOCUST_RUN_TIME=${LOCUST_RUN_TIME:-3m}
 LOCUST_SPAWN_RATE=${LOCUST_SPAWN_RATE:-0.5}
 MAX_TOKENS=${MAX_TOKENS:-100}
+ALLOW_429_RESPONSES=${ALLOW_429_RESPONSES:-false}
+
+if [[ -z "$DEPLOYMENT_NAME" ]]; then
+  error_exit "DEPLOYMENT_NAME not specified"
+fi
 
 if [[ ! -f "$script_dir/../infra/output.json" ]]; then
   # call error_exit function
@@ -112,7 +117,7 @@ az containerapp job create \
   --resource-group "$rg_name" \
   --environment "$aca_env_name" \
   --trigger-type "Manual" \
-  --replica-retry-limit 2 \
+  --replica-retry-limit 1 \
   --replica-completion-count 1 \
   --parallelism 1 \
   --replica-timeout 1800 \
@@ -122,7 +127,7 @@ az containerapp job create \
   --cpu "1" \
   --memory "2Gi" \
   --command "locust" \
-  --env-vars "LOCUST_LOCUSTFILE=$TEST_FILE" "LOCUST_HOST=https://${api_fqdn}/" "LOCUST_USERS=$LOCUST_USERS" "LOCUST_SPAWN_RATE=$LOCUST_SPAWN_RATE" "LOCUST_AUTOSTART=true" "LOCUST_RUN_TIME=$LOCUST_RUN_TIME" "LOCUST_AUTOQUIT=10" "SIMULATOR_API_KEY=${SIMULATOR_API_KEY}" "APP_INSIGHTS_CONNECTION_STRING=${app_insights_connection_string}" "MAX_TOKENS=${MAX_TOKENS}" 1>&2
+  --env-vars "LOCUST_LOCUSTFILE=$TEST_FILE" "LOCUST_HOST=https://${api_fqdn}/" "LOCUST_USERS=$LOCUST_USERS" "LOCUST_SPAWN_RATE=$LOCUST_SPAWN_RATE" "LOCUST_AUTOSTART=true" "LOCUST_RUN_TIME=$LOCUST_RUN_TIME" "LOCUST_AUTOQUIT=10" "SIMULATOR_API_KEY=${SIMULATOR_API_KEY}" "APP_INSIGHTS_CONNECTION_STRING=${app_insights_connection_string}" "MAX_TOKENS=${MAX_TOKENS}" "DEPLOYMENT_NAME=${DEPLOYMENT_NAME}" ALLOW_429_RESPONSES=${ALLOW_429_RESPONSES} 1>&2
 
 
 start_time=$(date -u +"%Y-%m-%dT%H:%M:%SZ")

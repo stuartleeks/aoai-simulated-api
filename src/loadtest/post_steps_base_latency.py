@@ -53,22 +53,25 @@ query_processor.wait_for_non_zero_count(check_results_query)
 timespan = (datetime.now(UTC) - timedelta(days=1), datetime.now(UTC))
 
 
+####################################################################
+# Ensure the base latency is low
+#
+
+
 def validate_request_latency(table: Table):
     mean_latency = table.rows[0][0]
-    if mean_latency > 1100:
+    if mean_latency > 10:
         return f"Mean latency is too high: {mean_latency}"
-    if mean_latency < 900:
-        return f"Mean latency is too low: {mean_latency}"
     return None
 
 
 query_processor.add_query(
-    title="Full Latency",
+    title="Base Latency",
     query=f"""
 AppMetrics
 | where TimeGenerated >= datetime({test_start_time.strftime('%Y-%m-%dT%H:%M:%SZ')})
     and TimeGenerated <= datetime({test_stop_time.strftime('%Y-%m-%dT%H:%M:%SZ')})
-    and Name == "aoai-simulator.latency.full"
+    and Name == "aoai-simulator.latency.base"
 | summarize Sum=sum(Sum),  Count = sum(ItemCount), Max=max(Max)
 | project mean_latency_ms=1000*Sum/Count, max_latency_ms=1000*Max
 """.strip(),
@@ -78,6 +81,32 @@ AppMetrics
     validation_func=validate_request_latency,
 )
 
+
+####################################################################
+# Show the number of completion tokens per request
+#
+
+query_processor.add_query(
+    title="Completion tokens per request",
+    query=f"""
+AppMetrics
+| where TimeGenerated >= datetime({test_start_time.strftime('%Y-%m-%dT%H:%M:%SZ')})
+    and TimeGenerated <= datetime({test_stop_time.strftime('%Y-%m-%dT%H:%M:%SZ')})
+    and Name == "aoai-simulator.tokens.used"
+    | extend token_type = tostring(Properties["token_type"])
+| where token_type == "completion"
+| summarize Sum=sum(Sum),  Count = sum(ItemCount)
+| project avg_tokens_per_request=Sum/Count
+""".strip(),
+    timespan=timespan,
+    show_query=True,
+    include_link=True,
+)
+
+
+####################################################################
+# Show the RPS over the test
+#
 
 query_processor.add_query(
     title="RPS over time",
@@ -104,13 +133,18 @@ AppMetrics
 )
 
 
+####################################################################
+# Show the base latency over the test
+#
+
+
 query_processor.add_query(
-    title="Latency (full) over time in ms (mean - yellow, max - blue)",
+    title="Latency (base) over time in ms (mean - yellow, max - blue)",
     query=f"""
 AppMetrics
 | where TimeGenerated >= datetime({test_start_time.strftime('%Y-%m-%dT%H:%M:%SZ')})
     and TimeGenerated <= datetime({test_stop_time.strftime('%Y-%m-%dT%H:%M:%SZ')})
-    and Name == "aoai-simulator.latency.full"
+    and Name == "aoai-simulator.latency.base"
 | summarize Sum=sum(Sum),  Count = sum(ItemCount), Max=max(Max) by bin(TimeGenerated, 10s)
 | project TimeGenerated, mean_latency_ms=1000*Sum/Count, max_latency_ms=1000*Max
 | render timechart

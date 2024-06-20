@@ -39,19 +39,29 @@ To run the tests run `make test`.
 
 The following load tests should be run against the simulator before a release:
 
-#### Load test: No latency, no limits
+#### Load test: Base latency (no added latency, no limits)
 
-To run this test, run `./scripts/run-load-test-no-latency-no-limits.sh`.
+To run this test, run `./scripts/run-load-test-base-latency.sh`.
 
 The test sends requests to the simulator as fast as possible with no latency and no rate limiting.
 This test is useful for validating the base latency and understanding the maximum throughput of the simulator.
 
 
-#### Load test: 1s latency, no limits
+#### Load test: Added latency (1s latency, no limits)
 
-To run this test, run `./scripts/run-load-test-1s-latency-no-limits.sh`.
+To run this test, run `./scripts/run-load-test-added-latency.sh`.
 
 The test sends requests to the simulator as fast as possible with 1s latency and no rate limiting.
 This test is useful for validating the simulated latency behavior.
+
+#### Load test: Rate limiting (no added latency, 10 requests per second)
+
+To run this test, run `./scripts/run-load-test-limits-requests.sh`.
+
+The simulator endpoint used in this test is configured for 100,000 tokens per minute.
+This equates to 600 requests per minute or 10 requests per second.
+
+This test uses 30 test users (i.e. ~30RPS) with a `max_tokens` value of 10 for each request.
+By keeping the `max_tokens` value low, we should trigger the request-based rate limiting rather than the token-based limiting.
 
 

@@ -11,7 +11,21 @@ set -e
 
 script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
-result=$(LOCUST_USERS=100 LOCUST_RUN_TIME=5m LOCUST_SPAWN_RATE=1 TEST_FILE=./test_chat_completions_no_limits_no_added_latency.py ./scripts/_run-load-test-aca.sh)
+# Use deployment with 10k TPM limit
+deployment_name="gpt-35-turbo-100k-token"
+
+# Set max tokens low to trigger rate-limiting by request count (not tokens)
+max_tokens=10
+
+result=$(\
+  LOCUST_USERS=30 \
+  LOCUST_RUN_TIME=3m \
+  LOCUST_SPAWN_RATE=2 \
+  TEST_FILE=./test_chat_completions_no_added_latency.py \
+  DEPLOYMENT_NAME=$deployment_name \
+  MAX_TOKENS=$max_tokens \
+  ALLOW_429_RESPONSES=true \
+  ./scripts/_run-load-test-aca.sh)
 
 echo -e "________________\n$result"
 
@@ -27,4 +41,4 @@ echo "Running post steps"
 "$script_dir/_run-load-test-post-steps.sh" \
   --test-start-time "$test_start_time" \
   --test-stop-time "$test_stop_time" \
-  --filename ./src/loadtest/test_chat_completions_no_limits_no_added_latency_post_steps.py
+  --filename ./src/loadtest/post_steps_limits_requests.py

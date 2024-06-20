@@ -84,31 +84,6 @@ lint:
 deploy-aca: 
 	./scripts/deploy-aca.sh
 
-load-test-chat-no-limits-no-added-latency: ## Load test chat completions with no limits and no added latency (good to test base generator perf)
-	API_KEY=${SIMULATOR_API_KEY} \
-	LOCUST_WEB_PORT=8090 \
-	locust \
-		-f ./src/loadtest/test_chat_completions_no_limits_no_added_latency.py \
-		-H http://localhost:8000/ \
-		--users 10 \
-		--spawn-rate 0.5 \
-		--run-time 5m \
-		--autostart \
-		--autoquit 0
-
-load-test-chat-100m-no-added-latency: ## Load test chat completions with 100m TPM and no added latency (good to test  generator perf including rate-limiting)
-	API_KEY=${SIMULATOR_API_KEY} \
-	LOCUST_WEB_PORT=8090 \
-	locust \
-		-f ./src/loadtest/test_chat_completions_100m_no_added_latency.py \
-		-H http://localhost:8000/ \
-		--users 10 \
-		--spawn-rate 0.5 \
-		--run-time 5m \
-		--autostart \
-		--autoquit 0
-
-
 docker-build-load-test:
 	# TODO should set a tag!
 	cd src/loadtest && \
