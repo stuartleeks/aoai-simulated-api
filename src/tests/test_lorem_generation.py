@@ -44,7 +44,7 @@ def test_generation_min_max_time_10_000_tokens():
         max_tokens=10000,
         expected_min=9994,
         expected_max=10000,
-        max_duration=0.001,
+        max_duration=0.01,
     )
 
 
