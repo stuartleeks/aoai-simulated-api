@@ -17,7 +17,8 @@
 				"yzhang.markdown-all-in-one",
 				"ms-python.pylint",
 				"ms-azuretools.vscode-bicep",
-				"timonwong.shellcheck"
+				"timonwong.shellcheck",
+				"hediet.vscode-drawio"
 			]
 		}
 	},
