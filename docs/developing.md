@@ -65,3 +65,14 @@ This test uses 30 test users (i.e. ~30RPS) with a `max_tokens` value of 10 for e
 By keeping the `max_tokens` value low, we should trigger the request-based rate limiting rather than the token-based limiting.
 
 
+#### Load test: Token limiting (no added latency, 100,000 tokens per minute)
+
+To run this test, run `./scripts/run-load-test-limits-tokens.sh`.
+
+The simulator endpoint used in this test is configured for 100,000 tokens per minute.
+This equates to ~16,667 tokens per 10 second window.
+
+This test uses 30 test users (i.e. ~30RPS) with a `max_tokens` value of 200 for each request.
+By keeping the `max_tokens` value high, we should trigger the token-based rate limiting rather than the request-based limiting.
+
+> NOTE: Every 1000 tokens per minute allows 6 requests per minute. Provided the `max_tokens` value used is greater than 1000/6 = 167, the rate-limiting should be triggered by tokens rather than requests.
