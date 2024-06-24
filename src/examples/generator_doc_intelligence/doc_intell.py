@@ -4,13 +4,13 @@ import os
 import random
 import json
 import uuid
-import lorem
 from fastapi import Response
 
 
 from aoai_simulated_api.auth import validate_api_key_header
 from aoai_simulated_api.constants import SIMULATOR_KEY_LIMITER
 from aoai_simulated_api.models import RequestContext
+from aoai_simulated_api.generator.openai import raw_lorem_get_word
 
 document_analysis_config = {}
 
@@ -155,9 +155,6 @@ async def doc_intelligence_analyze_result(context: RequestContext) -> Response |
     return Response(status_code=200, content=response_content, headers=headers)
 
 
-lorem.get_paragraph()
-
-
 def datetime_handler(x):
     if isinstance(x, datetime.datetime):
         # TODO: Is this the right way to format the datetime?
@@ -180,7 +177,7 @@ def build_result(analyze_result_dict):
 
     response_content_length = get_word_count_for_result(content_length)
 
-    content = "".join(lorem.get_word(count=response_content_length))
+    content = "".join(raw_lorem_get_word(count=response_content_length))
 
     # TODO: Should we build a different response based on the model ID?
 
@@ -265,7 +262,7 @@ def get_response_lines(line_count: int = 1):
     numbers = [random.randint(0, 2000) for _ in range(8)]
 
     for _ in range(line_count):
-        word = lorem.get_word()
+        word = raw_lorem_get_word()
         line_list.append(
             {
                 "content": word,
@@ -298,7 +295,7 @@ def get_response_words(word_count: int = 1):
     numbers = [random.randint(0, 2000) for _ in range(8)]
 
     for _ in range(word_count):
-        word = lorem.get_word()
+        word = raw_lorem_get_word()
         word_list.append(
             {
                 "content": word,

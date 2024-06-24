@@ -28,6 +28,8 @@ param openAIDeploymentConfigPath string
 
 param logLevel string
 
+param simulatorImageTag string
+
 // extract these to a common module to have a single, shared place for these across base/infra?
 var containerRegistryName = replace('aoaisim-${baseName}', '-', '')
 var containerAppEnvName = 'aoaisim-${baseName}'
@@ -208,7 +210,7 @@ resource apiSim 'Microsoft.App/containerApps@2023-05-01' = {
       containers: [
         {
           name: 'aoai-simulated-api'
-          image: '${containerRegistry.properties.loginServer}/aoai-simulated-api:latest'
+          image: '${containerRegistry.properties.loginServer}/aoai-simulated-api:${simulatorImageTag}'
           resources: {
             cpu: json('1')
             memory: '2Gi'
@@ -260,4 +262,10 @@ output storageAccountName string = storageAccount.name
 output fileShareName string = simulatorFileShare.name
 
 output acaName string = apiSim.name
+output acaEnvName string = containerAppEnv.name
+output acaIdentityId string = managedIdentity.id
 output apiSimFqdn string = apiSim.properties.configuration.ingress.fqdn
+
+output logAnalyticsName string = logAnalyticsName
+
+output keyVaultName string = vault.name

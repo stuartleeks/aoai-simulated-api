@@ -144,6 +144,7 @@ async def test_allows_unknown_deployment_when_config_not_set():
 
 
 @pytest.mark.asyncio
+@pytest.mark.slow
 async def test_max_tokens():
     """
     Ensure we can call the chat completion endpoint using the generator

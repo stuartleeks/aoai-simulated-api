@@ -29,6 +29,9 @@ if [[ ${#RECORDING_DIR} -eq 0 ]]; then
   RECORDING_DIR="/mnt/simulator/recording"
 fi
 
+image_tag=${SIMULATOR_IMAGE_TAG:-latest}
+
+
 RESOURCE_GROUP_NAME="aoaisim"
 
 cat << EOF > "$script_dir/../infra/azuredeploy.parameters.json"
@@ -68,6 +71,9 @@ cat << EOF > "$script_dir/../infra/azuredeploy.parameters.json"
 	},
 	"logLevel": {
 	  "value": "${LOG_LEVEL}"
+	},
+	"simulatorImageTag": {
+	  "value": "${image_tag}"
 	}
   }
 }

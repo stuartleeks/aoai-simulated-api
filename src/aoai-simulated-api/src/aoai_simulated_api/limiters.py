@@ -10,6 +10,7 @@ from limits import storage, strategies, RateLimitItemPerSecond
 
 
 from aoai_simulated_api import constants
+from aoai_simulated_api.metrics import simulator_metrics
 from aoai_simulated_api.models import Config, RequestContext
 
 logger = logging.getLogger(__name__)
@@ -93,6 +94,13 @@ def create_openai_limiter(
                     + f"Please retry after {retry_after} seconds.",
                 }
             }
+            simulator_metrics.histogram_rate_limit.record(
+                    1,
+                    attributes={
+                        "deployment": deployment_name,
+                        "reason": "requests_per_10s",
+                    },
+                )
             return Response(
                 status_code=429,
                 content=json.dumps(content),
@@ -109,6 +117,13 @@ def create_openai_limiter(
                     + f"Please retry after {retry_after} seconds.",
                 }
             }
+            simulator_metrics.histogram_rate_limit.record(
+                    1,
+                    attributes={
+                        "deployment": deployment_name,
+                        "reason": "tokens_per_10s",
+                    },
+                )
             return Response(
                 status_code=429,
                 content=json.dumps(content),

@@ -71,7 +71,10 @@ docker-run-simulated-api:
 
 test:
 	pytest ./src/tests -v
-	
+
+test-not-slow:
+	pytest ./src/tests -v -m "not slow"
+
 test-watch:
 	ptw --clear ./src/tests
 
@@ -81,49 +84,7 @@ lint:
 deploy-aca: 
 	./scripts/deploy-aca.sh
 
-locust-completions-100k:
-	LOCUST_WEB_PORT=8090 \
-	locust \
-		-f ./src/loadtest/test_completions_100k.py \
-		-H http://localhost:8000/ \
-		--users 20 \
-		--spawn-rate 0.5 \
-		--autostart
-
-locust-chat-completions-100k:
-	LOCUST_WEB_PORT=8090 \
-	locust \
-		-f ./src/loadtest/test_chat_completions_100k.py \
-		-H http://localhost:8000/ \
-		--users 20 \
-		--spawn-rate 0.5 \
-		--autostart
-
-locust-chat-completions-100m:
-	LOCUST_WEB_PORT=8090 \
-	locust \
-		-f ./src/loadtest/test_chat_completions_100m.py \
-		-H http://localhost:8000/ \
-		--users 20 \
-		--spawn-rate 0.5 \
-		--autostart
-		
-locust-chat-completions-no-limit:
-	LOCUST_WEB_PORT=8090 \
-	locust \
-		-f ./src/loadtest/test_chat_completions_no_limit.py \
-		-H http://localhost:8000/ \
-		--users 20 \
-		--spawn-rate 0.5 \
-		--autostart
-
-
-
-locust-doc-intell:
-	LOCUST_WEB_PORT=8090 \
-	locust \
-		-f ./src/loadtest/test_doc_intell.py \
-		-H http://localhost:8000/ \
-		--users 20 \
-		--spawn-rate 0.5 \
-		--autostart
+docker-build-load-test:
+	# TODO should set a tag!
+	cd src/loadtest && \
+	docker build -t aoai-simulated-api-load-test .

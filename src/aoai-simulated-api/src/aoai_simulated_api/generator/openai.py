@@ -3,9 +3,10 @@ import json
 import logging
 import time
 import random
+from typing import Tuple
 
-import lorem
 import nanoid
+
 
 from fastapi import Response
 from fastapi.responses import StreamingResponse
@@ -15,6 +16,7 @@ from aoai_simulated_api.auth import validate_api_key_header
 from aoai_simulated_api.models import RequestContext, OpenAIDeployment
 from aoai_simulated_api.constants import (
     SIMULATOR_KEY_DEPLOYMENT_NAME,
+    SIMULATOR_KEY_OPENAI_PROMPT_TOKENS,
     SIMULATOR_KEY_OPENAI_COMPLETION_TOKENS,
     SIMULATOR_KEY_OPENAI_TOTAL_TOKENS,
     SIMULATOR_KEY_LIMITER,
@@ -187,6 +189,7 @@ def create_embeddings_response(
     context.values[SIMULATOR_KEY_LIMITER] = "openai"
     context.values[SIMULATOR_KEY_OPERATION_NAME] = "embeddings"
     context.values[SIMULATOR_KEY_DEPLOYMENT_NAME] = deployment_name
+    context.values[SIMULATOR_KEY_OPENAI_PROMPT_TOKENS] = tokens
     context.values[SIMULATOR_KEY_OPENAI_TOTAL_TOKENS] = tokens
 
     return Response(
@@ -198,21 +201,191 @@ def create_embeddings_response(
     )
 
 
+def get_lorem_factor(max_tokens: int):
+    # Use a sliding factor for the number of words to generate based on the max_tokens
+    if max_tokens > 500:
+        return 0.72
+    if max_tokens > 100:
+        return 0.6
+    return 0.5
+
+
+class LoremReference:
+    """
+    Generating large amounts of lorem text can be slow, so we pre-generate a set of reference values.
+    These are then combined to generate the required amount of text for API requests
+    """
+
+    model_name: str
+    values: dict[int, list[str]]
+    token_sizes: list[int]
+
+    def __init__(self, model_name: str, reference_values: dict[int, list[str]]):
+        self.model_name = model_name
+        self.values = reference_values
+        self.token_sizes = sorted(reference_values.keys(), reverse=True)
+
+    def get_value_for_size(self, size: int) -> Tuple[str, int] | None:
+        for token_size in self.token_sizes:
+            if token_size <= size:
+                values = self.values[token_size]
+                value = random.choice(values)
+                return (value, token_size)
+        return None
+
+
+lorem_reference_values: dict[str, LoremReference] = {}
+
+
+def generate_lorem_reference_text_values(token_values: list[int], model_name: str):
+    value_count = 5  # number of reference values of each size to generate
+    values = {}
+    for max_tokens in token_values:
+        generated_texts = [raw_generate_lorem_text(max_tokens, model_name) for _ in range(value_count)]
+        values[max_tokens] = generated_texts
+
+    for max_tokens, texts in values.items():
+        actual_tokens = [num_tokens_from_string(text, model_name) for text in texts]
+        print(max_tokens, actual_tokens)
+
+    return LoremReference(model_name, values)
+
+
 def generate_lorem_text(max_tokens: int, model_name: str):
+    text = ""
+    target = max_tokens
+
+    if model_name not in lorem_reference_values:
+        logger.info("Generating lorem reference values for model %s...", model_name)
+        start_time = time.perf_counter()
+        token_sizes = [2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 4000]
+        lorem_reference_values[model_name] = generate_lorem_reference_text_values(token_sizes, model_name)
+        duration = time.perf_counter() - start_time
+        logger.info("Generated lorem reference values for model %s (took %ss)", model_name, duration)
+    reference_values = lorem_reference_values[model_name]
+
+    separator = ""
+    while target > 0:
+        value = reference_values.get_value_for_size(target)
+        if value is None:
+            break
+        new_text, size = value
+        text += separator + new_text
+        separator = " "
+        target -= size
+
+    while num_tokens_from_string(text, model_name) > max_tokens:
+        # remove last word
+        last_space = text.rfind(" ")
+        text = text[:last_space]
+
+    return text
+
+
+lorem_words = [
+    "ullamco",
+    "labore",
+    "cupidatat",
+    "ipsum",
+    "elit,",
+    "esse",
+    "officia",
+    "aliquip",
+    "do",
+    "magna",
+    "duis",
+    "consequat",
+    "exercitation",
+    "occaecat",
+    "ea",
+    "laboris",
+    "sit",
+    "reprehenderit",
+    "velit",
+    "dolor",
+    "enim",
+    "irure",
+    "anim",
+    "nisi",
+    "amet,",
+    "culpa",
+    "commodo",
+    "consectetur",
+    "eiusmod",
+    "minim",
+    "mollit",
+    "fugiat",
+    "cillum",
+    "non",
+    "deserunt",
+    "veniam,",
+    "est",
+    "eu",
+    "qui",
+    "tempor",
+    "adipiscing",
+    "aliqua",
+    "et",
+    "nostrud",
+    "ex",
+    "incididunt",
+    "aute",
+    "nulla",
+    "in",
+    "proident,",
+    "sunt",
+    "id",
+    "lorem",
+    "pariatur",
+    "excepteur",
+    "ut",
+    "ad",
+    "sed",
+    "sint",
+    "laborum",
+    "voluptate",
+    "dolore",
+    "quis",
+]
+
+
+def raw_lorem_get_word(count: int = 1) -> str:
+    return " ".join([random.choice(lorem_words) for _ in range(count)])
+
+
+def raw_generate_lorem_text(max_tokens: int, model_name: str) -> str:
     # The simplest approach to generating the compltion would
     # be to add a word at a time and count the tokens until we reach the limit
     # For large max_token values that will be slow, so we
     # estimate the number of words to generate based on the max_tokens
-    # opting to stay below the limit (based on experimentation)
-    # and then top up
-    init_word_count = int(0.5 * max_tokens)
-    text = lorem.get_word(count=init_word_count)
+    # and then measure the number of tokens in that text
+    # Then we repeat for the remaining token count
+    # (allowing for some degree of error as tokens don't exactly combine that way )
+    target = max_tokens
+    full_text = ""
+    sep = ""
+    while target > 5:
+        factor = get_lorem_factor(target)
+        init_word_count = int(factor * target)
+        # text = lorem.get_word(count=init_word_count)
+        text = raw_lorem_get_word(count=init_word_count)
+        used = num_tokens_from_string(text, model_name)
+        if used > target:
+            break
+        full_text += sep + text
+        sep = " "
+        target -= used
+        target -= 2  # allow for space and error margin in token count addition
+
+    # Now top up the text to the max_tokens
+    # by adding a word at a time
     while True:
-        new_text = text + " " + lorem.get_word()
+        new_text = full_text + " " + raw_lorem_get_word()  # lorem.get_word()
         if num_tokens_from_string(new_text, model_name) > max_tokens:
             break
-        text = new_text
-    return text
+        full_text = new_text
+
+    return full_text
 
 
 def create_completion_response(
@@ -254,6 +427,7 @@ def create_completion_response(
     context.values[SIMULATOR_KEY_LIMITER] = "openai"
     context.values[SIMULATOR_KEY_OPERATION_NAME] = "completions"
     context.values[SIMULATOR_KEY_DEPLOYMENT_NAME] = deployment_name
+    context.values[SIMULATOR_KEY_OPENAI_PROMPT_TOKENS] = prompt_tokens
     context.values[SIMULATOR_KEY_OPENAI_COMPLETION_TOKENS] = completion_tokens
     context.values[SIMULATOR_KEY_OPENAI_TOTAL_TOKENS] = total_tokens
 
@@ -309,6 +483,18 @@ def create_chat_completion_response(
     """
 
     prompt_tokens = num_tokens_from_messages(prompt_messages, model_name)
+
+    text = "".join(generated_content)
+    completion_tokens = num_tokens_from_string(text, model_name)
+    total_tokens = prompt_tokens + completion_tokens
+
+    # store values in the context for use by the rate-limiter etc
+    context.values[SIMULATOR_KEY_LIMITER] = "openai"
+    context.values[SIMULATOR_KEY_OPERATION_NAME] = "chat-completions"
+    context.values[SIMULATOR_KEY_DEPLOYMENT_NAME] = deployment_name
+    context.values[SIMULATOR_KEY_OPENAI_PROMPT_TOKENS] = prompt_tokens
+    context.values[SIMULATOR_KEY_OPENAI_COMPLETION_TOKENS] = completion_tokens
+    context.values[SIMULATOR_KEY_OPENAI_TOTAL_TOKENS] = total_tokens
 
     if streaming:
 
@@ -386,10 +572,6 @@ def create_chat_completion_response(
 
         return StreamingResponse(content=send_words())
 
-    text = "".join(generated_content)
-    completion_tokens = num_tokens_from_string(text, model_name)
-    total_tokens = prompt_tokens + completion_tokens
-
     response_body = {
         "id": "chatcmpl-" + nanoid.non_secure_generate(size=29),
         "object": "chat.completion",
@@ -429,13 +611,6 @@ def create_chat_completion_response(
         },
     }
 
-    # store values in the context for use by the rate-limiter etc
-    context.values[SIMULATOR_KEY_LIMITER] = "openai"
-    context.values[SIMULATOR_KEY_OPERATION_NAME] = "chat-completions"
-    context.values[SIMULATOR_KEY_DEPLOYMENT_NAME] = deployment_name
-    context.values[SIMULATOR_KEY_OPENAI_COMPLETION_TOKENS] = completion_tokens
-    context.values[SIMULATOR_KEY_OPENAI_TOTAL_TOKENS] = total_tokens
-
     return Response(
         content=json.dumps(response_body),
         headers={
@@ -473,15 +648,18 @@ async def azure_openai_embedding(context: RequestContext) -> Response | None:
         )
     request_input = request_body["input"]
 
-    # calculate a simulated latency and store in context.values
-    await calculate_latency(context, 200)
-
-    return create_embeddings_response(
+    response = create_embeddings_response(
         context=context,
         deployment_name=deployment_name,
         model=model,
         request_input=request_input,
     )
+
+    # calculate a simulated latency and store in context.values
+    # needs to be called after the response has been created
+    await calculate_latency(context, 200)
+
+    return response
 
 
 async def azure_openai_completion(context: RequestContext) -> Response | None:
@@ -509,16 +687,19 @@ async def azure_openai_completion(context: RequestContext) -> Response | None:
 
     max_tokens = get_max_completion_tokens(request_body, model_name, prompt_tokens=prompt_tokens)
 
-    # calculate a simulated latency and store in context.values
-    await calculate_latency(context, 200)
-
-    return create_completion_response(
+    response = create_completion_response(
         context=context,
         deployment_name=deployment_name,
         model_name=model_name,
         prompt_tokens=prompt_tokens,
         max_tokens=max_tokens,
     )
+
+    # calculate a simulated latency and store in context.values
+    # needs to be called after the response has been created
+    await calculate_latency(context, 200)
+
+    return response
 
 
 async def azure_openai_chat_completion(context: RequestContext) -> Response | None:
@@ -549,10 +730,7 @@ async def azure_openai_chat_completion(context: RequestContext) -> Response | No
 
     streaming = request_body.get("stream", False)
 
-    # calculate a simulated latency and store in context.values
-    await calculate_latency(context, 200)
-
-    return create_lorem_chat_completion_response(
+    response = create_lorem_chat_completion_response(
         context=context,
         deployment_name=deployment_name,
         model_name=model_name,
@@ -560,3 +738,9 @@ async def azure_openai_chat_completion(context: RequestContext) -> Response | No
         max_tokens=max_tokens,
         prompt_messages=messages,
     )
+
+    # calculate a simulated latency and store in context.values
+    # needs to be called after the response has been created
+    await calculate_latency(context, 200)
+
+    return response
