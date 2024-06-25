@@ -6,7 +6,7 @@ import time
 from typing import Callable
 
 from fastapi import Response
-from limits import storage, strategies, RateLimitItemPerSecond
+from limits import RateLimitItem, storage, strategies, RateLimitItemPerSecond
 
 
 from aoai_simulated_api import constants
@@ -17,11 +17,21 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
+class RateLimitItemWithName:
+    name: str
+    limiter: RateLimitItem
+    token_limit: bool
+
+
+@dataclass
 class OpenAILimits:
     deployment: str
     tokens_per_minute: int
     limit_tokens_per_10s: RateLimitItemPerSecond
     limit_requests_per_10s: RateLimitItemPerSecond
+    limit_tokens_per_minute: RateLimitItemPerSecond
+    limit_requests_per_minute: RateLimitItemPerSecond
+    limiters: list[RateLimitItemWithName]
 
 
 def apply_limits(context: RequestContext, response: Response) -> Response:
@@ -45,26 +55,38 @@ deployment_warnings_issues: dict[str, bool] = {}
 def create_openai_limiter(
     limit_storage: storage.Storage, deployments: dict[str, int]
 ) -> Callable[[RequestContext, Response], Response | None]:
-    deployment_limits = {}
+    deployment_limits: dict[str, OpenAILimits] = {}
     window = strategies.FixedWindowRateLimiter(limit_storage)
 
     for deployment, tokens_per_minute in deployments.items():
         tokens_per_10s = math.ceil(tokens_per_minute / 6)
         limit_tokens_per_10s = RateLimitItemPerSecond(tokens_per_10s, 10)
+        limit_tokens_per_minute = RateLimitItemPerSecond(tokens_per_minute, 60)
 
         # Logical breakdown:
+        # 1k tokens per minute => 6 requests per minute
         # requests_per_minute = (tokens_per_minute * 6) / 1000
         # requests_per_10s = math.ceil(requests_per_minute / 6)
         # i.e. requests_per_10s = math.ceil((tokens_per_minute * 6) / (1000 * 6))
         # which simplifies to
         requests_per_10s = math.ceil(tokens_per_minute / 1000)
         limit_requests_per_10s = RateLimitItemPerSecond(requests_per_10s, 10)
+        requests_per_minute = math.ceil(tokens_per_minute * 6 / 1000)
+        limit_requests_per_minute = RateLimitItemPerSecond(requests_per_minute, 60)
 
         deployment_limits[deployment] = OpenAILimits(
             deployment=deployment,
             tokens_per_minute=tokens_per_minute,
             limit_tokens_per_10s=limit_tokens_per_10s,
             limit_requests_per_10s=limit_requests_per_10s,
+            limit_tokens_per_minute=limit_tokens_per_minute,
+            limit_requests_per_minute=limit_requests_per_minute,
+            limiters=[
+                RateLimitItemWithName("tokens_per_10s", limit_tokens_per_10s, token_limit=True),
+                RateLimitItemWithName("requests_per_10s", limit_requests_per_10s, token_limit=False),
+                RateLimitItemWithName("tokens_per_minute", limit_tokens_per_minute, token_limit=True),
+                RateLimitItemWithName("requests_per_minute", limit_requests_per_minute, token_limit=False),
+            ],
         )
 
     def limiter(context: RequestContext, response: Response) -> Response:
@@ -81,54 +103,39 @@ def create_openai_limiter(
                 deployment_warnings_issues[deployment_name] = True
             return response
 
-        # TODO: revisit limiting logic: also track per minute limits? Allow burst?
+        # Apply limits in turn to determine if the request should be allowed through
+        for limit in limits.limiters:
+            cost = token_cost if limit.token_limit else 1
+            if not window.hit(limit.limiter, cost=cost):
+                stats = window.get_window_stats(limit.limiter)
+                current_time = int(time.time())
+                retry_after = str(stats.reset_time - current_time)
+                content = {
+                    "error": {
+                        "code": "429",
+                        "message": "Requests to the OpenAI API Simulator have exceeded call rate limit. "
+                        + f"Please retry after {retry_after} seconds.",
+                    }
+                }
+                simulator_metrics.histogram_rate_limit.record(
+                    cost,
+                    attributes={
+                        "deployment": deployment_name,
+                        "reason": limit.name,
+                    },
+                )
+                return Response(
+                    status_code=429,
+                    content=json.dumps(content),
+                    headers={"Retry-After": retry_after, "x-ratelimit-reset-requests": retry_after},
+                )
 
-        if not window.hit(limits.limit_requests_per_10s):
-            stats = window.get_window_stats(limit_requests_per_10s)
-            current_time = int(time.time())
-            retry_after = str(stats.reset_time - current_time)
-            content = {
-                "error": {
-                    "code": "429",
-                    "message": "Requests to the OpenAI API Simulator have exceeded call rate limit. "
-                    + f"Please retry after {retry_after} seconds.",
-                }
-            }
-            simulator_metrics.histogram_rate_limit.record(
-                    1,
-                    attributes={
-                        "deployment": deployment_name,
-                        "reason": "requests_per_10s",
-                    },
-                )
-            return Response(
-                status_code=429,
-                content=json.dumps(content),
-                headers={"Retry-After": retry_after, "x-ratelimit-reset-requests": retry_after},
-            )
-        if not window.hit(limits.limit_tokens_per_10s, cost=token_cost):
-            stats = window.get_window_stats(limit_tokens_per_10s)
-            current_time = int(time.time())
-            retry_after = str(stats.reset_time - current_time)
-            content = {
-                "error": {
-                    "code": "429",
-                    "message": "Requests to the OpenAI API Simulator have exceeded call rate limit. "
-                    + f"Please retry after {retry_after} seconds.",
-                }
-            }
-            simulator_metrics.histogram_rate_limit.record(
-                    1,
-                    attributes={
-                        "deployment": deployment_name,
-                        "reason": "tokens_per_10s",
-                    },
-                )
-            return Response(
-                status_code=429,
-                content=json.dumps(content),
-                headers={"Retry-After": retry_after, "x-ratelimit-reset-requests": retry_after},
-            )
+        # Add rate limit headers to response
+        tpm_stats = window.get_window_stats(limits.limit_tokens_per_minute)
+        rpm_stats = window.get_window_stats(limits.limit_requests_per_minute)
+        response.headers["x-ratelimit-remaining-tokens"] = str(tpm_stats.remaining)
+        response.headers["x-ratelimit-remaining-requests"] = str(rpm_stats.remaining)
+
         return response
 
     return limiter

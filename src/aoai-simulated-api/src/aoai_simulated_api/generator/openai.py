@@ -244,10 +244,6 @@ def generate_lorem_reference_text_values(token_values: list[int], model_name: st
         generated_texts = [raw_generate_lorem_text(max_tokens, model_name) for _ in range(value_count)]
         values[max_tokens] = generated_texts
 
-    for max_tokens, texts in values.items():
-        actual_tokens = [num_tokens_from_string(text, model_name) for text in texts]
-        print(max_tokens, actual_tokens)
-
     return LoremReference(model_name, values)
 
 

@@ -102,14 +102,18 @@ def validate_mean_tokens_used_per_10s(table: Table):
 query_processor.add_query(
     title="Mean Tokens Per 10s (successful requests)",
     query=f"""
-AppMetrics
+let results = AppMetrics
 | where TimeGenerated >= datetime({test_start_time.strftime('%Y-%m-%dT%H:%M:%SZ')})
     and TimeGenerated <= datetime({test_stop_time.strftime('%Y-%m-%dT%H:%M:%SZ')})
     and Name == "aoai-simulator.tokens.used"
 | extend deployment = tostring(Properties["deployment"])
-| summarize total_token_count = sum(Sum) by bin(TimeGenerated, 10s)
-| summarize avg_tokens_per_10s = avg(total_token_count)
-""".strip(),
+| summarize total_token_count = sum(Sum) by bin(TimeGenerated, 10s);
+// Ignore the first and last minutes of the test
+let n = toscalar(results | count);
+results
+| order by TimeGenerated desc | take n-1
+| order by  TimeGenerated asc | take n-2
+| summarize avg_tokens_per_10s = avg(total_token_count)""".strip(),
     timespan=timespan,
     show_query=True,
     include_link=True,
