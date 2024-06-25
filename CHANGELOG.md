@@ -2,6 +2,10 @@
 
 ## vNext
 
+- TODO
+
+# v0.4 - 2024-06-25
+
 - Extensibility updates
   - Focus core simulator on OpenAI (moved doc intelligence generator to example extension)
   - API authorization is now part of forwarders/generators to allow extensions to add their own authentication schemes. **BREAKING CHANGE:** If you have custom forwarders/generators they need to be updated to handle this (see examples for implementation details)
@@ -13,7 +17,7 @@
 - Token usage metrics are now split into prompt and completion tokens using metric dimensions
 - **BREAKING CHANGE:** Token metrics have been renamed from `aoai-simulator.tokens_used` and `aoai-simulator.tokens_requested` to `aoai-simulator.tokens.used` and `aoai-simulator.tokens.requested` for consistency with latency metric names
 
-## v0.3 2024-05-03
+## v0.3 - 2024-05-03
 
 - Improve error info when no matching handler is found
 - Fix tokens-per-minute to requests-per-minute conversion bug
