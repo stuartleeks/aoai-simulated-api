@@ -566,7 +566,7 @@ def create_chat_completion_response(
             yield "\n"
             yield "[DONE]"
 
-        return StreamingResponse(content=send_words())
+        return StreamingResponse(content=send_words(), media_type="text/event-stream")
 
     response_body = {
         "id": "chatcmpl-" + nanoid.non_secure_generate(size=29),
