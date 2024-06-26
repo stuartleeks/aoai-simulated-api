@@ -1,4 +1,5 @@
 import asyncio
+import datetime
 import json
 import logging
 import time
@@ -494,13 +495,61 @@ def create_chat_completion_response(
 
     if streaming:
 
+        id = "chatcmpl-" + nanoid.non_secure_generate(size=29)
+
         async def send_words():
+
+            # Send preamble chunks
+            chunk_string = json.dumps(
+                {
+                    "choices": [],
+                    "created": 0,
+                    "id": "",
+                    "model": "",
+                    "object": "",
+                    "prompt_filter_results": [
+                        {
+                            "prompt_index": 0,
+                            "content_filter_results": {
+                                "hate": {"filtered": False, "severity": "safe"},
+                                "self_harm": {"filtered": False, "severity": "safe"},
+                                "sexual": {"filtered": False, "severity": "safe"},
+                                "violence": {"filtered": False, "severity": "safe"},
+                            },
+                        }
+                    ],
+                }
+            )
+            yield "data: " + chunk_string + "\n"
+            yield "\n"
+
+            chunk_string = json.dumps(
+                {
+                    "choices": [
+                        {
+                            "content_filter_results": {},
+                            "delta": {"content": "", "role": "assistant"},
+                            "finish_reason": None,
+                            "index": 0,
+                        }
+                    ],
+                    "created": int(time.mktime(datetime.datetime.now(datetime.UTC).timetuple())),
+                    "id": id,
+                    "model": "gpt-35-turbo",
+                    "object": "chat.completion.chunk",
+                    "system_fingerprint": None,
+                }
+            )
+            yield "data: " + chunk_string + "\n"
+            yield "\n"
+
+            # send content chunks
             space = ""
             role = "assistant"
             for word in generated_content.split(" "):
                 chunk_string = json.dumps(
                     {
-                        "id": "chatcmpl-" + nanoid.non_secure_generate(size=29),
+                        "id": id,
                         "object": "chat.completion.chunk",
                         "created": int(time.time()),
                         "model_name": model_name,
@@ -533,6 +582,7 @@ def create_chat_completion_response(
                 await asyncio.sleep(0.05)
                 space = " "
 
+            # send final chunks
             chunk_string = json.dumps(
                 {
                     "id": "chatcmpl-" + nanoid.non_secure_generate(size=29),
