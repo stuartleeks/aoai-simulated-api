@@ -495,7 +495,7 @@ def create_chat_completion_response(
 
     if streaming:
 
-        id = "chatcmpl-" + nanoid.non_secure_generate(size=29)
+        response_id = "chatcmpl-" + nanoid.non_secure_generate(size=29)
 
         async def send_words():
 
@@ -534,7 +534,7 @@ def create_chat_completion_response(
                         }
                     ],
                     "created": int(time.mktime(datetime.datetime.now(datetime.UTC).timetuple())),
-                    "id": id,
+                    "id": response_id,
                     "model": "gpt-35-turbo",
                     "object": "chat.completion.chunk",
                     "system_fingerprint": None,
@@ -545,49 +545,56 @@ def create_chat_completion_response(
 
             # send content chunks
             space = ""
-            role = "assistant"
+            created_timestamp = int(time.time())
             for word in generated_content.split(" "):
                 chunk_string = json.dumps(
                     {
-                        "id": id,
-                        "object": "chat.completion.chunk",
-                        "created": int(time.time()),
-                        "model_name": model_name,
-                        "system_fingerprint": None,
                         "choices": [
                             {
-                                "delta": {
-                                    "content": space + word,
-                                    "function_call": None,
-                                    "role": role,
-                                    "tool_calls": None,
-                                    "finish_reason": None,
-                                    "index": 0,
-                                    "logprobs": None,
-                                    "content_filter_results": {
-                                        "hate": {"filtered": False, "severity": "safe"},
-                                        "self_harm": {"filtered": False, "severity": "safe"},
-                                        "sexual": {"filtered": False, "severity": "safe"},
-                                        "violence": {"filtered": False, "severity": "safe"},
-                                    },
+                                "content_filter_results": {
+                                    "hate": {"filtered": False, "severity": "safe"},
+                                    "self_harm": {"filtered": False, "severity": "safe"},
+                                    "sexual": {"filtered": False, "severity": "safe"},
+                                    "violence": {"filtered": False, "severity": "safe"},
                                 },
-                            },
+                                "delta": {"content": space + word},
+                                "finish_reason": None,
+                                "index": 0,
+                            }
                         ],
+                        "created": created_timestamp,
+                        "id": response_id,
+                        "model": model_name,
+                        "object": "chat.completion.chunk",
+                        "system_fingerprint": None,
                     }
+                    # {
+                    #     "id": response_id,
+                    #     "object": "chat.completion.chunk",
+                    #     "created": created_timestamp,
+                    #     "model_name": model_name,
+                    #     "system_fingerprint": None,
+                    #     "choices": [
+                    #         {
+                    #             "delta": {
+                    #                 "content": space + word,
+                    #             },
+                    #         },
+                    #     ],
+                    # }
                 )
-                role = None
 
                 yield "data: " + chunk_string + "\n"
                 yield "\n"
-                await asyncio.sleep(0.05)
+                await asyncio.sleep(0.05)  # TODO: determine this from the latency configuration
                 space = " "
 
             # send final chunks
             chunk_string = json.dumps(
                 {
-                    "id": "chatcmpl-" + nanoid.non_secure_generate(size=29),
+                    "id": response_id,
                     "object": "chat.completion.chunk",
-                    "created": int(time.time()),
+                    "created": created_timestamp,
                     "model_name": model_name,
                     "system_fingerprint": None,
                     "choices": [
