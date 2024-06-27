@@ -628,7 +628,7 @@ def create_chat_completion_response(
 
             yield "data: " + chunk_string + "\n"
             yield "\n"
-            yield "[DONE]"
+            yield "data: [DONE]"
 
         # return StreamingResponse(content=send_words(), media_type="text/event-stream")
         response = StreamingResponse(content=send_words())
