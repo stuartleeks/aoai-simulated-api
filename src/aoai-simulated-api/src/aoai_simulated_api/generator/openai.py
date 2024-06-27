@@ -598,31 +598,46 @@ def create_chat_completion_response(
             # send final chunks
             chunk_string = json.dumps(
                 {
-                    "id": response_id,
-                    "object": "chat.completion.chunk",
-                    "created": created_timestamp,
-                    "model_name": model_name,
-                    "system_fingerprint": None,
                     "choices": [
                         {
-                            "delta": {
-                                "content": None,
-                                "function_call": None,
-                                "role": None,
-                                "tool_calls": None,
-                                "finish_reason": finish_reason,
-                                "index": 0,
-                                "logprobs": None,
-                                "content_filter_results": {
-                                    "hate": {"filtered": False, "severity": "safe"},
-                                    "self_harm": {"filtered": False, "severity": "safe"},
-                                    "sexual": {"filtered": False, "severity": "safe"},
-                                    "violence": {"filtered": False, "severity": "safe"},
-                                },
-                            },
-                        },
+                            "content_filter_results": {},
+                            "delta": {},
+                            "finish_reason": finish_reason,
+                            "index": 0,
+                        }
                     ],
+                    "created": created_timestamp,
+                    "id": response_id,
+                    "model": "gpt-35-turbo",
+                    "object": "chat.completion.chunk",
+                    "system_fingerprint": None,
                 },
+                # {
+                #     "id": response_id,
+                #     "object": "chat.completion.chunk",
+                #     "created": created_timestamp,
+                #     "model_name": model_name,
+                #     "system_fingerprint": None,
+                #     "choices": [
+                #         {
+                #             "delta": {
+                #                 "content": None,
+                #                 "function_call": None,
+                #                 "role": None,
+                #                 "tool_calls": None,
+                #                 "finish_reason": finish_reason,
+                #                 "index": 0,
+                #                 "logprobs": None,
+                #                 "content_filter_results": {
+                #                     "hate": {"filtered": False, "severity": "safe"},
+                #                     "self_harm": {"filtered": False, "severity": "safe"},
+                #                     "sexual": {"filtered": False, "severity": "safe"},
+                #                     "violence": {"filtered": False, "severity": "safe"},
+                #                 },
+                #             },
+                #         },
+                #     ],
+                # },
                 separators=(",", ":"),
             )
 
