@@ -493,6 +493,9 @@ def create_chat_completion_response(
     context.values[SIMULATOR_KEY_OPENAI_COMPLETION_TOKENS] = completion_tokens
     context.values[SIMULATOR_KEY_OPENAI_TOTAL_TOKENS] = total_tokens
 
+    ## TEMP
+    model_name = "gpt-35-turbo"
+
     if streaming:
 
         response_id = "chatcmpl-" + nanoid.non_secure_generate(size=29)
@@ -518,7 +521,8 @@ def create_chat_completion_response(
                             },
                         }
                     ],
-                }
+                },
+                separators=(",", ":"),
             )
             yield "data: " + chunk_string + "\n"
             yield "\n"
@@ -538,7 +542,8 @@ def create_chat_completion_response(
                     "model": "gpt-35-turbo",
                     "object": "chat.completion.chunk",
                     "system_fingerprint": None,
-                }
+                },
+                separators=(",", ":"),
             )
             yield "data: " + chunk_string + "\n"
             yield "\n"
@@ -567,7 +572,8 @@ def create_chat_completion_response(
                         "model": model_name,
                         "object": "chat.completion.chunk",
                         "system_fingerprint": None,
-                    }
+                    },
+                    separators=(",", ":"),
                     # {
                     #     "id": response_id,
                     #     "object": "chat.completion.chunk",
@@ -616,14 +622,19 @@ def create_chat_completion_response(
                             },
                         },
                     ],
-                }
+                },
+                separators=(",", ":"),
             )
 
             yield "data: " + chunk_string + "\n"
             yield "\n"
             yield "[DONE]"
 
-        return StreamingResponse(content=send_words(), media_type="text/event-stream")
+        # return StreamingResponse(content=send_words(), media_type="text/event-stream")
+        response = StreamingResponse(content=send_words())
+        response.headers["Content-Type"] = "text/event-stream"
+        response.headers["Transfer-Encoding"] = "chunked"
+        return response
 
     response_body = {
         "id": "chatcmpl-" + nanoid.non_secure_generate(size=29),
