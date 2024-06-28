@@ -8,7 +8,7 @@ version = "0.0.1"
 authors = [
   { name="Stuart Leeks", email="stuartle@microsoft.com" },
 ]
-description = "Experimental CLI for ISE time tracking"
+description = "API Simulator for OpenAI"
 #readme = "README.md"
 requires-python = ">=3.12"
 classifiers = [
