@@ -1,12 +1,12 @@
 import asyncio
+import logging
 import time
 from fastapi import Response
 
 from aoai_simulated_api import constants
 from aoai_simulated_api.metrics import simulator_metrics
 from aoai_simulated_api.models import RequestContext
-
-
+from fastapi.responses import StreamingResponse
 
 
 class LatencyGenerator:
@@ -51,12 +51,14 @@ class LatencyGenerator:
 
         status_code = self.__response.status_code
         if status_code < 300:
-            target_duration_ms = self.__context.values.get(constants.TARGET_DURATION_MS, None)
-            if target_duration_ms:
-                target_duration_s = target_duration_ms / 1000
-                extra_latency_s = target_duration_s - base_duration_s
+            # don't apply latency to streaming requests - they add latency in the streaming
+            if not isinstance(self.__response, StreamingResponse):
+                target_duration_ms = self.__context.values.get(constants.TARGET_DURATION_MS, None)
+                if target_duration_ms:
+                    target_duration_s = target_duration_ms / 1000
+                    extra_latency_s = target_duration_s - base_duration_s
 
-        if extra_latency_s and extra_latency_s > 0:
+        if extra_latency_s > 0:
             await asyncio.sleep(extra_latency_s)
 
         full_end_time = time.perf_counter()
