@@ -188,18 +188,26 @@ async def test_stream_success():
             model="deployment1", messages=messages, max_tokens=50, stream=True
         )
 
-        is_first_chunk = True
         count = 0
         chunk: ChatCompletionChunk
-        for chunk in response:
-            if is_first_chunk:
-                is_first_chunk = False
+        for index, chunk in enumerate(response):
+            if index == 0:
+                assert len(chunk.choices) == 0
+            elif index == 1:
+                assert len(chunk.choices) == 1
                 assert chunk.choices[0].delta.role == "assistant"
-            assert len(chunk.choices) == 1
+                assert chunk.choices[0].delta.content == ""
+            else:
+                assert len(chunk.choices) == 1
+                if chunk.choices[0].finish_reason:
+                    assert chunk.choices[0].finish_reason == "length"
+                    assert chunk.choices[0].delta.content is None
+                else:
+                    assert chunk.choices[0].delta.content != ""
+
             count += 1
 
         assert count > 5
-        assert chunk.choices[0].delta.finish_reason == "length"
 
 
 @pytest.mark.asyncio

@@ -27,6 +27,8 @@ Units: `seconds`
 
 The `aoai-simulator.latency.full` metric measures the full latency of the simulator. This is the time taken to process a request _including_ any added latency.
 
+NOTE: Added latency for streaming requests is not included in this metric.
+
 Dimensions:
 - `deployment`: The name of the deployment the metric relates to.
 - `status_code`: The HTTP status code of the response.

@@ -97,7 +97,11 @@ def chat_bot():
         if not user_input:
             break
         messages.append({"role": "user", "content": user_input})
-        response = aoai_client.chat.completions.create(model=get_deployment_name(), messages=messages)
+        response = aoai_client.chat.completions.create(
+            model=get_deployment_name(),
+            messages=messages,
+            max_tokens=750,
+        )
         response_content = response.choices[0].message.content
         messages.append({"role": "assistant", "content": response_content})
         print("\x1b[0;33mBot: " + response_content)
@@ -111,7 +115,12 @@ def chat_bot_stream():
         if not user_input:
             break
         messages.append({"role": "user", "content": user_input})
-        response = aoai_client.chat.completions.create(model=get_deployment_name(), messages=messages, stream=True)
+        response = aoai_client.chat.completions.create(
+            model=get_deployment_name(),
+            messages=messages,
+            stream=True,
+            max_tokens=750,
+        )
         print("\x1b[0;33mBot: ", end="")
         bot_response = ""
         for chunk in response:
