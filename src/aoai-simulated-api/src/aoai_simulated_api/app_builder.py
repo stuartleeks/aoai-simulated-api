@@ -153,7 +153,7 @@ async def catchall(request: Request):
 
             # Apply limits here so that that they apply to record/replay as well as generate
             if response.status_code < 300:
-                response = apply_limits(context, response)
+                response = await apply_limits(context, response)
 
             # pass the response to the latency generator
             # so that it can determine the latency to add

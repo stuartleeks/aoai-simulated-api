@@ -1,9 +1,10 @@
 from dataclasses import dataclass
+import inspect
 import json
 import logging
 import math
 import time
-from typing import Callable
+from typing import Awaitable, Callable
 
 from fastapi import Response
 from limits import RateLimitItem, storage, strategies, RateLimitItemPerSecond
@@ -27,18 +28,20 @@ class RateLimitItemWithName:
 class OpenAILimits:
     deployment: str
     tokens_per_minute: int
-    limit_tokens_per_10s: RateLimitItemPerSecond
+    # limit_tokens_per_10s: RateLimitItemPerSecond
     limit_requests_per_10s: RateLimitItemPerSecond
     limit_tokens_per_minute: RateLimitItemPerSecond
-    limit_requests_per_minute: RateLimitItemPerSecond
+    # limit_requests_per_minute: RateLimitItemPerSecond
     limiters: list[RateLimitItemWithName]
 
 
-def apply_limits(context: RequestContext, response: Response) -> Response:
+async def apply_limits(context: RequestContext, response: Response) -> Awaitable[Response]:
     limiter_name = context.values.get(constants.SIMULATOR_KEY_LIMITER)
     limiter = context.config.limiters.get(limiter_name) if limiter_name else None
     if limiter:
         limit_response = limiter(context, response)
+        if limit_response and inspect.isawaitable(limit_response):
+            limit_response = await limit_response
         return limit_response
 
     logger.info("No limiter found for response: %s [limiter name: %s]", context.request.url.path, limiter_name)
@@ -59,8 +62,9 @@ def create_openai_limiter(
     window = strategies.FixedWindowRateLimiter(limit_storage)
 
     for deployment, tokens_per_minute in deployments.items():
-        tokens_per_10s = math.ceil(tokens_per_minute / 6)
-        limit_tokens_per_10s = RateLimitItemPerSecond(tokens_per_10s, 10)
+        # TODO: clean up commented out code if no longer needed
+        # tokens_per_10s = math.ceil(tokens_per_minute / 6)
+        # limit_tokens_per_10s = RateLimitItemPerSecond(tokens_per_10s, 10)
         limit_tokens_per_minute = RateLimitItemPerSecond(tokens_per_minute, 60)
 
         # Logical breakdown:
@@ -71,30 +75,54 @@ def create_openai_limiter(
         # which simplifies to
         requests_per_10s = math.ceil(tokens_per_minute / 1000)
         limit_requests_per_10s = RateLimitItemPerSecond(requests_per_10s, 10)
-        requests_per_minute = math.ceil(tokens_per_minute * 6 / 1000)
-        limit_requests_per_minute = RateLimitItemPerSecond(requests_per_minute, 60)
+        # requests_per_minute = math.ceil(tokens_per_minute * 6 / 1000)
+        # limit_requests_per_minute = RateLimitItemPerSecond(requests_per_minute, 60)
 
         deployment_limits[deployment] = OpenAILimits(
             deployment=deployment,
             tokens_per_minute=tokens_per_minute,
-            limit_tokens_per_10s=limit_tokens_per_10s,
+            # limit_tokens_per_10s=limit_tokens_per_10s,
             limit_requests_per_10s=limit_requests_per_10s,
             limit_tokens_per_minute=limit_tokens_per_minute,
-            limit_requests_per_minute=limit_requests_per_minute,
+            # limit_requests_per_minute=limit_requests_per_minute,
             limiters=[
-                RateLimitItemWithName("tokens_per_10s", limit_tokens_per_10s, token_limit=True),
+                # RateLimitItemWithName("tokens_per_10s", limit_tokens_per_10s, token_limit=True),
                 RateLimitItemWithName("requests_per_10s", limit_requests_per_10s, token_limit=False),
                 RateLimitItemWithName("tokens_per_minute", limit_tokens_per_minute, token_limit=True),
-                RateLimitItemWithName("requests_per_minute", limit_requests_per_minute, token_limit=False),
+                # RateLimitItemWithName("requests_per_minute", limit_requests_per_minute, token_limit=False),
             ],
         )
 
-    def limiter(context: RequestContext, response: Response) -> Response:
-        token_cost = context.values.get(constants.SIMULATOR_KEY_OPENAI_TOTAL_TOKENS)
+    async def limiter(context: RequestContext, response: Response) -> Awaitable[Response]:
         deployment_name = context.values.get(constants.SIMULATOR_KEY_DEPLOYMENT_NAME)
 
-        if not token_cost or not deployment_name:
-            logger.warning("openai_limiter: No token cost or deployment name found in context")
+        # Check whether the request has set max_tokens
+        # If so, use that as the rate-limiting token value
+        request_body = await context.request.json()
+        max_tokens = request_body.get("max_tokens")
+        if max_tokens:
+            token_cost = max_tokens
+        else:
+            # otherwise, calculate the rate-limiting token cost
+            if "/chat/completions" in context.request.url.path:
+                token_cost = 16
+            elif "/embeddings" in context.request.url.path:
+                request_body = await context.request.json()
+                request_input = request_body.get("input")
+                if request_input is None:
+                    logger.warning("openai_limiter: input not found in request body for embedding request")
+                    token_cost = 0
+                else:
+                    token_cost = math.ceil(len(request_input) / 4)
+            else:
+                # TODO: implement calculations for other endpoints
+                logger.warning("openai_limiter: unhanndled endpoint %s", context.request.url.path)
+                token_cost = 0
+
+        if not deployment_name:
+            logger.warning("openai_limiter: deployment name found in context")
+
+        context.values[constants.SIMULATOR_KEY_OPENAI_RATE_LIMIT_TOKENS] = token_cost  # TODO add a metric for this?
 
         limits = deployment_limits.get(deployment_name)
         if not limits:
@@ -132,7 +160,7 @@ def create_openai_limiter(
 
         # Add rate limit headers to response
         tpm_stats = window.get_window_stats(limits.limit_tokens_per_minute)
-        rpm_stats = window.get_window_stats(limits.limit_requests_per_minute)
+        rpm_stats = window.get_window_stats(limits.limit_requests_per_10s)
         response.headers["x-ratelimit-remaining-tokens"] = str(tpm_stats.remaining)
         response.headers["x-ratelimit-remaining-requests"] = str(rpm_stats.remaining)
 

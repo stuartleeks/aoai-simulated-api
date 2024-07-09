@@ -14,13 +14,23 @@ SIMULATOR_KEY_DEPLOYMENT_NAME = "Deployment-Name"
 SIMULATOR_KEY_LIMITER = "Limiter"
 
 # SIMULATOR_KEY_OPENAI_PROMPT_TOKENS stores the number of tokens used for the prompt
-SIMULATOR_KEY_OPENAI_PROMPT_TOKENS = "XOpenAI-Tokens-Prompt"
+SIMULATOR_KEY_OPENAI_PROMPT_TOKENS = "X-OpenAI-Tokens-Prompt"
 
 # SIMULATOR_KEY_OPENAI_COMPLETION_TOKENS stores the number of tokens used for the completion (i.e. generated tokens)
-SIMULATOR_KEY_OPENAI_COMPLETION_TOKENS = "XOpenAI-Tokens-Completion"
+SIMULATOR_KEY_OPENAI_COMPLETION_TOKENS = "X-OpenAI-Tokens-Completion"
 
 # SIMULATOR_KEY_OPENAI_TOTAL_TOKENS stores the total number of tokens used in the request
-SIMULATOR_KEY_OPENAI_TOTAL_TOKENS = "XOpenAI-Tokens-Total"
+SIMULATOR_KEY_OPENAI_TOTAL_TOKENS = "X-OpenAI-Tokens-Total"
+
+# SIMULATOR_KEY_OPENAI_RATE_LIMIT_TOKENS stores the number of tokens used for rate limiting
+SIMULATOR_KEY_OPENAI_RATE_LIMIT_TOKENS = "X-OpenAI-Tokens-Rate-Limit"
+
+# SIMULATOR_KEY_OPENAI_MAX_TOKENS_REQUESTED stores the max_tokens from the request
+SIMULATOR_KEY_OPENAI_MAX_TOKENS_REQUESTED = "X-OpenAI-Max-Tokens-Requested"
+
+# SIMULATOR_KEY_OPENAI_MAX_TOKENS_EFFECTIVE stores the effective max_tokens value for the request
+# (taking into account the model's limits/defaults)
+SIMULATOR_KEY_OPENAI_MAX_TOKENS_EFFECTIVE = "X-OpenAI-Max-Tokens-Effective"
 
 
 # TARGET_DURATION_MS stores the target duration of the request in milliseconds
