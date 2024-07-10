@@ -113,7 +113,11 @@ def create_openai_limiter(
                     logger.warning("openai_limiter: input not found in request body for embedding request")
                     token_cost = 0
                 else:
-                    token_cost = math.ceil(len(request_input) / 4)
+                    if isinstance(request_input, list):
+                        # TODO - validate whether we should sum the ceil values or ceil the sum
+                        token_cost = sum([math.ceil(len(input_str) / 4) for input_str in request_input])
+                    else:
+                        token_cost = math.ceil(len(request_input) / 4)
             else:
                 # TODO: implement calculations for other endpoints
                 logger.warning("openai_limiter: unhanndled endpoint %s", context.request.url.path)
