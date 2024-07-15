@@ -51,7 +51,7 @@ api-key: {{aoai_key}}
     "content": "What is the meaning of life?"
     }],
   "model": "gpt-5-turbo-1",
-  "max_tokens": 50
+  "max_tokens": 200
 }
 
 
@@ -228,6 +228,29 @@ api-key: {{aoai_key}}
 		"open_ai_chat_completions": {
 			"mean": 10,
 			"std_dev": 0.5
+		}
+	}
+}
+
+###
+
+PATCH {{aoai_endpoint}}++/config
+Content-Type: application/json
+api-key: {{aoai_key}}
+
+{
+	"latency": {
+		"open_ai_chat_completions": {
+			"mean": 0,
+			"std_dev": 0
+		},
+		"open_ai_completions": {
+			"mean": 0,
+			"std_dev": 0
+		},
+		"open_ai_embeddings": {
+			"mean": 0,
+			"std_dev": 0
 		}
 	}
 }

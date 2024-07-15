@@ -60,4 +60,4 @@ The `aoai-simulator.limits` metric measures the number of requests that were rat
 
 Dimensions:
 - `deployment`: The name of the deployment the metric relates to.
-- `limit_type`: The type of limit that was hit, e.g. `requests_per_10s` or `tokens_per_10s`.
+- `limit_type`: The type of limit that was hit, e.g. `requests` or `tokens`.
