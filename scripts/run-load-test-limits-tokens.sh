@@ -16,7 +16,7 @@ deployment_name="gpt-35-turbo-100k-token"
 
 # Set max tokens high to trigger rate-limiting by tokens not request count
 # Since there are 6 RPM per 1000 TPM a max_tokens of 1000/6 = 167 will trigger rate limiting
-# Keeping the value relatively makes the validation more granular
+# Keeping the value near that threshold makes the validation more granular
 max_tokens=200
 
 result=$(\

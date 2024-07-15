@@ -31,6 +31,10 @@
 		"model": "gpt-3.5-turbo",
 		"tokensPerMinute" : 100000
 	},
+	"gpt-35-turbo-1m-token" : {
+		"model": "gpt-3.5-turbo",
+		"tokensPerMinute" : 1000000
+	},
 	"gpt-35-turbo-100m-token" : {
 		"model": "gpt-3.5-turbo",
 		"tokensPerMinute" : 100000000

@@ -2,7 +2,9 @@
 # @aoai_endpoint={{$dotenv AZURE_OPENAI_ENDPOINT}}
 # @aoai_key={{$dotenv AZURE_OPENAI_KEY}}
 
-@aoai_endpoint=http://localhost:8000/
+# @aoai_endpoint=http://localhost:8000/
+@aoai_endpoint=https://aoai-simulated-api.redgrass-43a1622c.westeurope.azurecontainerapps.io/
+
 @aoai_key={{$dotenv SIMULATOR_API_KEY}}
 
 @aoai_deployment={{$dotenv AZURE_OPENAI_DEPLOYMENT}}
@@ -228,6 +230,27 @@ api-key: {{aoai_key}}
 		"open_ai_chat_completions": {
 			"mean": 10,
 			"std_dev": 0.5
+		}
+	}
+}
+
+###
+
+
+
+PATCH {{aoai_endpoint}}++/config
+Content-Type: application/json
+api-key: {{aoai_key}}
+
+{
+	"latency": {
+		"open_ai_embeddings": {
+			"mean": 0,
+			"std_dev": 0
+		},
+		"open_ai_chat_completions": {
+			"mean": 0,
+			"std_dev": 0
 		}
 	}
 }

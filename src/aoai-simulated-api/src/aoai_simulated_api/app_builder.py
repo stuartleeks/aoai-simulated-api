@@ -47,6 +47,7 @@ def apply_config():
 
     logger.info("📝 Using OpenAI deployments                : %s", get_config().openai_deployments)
     logger.info("📝 Using latencies                         : %s", get_config().latency)
+    logger.info("📝 Using limits_storage_connection_string  : %s", get_config().limits_storage_connection_string)
 
 
 def _default_validate_api_key_header(request: Request):

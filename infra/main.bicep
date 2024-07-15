@@ -162,7 +162,44 @@ resource appInsightsConnectionStringSecret 'Microsoft.KeyVault/vaults/secrets@20
   }
 }
 
-resource apiSim 'Microsoft.App/containerApps@2023-05-01' = {
+resource apiSimRedis 'Microsoft.App/containerApps@2024-03-01' = {
+  // TODO: Make this optional (i.e. have a useRedis param)
+  name: 'redis'
+  location: location
+  properties: {
+    managedEnvironmentId: containerAppEnv.id
+    configuration: {
+      activeRevisionsMode: 'single'
+      maxInactiveRevisions: 0
+      ingress: {
+        external: false
+        targetPort: 6379
+        transport: 'TCP'
+      }
+      service: {
+        type: 'redis'
+      }
+    }
+    template: {
+      containers: [
+        {
+          name: 'redis'
+          image: 'redis:6.2.6'
+          resources: {
+            cpu: json('0.5')
+            memory: '1Gi'
+          }
+        }
+      ]
+      scale: {
+        minReplicas: 1
+        maxReplicas: 1
+      }
+    }
+  }
+}
+
+resource apiSim 'Microsoft.App/containerApps@2024-03-01' = {
   name: apiSimulatorName
   location: location
   identity: {
@@ -230,6 +267,7 @@ resource apiSim 'Microsoft.App/containerApps@2023-05-01' = {
             // https://opentelemetry-python.readthedocs.io/en/latest/sdk/environment_variables.html#opentelemetry.sdk.environment_variables.OTEL_SERVICE_NAME
             { name: 'OTEL_SERVICE_NAME', value: apiSimulatorName }
             { name: 'OTEL_METRIC_EXPORT_INTERVAL', value: '10000' } // metric export interval in milliseconds
+            { name: 'LIMITS_STORAGE_CONNECTION_STRING', value: 'redis://:$REDIS_PASSWORD@$REDIS_ENDPOINT' } // TODO: make this conditional on useRedis
           ]
           volumeMounts: [
             {
@@ -245,6 +283,12 @@ resource apiSim 'Microsoft.App/containerApps@2023-05-01' = {
           storageName: containerAppStorage.name
           storageType: 'AzureFile'
           mountOptions: 'uid=1000,gid=1000,nobrl,mfsymlinks,cache=none'
+        }
+      ]
+      serviceBinds: [ // TODO: make conditional on useRedis
+        {
+          serviceId: apiSimRedis.id
+          name: 'redis'
         }
       ]
       scale: {

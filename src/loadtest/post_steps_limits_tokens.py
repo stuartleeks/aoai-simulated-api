@@ -60,8 +60,9 @@ timespan = (datetime.now(UTC) - timedelta(days=1), datetime.now(UTC))
 
 def validate_request_latency(table: Table):
     mean_latency = table.rows[0][0]
-    if mean_latency > 10:
-        return f"Mean latency is too high: {mean_latency}"
+    threshold = 10
+    if mean_latency > threshold:
+        return f"Mean latency is too high: {mean_latency} (expected <= {threshold})"
     return None
 
 

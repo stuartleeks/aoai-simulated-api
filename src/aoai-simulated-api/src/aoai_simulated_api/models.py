@@ -140,6 +140,9 @@ class Config(PatchableConfig):
     generators: list[Callable[[RequestContext], Response | Awaitable[Response] | None]] = None
     limiters: dict[str, Callable[[RequestContext, Response], Response | None]] = {}
     extension_path: Annotated[str | None, Field(default=None, alias="EXTENSION_PATH")]
+    limits_storage_connection_string: Annotated[
+        str | None, Field(default=None, alias="LIMITS_STORAGE_CONNECTION_STRING")
+    ]
 
 
 @dataclass
@@ -148,6 +151,7 @@ class OpenAIDeployment:
     model: str
     tokens_per_minute: int = 0
     embedding_size: int = 0
+
 
 # re-using Starlette's Route class to define a route
 # endpoint to pass to Route

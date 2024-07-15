@@ -3,11 +3,14 @@ import inspect
 import json
 import logging
 import math
+import os
 import time
+from string import Template
 from typing import Awaitable, Callable
 
 from fastapi import Response
 from limits import RateLimitItem, storage, strategies, RateLimitItemPerSecond
+from limits.storage import storage_from_string
 
 
 from aoai_simulated_api import constants
@@ -60,6 +63,7 @@ def create_openai_limiter(
 ) -> Callable[[RequestContext, Response], Response | None]:
     deployment_limits: dict[str, OpenAILimits] = {}
     window = strategies.FixedWindowRateLimiter(limit_storage)
+    # window = strategies.MovingWindowRateLimiter(limit_storage)
 
     for deployment, tokens_per_minute in deployments.items():
         # TODO: clean up commented out code if no longer needed
@@ -180,11 +184,17 @@ def get_default_limiters(config: Config):
         else {}
     )
 
-    memory_storage = storage.MemoryStorage()
+    # expand env vars in the connection string to allow for dynamic configuration
+    # e.g. "memory://" or "redis://:$REDIS_USER@$REDIS_ENDPOINT"
+    connection_string_base = config.limits_storage_connection_string or "memory://"
+    t = Template(connection_string_base)
+    connection_string_expanded = t.substitute(os.environ)
+    limits_storage = storage_from_string(connection_string_expanded)
+
     # Dictionary of limiters keyed by name
     # Each limiter is a function that takes a response and returns a boolean indicating
     # whether the request should be allowed
     # Limiter returns Response object if request should be blocked or None otherwise
     return {
-        "openai": create_openai_limiter(memory_storage, openai_deployment_limits),
+        "openai": create_openai_limiter(limits_storage, openai_deployment_limits),
     }

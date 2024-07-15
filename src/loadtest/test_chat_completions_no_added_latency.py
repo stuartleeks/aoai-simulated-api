@@ -39,6 +39,15 @@ def on_locust_init(environment: Environment, **_):
     logging.info("Set chat completion latencies to zero")
     set_simulator_chat_completions_latency(environment.host, mean=0, std_dev=0)
 
+    logging.info("Sending initial request to warm up the simulator...")
+    # the first request creates the response texts and is slower than subsequent requests
+    # so we send a request here to warm up the simulator and avoid this latency in the test metrics
+    environment.reset_stats = True
+    ChatCompletionsUser.host = environment.host
+    user = ChatCompletionsUser(environment)
+    user.hello_world()
+    environment.reset_stats = False
+
     logging.info("on_locust_init - done")
 
 
