@@ -92,10 +92,12 @@ def validate_mean_sucess_rps(table: Table):
     # The deployment for the tests has 100,000 Tokens Per Minute (TPM) limit
     # That equates to 600 Requests Per Minute (RPM) or 10 Requests Per Second (RPS)
     mean_rps = table.rows[0][0]
-    if mean_rps > 11:
-        return f"Mean RPS is too high: {mean_rps}"
-    if mean_rps < 9:
-        return f"Mean RPS is too low: {mean_rps}"
+    low_value = 9
+    high_value = 11
+    if mean_rps > high_value:
+        return f"Mean RPS is too high: {mean_rps} (expected between {low_value} and {high_value})"
+    if mean_rps < low_value:
+        return f"Mean RPS is too low: {mean_rps} (expected between {low_value} and {high_value})"
     return None
 
 

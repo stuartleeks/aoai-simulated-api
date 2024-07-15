@@ -92,10 +92,12 @@ def validate_mean_tokens_used_per_10s(table: Table):
     # The deployment for the tests has 100,000 Tokens Per Minute (TPM) limit
     # That equates to ~16,667 tokens per 10s period
     mean_tokens_per_10s = table.rows[0][0]
-    if mean_tokens_per_10s > 17000:
-        return f"Mean tokens per 10s is too high: {mean_tokens_per_10s}"
-    if mean_tokens_per_10s < 16000:
-        return f"Mean tokens per 10s is too low: {mean_tokens_per_10s}"
+    low_value = 16000
+    high_value = 17000
+    if mean_tokens_per_10s > high_value:
+        return f"Mean tokens per 10s is too high: {mean_tokens_per_10s} (expected between {low_value} and {high_value})"
+    if mean_tokens_per_10s < low_value:
+        return f"Mean tokens per 10sis too low: {mean_tokens_per_10s} (expected between {low_value} and {high_value})"
     return None
 
 
@@ -166,7 +168,7 @@ AppMetrics
 | extend deployment = tostring(Properties["deployment"])
 | summarize total_token_count = sum(Sum) by bin(TimeGenerated, 10s), Name
 | evaluate pivot(Name, sum(total_token_count))
-| render timechart | render timechart 
+| render timechart
 """.strip(),
     is_chart=True,
     columns=["aoai-simulator.tokens.used", "aoai-simulator.tokens.requested"],
