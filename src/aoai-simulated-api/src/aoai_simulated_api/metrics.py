@@ -8,6 +8,7 @@ class SimulatorMetrics:
     histogram_latency_full: metrics.Histogram
     histogram_tokens_used: metrics.Histogram
     histogram_tokens_requested: metrics.Histogram
+    histogram_tokens_rate_limit: metrics.Histogram
     histogram_rate_limit: metrics.Histogram
 
 
@@ -36,6 +37,12 @@ def _get_simulator_metrics() -> SimulatorMetrics:
         histogram_tokens_requested=meter.create_histogram(
             name="aoai-simulator.tokens.requested",
             description="Number of tokens across all requests (success or not)",
+            unit="tokens",
+        ),
+        # dimensions: deployment
+        histogram_tokens_rate_limit=meter.create_histogram(
+            name="aoai-simulator.tokens.rate-limit",
+            description="Number of tokens that were counted for rate-limiting",
             unit="tokens",
         ),
         # dimensions: deployment, reason

@@ -7,6 +7,7 @@ To help you understand how the API Simulator is performing, we provide a number 
 	- [aoai-simulator.latency.full](#aoai-simulatorlatencyfull)
 	- [aoai-simulator.tokens.used](#aoai-simulatortokensused)
 	- [aoai-simulator.tokens.requested](#aoai-simulatortokensrequested)
+	- [aoai-simulator.tokens.rate-limit](#aoai-simulatortokensrate-limit)
 	- [aoai-simulator.limits](#aoai-simulatorlimits)
 
 
@@ -51,6 +52,15 @@ The `aoai-simulator.tokens.requested` metric measures the number of tokens reque
 Dimensions:
 - `deployment`: The name of the deployment the metric relates to.
 - `token_type`: The type of token, e.g. `prompt` or `completion`.
+
+## aoai-simulator.tokens.rate-limit
+
+Units: `tokens`
+
+The `aoai-simulator.tokens.rate-limit` metric measures the number of tokens counted by the simulator for rate-limiting. This is different to `aoai-simulator.tokens.used` which corresponding to the billing count for tokens.
+
+Dimensions:
+- `deployment`: The name of the deployment the metric relates to.
 
 ## aoai-simulator.limits
 

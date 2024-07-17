@@ -225,5 +225,5 @@ async def test_openai_record_replay_completion_limit_reached(httpserver: HTTPSer
                 assert e.status_code == 429
                 assert (
                     e.message
-                    == "Error code: 429 - {'error': {'code': '429', 'message': 'Requests to the OpenAI API Simulator have exceeded call rate limit. Please retry after 10 seconds.'}}"
+                    == "Error code: 429 - {'error': {'code': '429', 'message': 'Requests to the OpenAI API Simulator have exceeded call rate limit. Please retry after 60 seconds.'}}"
                 )

@@ -91,9 +91,9 @@ def validate_mean_tokens_used_per_10s(table: Table):
     # Check if the mean RPS is within the expected range
     # The deployment for the tests has 100,000 Tokens Per Minute (TPM) limit
     # That equates to ~16,667 tokens per 10s period
-    mean_tokens_per_10s = table.rows[0][0]
-    low_value = 16000
-    high_value = 17000
+    mean_tokens_per_10s = int(table.rows[0][0])
+    low_value = 16600
+    high_value = 16700
     if mean_tokens_per_10s > high_value:
         return f"Mean tokens per 10s is too high: {mean_tokens_per_10s} (expected between {low_value} and {high_value})"
     if mean_tokens_per_10s < low_value:
@@ -102,19 +102,32 @@ def validate_mean_tokens_used_per_10s(table: Table):
 
 
 query_processor.add_query(
-    title="Mean Tokens Per 10s (successful requests)",
+    title="Mean Rate-Limiting Tokens Per 10s",
     query=f"""
-let results = AppMetrics
+AppMetrics
+| where TimeGenerated >= datetime({test_start_time.strftime('%Y-%m-%dT%H:%M:%SZ')})
+    and TimeGenerated <= datetime({test_stop_time.strftime('%Y-%m-%dT%H:%M:%SZ')})
+    and Name == "aoai-simulator.tokens.rate-limit"
+| extend deployment = tostring(Properties["deployment"])
+| summarize total_token_count = sum(Sum) by bin(TimeGenerated, 10s)
+| summarize avg_tokens_per_10s = avg(total_token_count)""".strip(),
+    timespan=timespan,
+    show_query=True,
+    include_link=True,
+    validation_func=validate_mean_tokens_used_per_10s,
+)
+
+
+query_processor.add_query(
+    title="Mean Consumption Tokens Per 10s (successful requests, billed tokens)",
+    query=f"""
+AppMetrics
 | where TimeGenerated >= datetime({test_start_time.strftime('%Y-%m-%dT%H:%M:%SZ')})
     and TimeGenerated <= datetime({test_stop_time.strftime('%Y-%m-%dT%H:%M:%SZ')})
     and Name == "aoai-simulator.tokens.used"
-| extend deployment = tostring(Properties["deployment"])
-| summarize total_token_count = sum(Sum) by bin(TimeGenerated, 10s);
-// Ignore the first and last minutes of the test
-let n = toscalar(results | count);
-results
-| order by TimeGenerated desc | take n-1
-| order by  TimeGenerated asc | take n-2
+| extend deployment = tostring(Properties["deployment"]), token_type=tostring(Properties["token_type"])
+| where token_type == "completion"
+| summarize total_token_count = sum(Sum) by bin(TimeGenerated, 10s)
 | summarize avg_tokens_per_10s = avg(total_token_count)""".strip(),
     timespan=timespan,
     show_query=True,
