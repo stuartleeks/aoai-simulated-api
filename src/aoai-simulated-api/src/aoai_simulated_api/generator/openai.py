@@ -21,6 +21,8 @@ from aoai_simulated_api.constants import (
     SIMULATOR_KEY_OPENAI_TOTAL_TOKENS,
     SIMULATOR_KEY_LIMITER,
     SIMULATOR_KEY_OPERATION_NAME,
+    SIMULATOR_KEY_OPENAI_MAX_TOKENS_REQUESTED,
+    SIMULATOR_KEY_OPENAI_MAX_TOKENS_EFFECTIVE,
 )
 from aoai_simulated_api.generator.openai_tokens import (
     get_max_completion_tokens,
@@ -163,25 +165,25 @@ def create_embedding_content(index: int, embedding_size):
 def create_embeddings_response(
     context: RequestContext,
     deployment_name: str,
-    model: OpenAIDeployment,
+    deployment: OpenAIDeployment,
     request_input: str | list,
 ):
     embeddings = []
     if isinstance(request_input, str):
-        tokens = num_tokens_from_string(request_input, model.name)
-        embeddings.append(create_embedding_content(0, embedding_size=model.embedding_size))
+        tokens = num_tokens_from_string(request_input, deployment.model)
+        embeddings.append(create_embedding_content(0, embedding_size=deployment.embedding_size))
     else:
         tokens = 0
         index = 0
         for i in request_input:
-            tokens += num_tokens_from_string(i, model.name)
-            embeddings.append(create_embedding_content(index, embedding_size=model.embedding_size))
+            tokens += num_tokens_from_string(i, deployment.model)
+            embeddings.append(create_embedding_content(index, embedding_size=deployment.embedding_size))
             index += 1
 
     response_data = {
         "object": "list",
         "data": embeddings,
-        "model": "ada",
+        "model": deployment.model,
         "usage": {"prompt_tokens": tokens, "total_tokens": tokens},
     }
 
@@ -647,7 +649,7 @@ async def azure_openai_embedding(context: RequestContext) -> Response | None:
     response = create_embeddings_response(
         context=context,
         deployment_name=deployment_name,
-        model=model,
+        deployment=model,
         request_input=request_input,
     )
 
@@ -681,7 +683,10 @@ async def azure_openai_completion(context: RequestContext) -> Response | None:
     request_body = await request.json()
     prompt_tokens = num_tokens_from_string(request_body["prompt"], model_name)
 
-    max_tokens = get_max_completion_tokens(request_body, model_name, prompt_tokens=prompt_tokens)
+    requested_max_tokens, max_tokens = get_max_completion_tokens(request_body, model_name, prompt_tokens=prompt_tokens)
+
+    context.values[SIMULATOR_KEY_OPENAI_MAX_TOKENS_REQUESTED] = requested_max_tokens
+    context.values[SIMULATOR_KEY_OPENAI_MAX_TOKENS_EFFECTIVE] = max_tokens
 
     response = create_completion_response(
         context=context,
@@ -722,7 +727,10 @@ async def azure_openai_chat_completion(context: RequestContext) -> Response | No
     messages = request_body["messages"]
     prompt_tokens = num_tokens_from_messages(messages, model_name)
 
-    max_tokens = get_max_completion_tokens(request_body, model_name, prompt_tokens=prompt_tokens)
+    requested_max_tokens, max_tokens = get_max_completion_tokens(request_body, model_name, prompt_tokens=prompt_tokens)
+
+    context.values[SIMULATOR_KEY_OPENAI_MAX_TOKENS_REQUESTED] = requested_max_tokens
+    context.values[SIMULATOR_KEY_OPENAI_MAX_TOKENS_EFFECTIVE] = max_tokens
 
     streaming = request_body.get("stream", False)
 

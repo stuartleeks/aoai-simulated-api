@@ -7,8 +7,6 @@ from aoai_simulated_api.metrics import simulator_metrics
 from aoai_simulated_api.models import RequestContext
 
 
-
-
 class LatencyGenerator:
     """
     LatencyGenerator is a context manager that adds simulated latency to the response.
@@ -48,6 +46,7 @@ class LatencyGenerator:
         deployment_name = self.__context.values.get(constants.SIMULATOR_KEY_DEPLOYMENT_NAME)
         prompt_tokens_used = self.__context.values.get(constants.SIMULATOR_KEY_OPENAI_PROMPT_TOKENS, 0)
         completion_tokens_used = self.__context.values.get(constants.SIMULATOR_KEY_OPENAI_COMPLETION_TOKENS, 0)
+        rate_limit_tokens = self.__context.values.get(constants.SIMULATOR_KEY_OPENAI_RATE_LIMIT_TOKENS, 0)
 
         status_code = self.__response.status_code
         if status_code < 300:
@@ -109,5 +108,12 @@ class LatencyGenerator:
                     attributes={
                         "deployment": deployment_name,
                         "token_type": "completion",
+                    },
+                )
+            if rate_limit_tokens > 0:
+                simulator_metrics.histogram_tokens_rate_limit.record(
+                    rate_limit_tokens,
+                    attributes={
+                        "deployment": deployment_name,
                     },
                 )

@@ -5,6 +5,8 @@ import requests
 from aoai_simulated_api.models import RequestContext
 from aoai_simulated_api.constants import (
     SIMULATOR_KEY_DEPLOYMENT_NAME,
+    SIMULATOR_KEY_OPENAI_PROMPT_TOKENS,
+    SIMULATOR_KEY_OPENAI_COMPLETION_TOKENS,
     SIMULATOR_KEY_OPENAI_TOTAL_TOKENS,
     SIMULATOR_KEY_LIMITER,
 )
@@ -72,8 +74,12 @@ def _get_deployment_name_from_url(url: str) -> str | None:
 def _get_token_usage_from_response(body: str) -> int | None:
     try:
         response_json = json.loads(body)
-        if "usage" in response_json and "total_tokens" in response_json["usage"]:
-            return response_json["usage"]["total_tokens"]
+        usage = response_json.get("usage")
+        if usage is not None:
+            prompt_tokens = usage.get("prompt_tokens")
+            completion_tokens = usage.get("completion_tokens")
+            total_tokens = usage.get("total_tokens")
+            return prompt_tokens, completion_tokens, total_tokens
     except json.JSONDecodeError as e:
         logger.error("Error getting token usage: %s", e)
     return None
@@ -127,9 +133,11 @@ async def forward_to_azure_openai(context: RequestContext) -> dict:
 
     # store values in the context for use by the rate-limiter etc
     deployment_name = _get_deployment_name_from_url(request.url.path)
-    tokens_used = _get_token_usage_from_response(response.text)
+    prompt_tokens, completion_tokens, total_tokens = _get_token_usage_from_response(response.text)
     context.values[SIMULATOR_KEY_LIMITER] = "openai"
     context.values[SIMULATOR_KEY_DEPLOYMENT_NAME] = deployment_name
-    context.values[SIMULATOR_KEY_OPENAI_TOTAL_TOKENS] = tokens_used
+    context.values[SIMULATOR_KEY_OPENAI_PROMPT_TOKENS] = prompt_tokens
+    context.values[SIMULATOR_KEY_OPENAI_COMPLETION_TOKENS] = completion_tokens
+    context.values[SIMULATOR_KEY_OPENAI_TOTAL_TOKENS] = total_tokens
 
     return {"response": response, "persist_response": True}

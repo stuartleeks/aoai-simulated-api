@@ -91,29 +91,26 @@ def validate_mean_sucess_rps(table: Table):
     # Check if the mean RPS is within the expected range
     # The deployment for the tests has 100,000 Tokens Per Minute (TPM) limit
     # That equates to 600 Requests Per Minute (RPM) or 10 Requests Per Second (RPS)
-    mean_rps = table.rows[0][0]
-    if mean_rps > 11:
-        return f"Mean RPS is too high: {mean_rps}"
-    if mean_rps < 9:
-        return f"Mean RPS is too low: {mean_rps}"
+    mean_rps = int(table.rows[0][0])
+    low_value = 9
+    high_value = 11
+    if mean_rps > high_value:
+        return f"Mean RPS is too high: {mean_rps} (expected between {low_value} and {high_value})"
+    if mean_rps < low_value:
+        return f"Mean RPS is too low: {mean_rps} (expected between {low_value} and {high_value})"
     return None
 
 
 query_processor.add_query(
     title="Mean RPS (successful requests)",
     query=f"""
-let results = AppMetrics
+AppMetrics
 | where TimeGenerated >= datetime({test_start_time.strftime('%Y-%m-%dT%H:%M:%SZ')})
     and TimeGenerated <= datetime({test_stop_time.strftime('%Y-%m-%dT%H:%M:%SZ')})
     and Name == "aoai-simulator.latency.base"
 | extend status_code = Properties["status_code"]
 | where status_code == 200
-| summarize RPS = sum(ItemCount)/60.0 by bin(TimeGenerated, 1m);
-let n = toscalar(results | count);
-results
-// Ignore the first and last minutes of the test
-| order by TimeGenerated desc | take n-1
-| order by  TimeGenerated asc | take n-2
+| summarize RPS = sum(ItemCount)/60.0 by bin(TimeGenerated, 1m)
 | summarize avg(RPS)
 """.strip(),
     timespan=timespan,
