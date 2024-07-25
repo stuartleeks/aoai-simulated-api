@@ -2,7 +2,8 @@
 
 ## vNext
 
-- TODO
+- Return to sliding window rate limiting. This change moves from the limits package to a custom rate-limiting implementation to address performance with sliding windows (#20)
+- Update rate-limit handling for tokens based on experimentation (limited set of models currently - see #52)
 
 # v0.4 - 2024-06-25
 
