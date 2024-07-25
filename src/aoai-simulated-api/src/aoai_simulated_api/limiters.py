@@ -44,7 +44,17 @@ async def determine_token_cost(context: RequestContext):
         token_cost = max_tokens
     else:
         # otherwise, calculate the rate-limiting token cost
+
+        # TODO: update this to enable plugging in different behaviour for different models
+        # This behaviour works for PAYG with the following models
+        #  - text-embedding-ada-002
+        #  - text-embedding-3-small
+        #  - text-embedding-3-large
+        #  - gpt-3.5-turbo
+
         if "/chat/completions" in context.request.url.path:
+            token_cost = 16
+        elif "/completions" in context.request.url.path:
             token_cost = 16
         elif "/embeddings" in context.request.url.path:
             request_body = await context.request.json()
