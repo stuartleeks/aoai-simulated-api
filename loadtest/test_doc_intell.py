@@ -13,7 +13,7 @@ class DocIntelligenceBasic(HttpUser):
         url = "formrecognizer/documentModels/prebuilt-receipt:analyze?api-version=2023-07-31"
         response = self.client.post(
             url,
-            files={"file": open("./src/test-client/receipt.png", "rb")},
+            files={"file": open("./tools/test-client/receipt.png", "rb")},
             headers={
                 "ocp-apim-subscription-key": api_key,
                 "Content-Type": "application/octet-stream",

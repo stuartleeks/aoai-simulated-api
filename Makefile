@@ -13,10 +13,10 @@ help: ## Show this help
 
 install-requirements: ## Install PyPI requirements for all projects
 	pip install -r src/aoai-simulated-api/requirements.txt
-	pip install -r src/tests/requirements.txt
-	pip install -r src/test-client/requirements.txt
-	pip install -r src/loadtest/requirements.txt
-	pip install -r src/test-client-web/requirements.txt
+	pip install -r loadtest/requirements.txt
+	pip install -r tests/requirements.txt
+	pip install -r tools/test-client/requirements.txt
+	pip install -r tools/test-client-web/requirements.txt
 
 erase-recording: ## Erase all *.recording files
 	rm -rf "${makefile_dir}.recording"
@@ -30,11 +30,11 @@ run-simulated-api: ## Launch the AOAI Simulated API locally
 		--timeout 3600
 
 run-test-client: ## Run the test client
-	cd src/test-client && \
+	cd tools/test-client && \
 	python app.py
 
 run-test-client-simulator-local: ## Run the test client against local AOAI Simulated API 
-	cd src/test-client && \
+	cd tools/test-client && \
 	AZURE_OPENAI_KEY=${SIMULATOR_API_KEY} \
 	AZURE_OPENAI_ENDPOINT=http://localhost:8000 \
 	AZURE_FORM_RECOGNIZER_ENDPOINT=http://localhost:8000 \
@@ -45,7 +45,7 @@ run-test-client-simulator-aca: ## Run the test client against an Azure Container
 	./scripts/run-test-client-aca.sh
 
 run-test-client-web: ## Launch the test client web app locally
-	cd src/test-client-web && \
+	cd tools/test-client-web && \
 	flask run --host 0.0.0.0
 
 docker-build-simulated-api: ## Build the AOAI Simulated API as a docker image
@@ -68,13 +68,13 @@ docker-run-simulated-api: ## Run the AOAI Simulated API docker container
 		aoai-simulated-api
 
 test: ## Run PyTest (verbose)
-	pytest ./src/tests -v
+	pytest ./tests -v
 
 test-not-slow: ## Run PyTest (verbose, skip slow tests)
-	pytest ./src/tests -v -m "not slow"
+	pytest ./tests -v -m "not slow"
 
 test-watch: ## Start PyTest Watch
-	ptw --clear ./src/tests
+	ptw --clear ./tests
 
 lint: ## Lint aoai-simulated-api source code
 	pylint ./src/aoai-simulated-api/
@@ -84,5 +84,5 @@ deploy-aca: ## Run deployment script for Azure Container Apps
 
 docker-build-load-test: ## Build the AOAI Simulated API Load Test as a docker image
 	# TODO should set a tag!
-	cd src/loadtest && \
+	cd loadtest && \
 	docker build -t aoai-simulated-api-load-test .

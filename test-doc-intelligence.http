@@ -14,7 +14,7 @@ ocp-apim-subscription-key: {{doc_intelligence_key}}
 Content-Type: application/octet-stream
 Accept: application/json
 
-< ./src/test-client/receipt.png
+< ./tools/test-client/receipt.png
 
 
 ###
@@ -31,7 +31,7 @@ ocp-apim-subscription-key: {{doc_intelligence_key}}
 Content-Type: application/octet-stream
 Accept: application/json
 
-< ./src/test-client/receipt.png
+< ./tools/test-client/receipt.png
 
 
 ###
@@ -47,7 +47,7 @@ ocp-apim-subscription-key: {{doc_intelligence_key}}
 Content-Type: application/octet-stream
 Accept: application/json
 
-< ./src/test-client/sample-layout.pdf
+< ./tools/test-client/sample-layout.pdf
 
 
 ###
@@ -64,7 +64,7 @@ ocp-apim-subscription-key: {{doc_intelligence_key}}
 Content-Type: application/octet-stream
 Accept: application/json
 
-< ./src/test-client/sample-layout.pdf
+< ./tools/test-client/sample-layout.pdf
 
 
 ### 

@@ -28,7 +28,7 @@ fi
 if [[ -z "$TEST_FILE" ]]; then
   error_exit "TEST_FILE not specified"
 fi
-if [[ ! -f "$script_dir/../src/loadtest/$TEST_FILE" ]]; then
+if [[ ! -f "$script_dir/../loadtest/$TEST_FILE" ]]; then
   error_exit "Test file $TEST_FILE not found"
 fi
 
@@ -95,7 +95,7 @@ log "=="
 log "== Building and pushing aoai-simulated-api-load-test image to $acr_login_server"
 log "=="
 
-src_path=$(realpath "$script_dir/../src/loadtest")
+src_path=$(realpath "$script_dir/../loadtest")
 
 docker build -t "${acr_login_server}/aoai-simulated-api-load-test:latest" "$src_path" -f "$src_path/Dockerfile" 1>&2
 

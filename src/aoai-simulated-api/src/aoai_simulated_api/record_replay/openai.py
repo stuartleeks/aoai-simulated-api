@@ -14,7 +14,7 @@ from aoai_simulated_api.constants import (
 # This file contains a default openai forwarder
 # You can configure your own forwarders by creating a forwarder_config.py file and setting the
 # EXTENSION_PATH environment variable to the path of the file when running the API
-# See src/examples/forwarder_doc_intelligence for an example of how to define your own forwarders
+# See examples/forwarder_doc_intelligence for an example of how to define your own forwarders
 
 config_validated: bool = False
 

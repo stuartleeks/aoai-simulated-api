@@ -36,4 +36,4 @@ echo "Running post steps"
 "$script_dir/_run-load-test-post-steps.sh" \
   --test-start-time "$test_start_time" \
   --test-stop-time "$test_stop_time" \
-  --filename ./src/loadtest/post_steps_base_latency.py
+  --filename ./loadtest/post_steps_base_latency.py

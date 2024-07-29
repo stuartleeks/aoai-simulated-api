@@ -21,5 +21,5 @@ if [[ -z "$api_fqdn" ]]; then
 fi
 
 echo "== Running test-client against simulator at https://$api_fqdn"
-cd src/test-client
+cd tools/test-client
 AZURE_OPENAI_KEY="${SIMULATOR_API_KEY}" AZURE_OPENAI_ENDPOINT="https://$api_fqdn" AZURE_FORM_RECOGNIZER_ENDPOINT="https://$api_fqdn" python app.py

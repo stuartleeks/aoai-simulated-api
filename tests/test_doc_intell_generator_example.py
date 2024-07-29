@@ -44,7 +44,7 @@ def _get_generator_config() -> Config:
             LATENCY_OPENAI_EMBEDDINGS_STD_DEV=0.1,
         ),
     )
-    config.extension_path = "src/examples/generator_doc_intelligence"
+    config.extension_path = "examples/generator_doc_intelligence"
 
     return config
 
@@ -61,7 +61,7 @@ async def test_requires_auth():
         document_analysis_client = DocumentAnalysisClient("http://localhost:8001", credential)
 
         base_path = os.path.dirname(os.path.realpath(__file__))
-        pdf_path = os.path.join(base_path, "../test-client/receipt.png")
+        pdf_path = os.path.join(base_path, "../tools/test-client/receipt.png")
 
         try:
             print("Making request...")
@@ -87,7 +87,7 @@ async def test_gets_result():
         document_analysis_client = DocumentAnalysisClient("http://localhost:8001", credential)
 
         base_path = os.path.dirname(os.path.realpath(__file__))
-        pdf_path = os.path.join(base_path, "../test-client/receipt.png")
+        pdf_path = os.path.join(base_path, "../tools/test-client/receipt.png")
 
         with open(pdf_path, "rb") as f:
             poller = document_analysis_client.begin_analyze_document("prebuilt-receipt", f)
@@ -106,7 +106,7 @@ async def test_rate_limit():
 
     async def make_request():
         base_path = os.path.dirname(os.path.realpath(__file__))
-        pdf_path = os.path.join(base_path, "../test-client/receipt.png")
+        pdf_path = os.path.join(base_path, "../tools/test-client/receipt.png")
         with open(pdf_path, "rb") as f:
             payload = f.read()
 

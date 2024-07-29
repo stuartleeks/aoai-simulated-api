@@ -33,7 +33,7 @@ from aoai_simulated_api.generator.openai_tokens import (
 # This file contains a default implementation of the openai generators
 # You can configure your own generators by creating a generator_config.py file and setting the
 # EXTENSION_PATH environment variable to the path of the file when running the API
-# See src/examples/generator_echo for an example of how to define your own generators
+# See examples/generator_echo for an example of how to define your own generators
 
 logger = logging.getLogger(__name__)
 
