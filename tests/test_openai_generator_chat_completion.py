@@ -207,7 +207,7 @@ async def test_custom_generator():
     """
     Ensure we can call the chat completion endpoint using a generator from an extension
     """
-    config = _get_generator_config(extension_path="src/examples/generator_replace_chat_completion/generator_config.py")
+    config = _get_generator_config(extension_path="examples/generator_replace_chat_completion/generator_config.py")
 
     server = UvicornTestServer(config)
     with server.run_in_thread():

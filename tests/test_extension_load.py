@@ -51,7 +51,7 @@ async def test_load_extension_from_single_file():
     Ensure we can load a single file extension
     """
 
-    config = _get_config(extension_path="src/examples/generator_echo/generator_config.py")
+    config = _get_config(extension_path="examples/generator_echo/generator_config.py")
 
     # Check that the generator is called
     server = UvicornTestServer(config)
@@ -72,7 +72,7 @@ async def test_load_extension_from_directory():
     Ensure we can load a single file extension
     """
 
-    config = _get_config(extension_path="src/examples/forwarder_doc_intelligence")
+    config = _get_config(extension_path="examples/forwarder_doc_intelligence")
 
     assert config.recording.forwarders[-1].__name__ == "forward_to_azure_document_intelligence"
 
@@ -83,6 +83,6 @@ async def test_load_extension_from_directory_init_py():
     Ensure we can load a single file extension
     """
 
-    config = _get_config(extension_path="src/examples/forwarder_doc_intelligence/__init__.py")
+    config = _get_config(extension_path="examples/forwarder_doc_intelligence/__init__.py")
 
     assert config.recording.forwarders[-1].__name__ == "forward_to_azure_document_intelligence"
