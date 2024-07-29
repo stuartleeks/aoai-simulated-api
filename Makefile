@@ -7,23 +7,21 @@ endif
 
 makefile_dir := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
-help: ## show this help
-	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
-	| awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%s\033[0m|%s\n", $$1, $$2}' \
-	| column -t -s '|'
+help: ## Show this help
+	@grep -E '[a-zA-Z_-]+:.*?## .*$$' $(firstword $(MAKEFILE_LIST)) \
+	| awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-32s\033[0m %s\n", $$1, $$2}'
 
-
-install-requirements:
+install-requirements: ## Install PyPI requirements for all projects
 	pip install -r src/aoai-simulated-api/requirements.txt
 	pip install -r src/tests/requirements.txt
 	pip install -r src/test-client/requirements.txt
 	pip install -r src/loadtest/requirements.txt
 	pip install -r src/test-client-web/requirements.txt
 
-erase-recording:
+erase-recording: ## Erase all *.recording files
 	rm -rf "${makefile_dir}.recording"
 
-run-simulated-api:
+run-simulated-api: ## Launch the AOAI Simulated API locally
 	gunicorn \
 		aoai_simulated_api.main:app \
 		--worker-class uvicorn.workers.UvicornWorker \
@@ -31,11 +29,11 @@ run-simulated-api:
 		--bind 0.0.0.0:8000 \
 		--timeout 3600
 
-run-test-client:
+run-test-client: ## Run the test client
 	cd src/test-client && \
 	python app.py
 
-run-test-client-simulator-local:
+run-test-client-simulator-local: ## Run the test client against local AOAI Simulated API 
 	cd src/test-client && \
 	AZURE_OPENAI_KEY=${SIMULATOR_API_KEY} \
 	AZURE_OPENAI_ENDPOINT=http://localhost:8000 \
@@ -43,19 +41,19 @@ run-test-client-simulator-local:
 	AZURE_FORM_RECOGNIZER_KEY=${SIMULATOR_API_KEY} \
 	python app.py
 
-run-test-client-simulator-aca:
+run-test-client-simulator-aca: ## Run the test client against an Azure Container Apps deployment
 	./scripts/run-test-client-aca.sh
 
-run-test-client-web:
+run-test-client-web: ## Launch the test client web app locally
 	cd src/test-client-web && \
 	flask run --host 0.0.0.0
 
-docker-build-simulated-api:
+docker-build-simulated-api: ## Build the AOAI Simulated API as a docker image
 	# TODO should set a tag!
 	cd src/aoai-simulated-api && \
 	docker build -t aoai-simulated-api .
 
-docker-run-simulated-api:
+docker-run-simulated-api: ## Run the AOAI Simulated API docker container
 	echo "makefile_dir: ${makefile_dir}"
 	echo "makefile_path: ${makefile_path}"
 	docker run --rm -i -t \
@@ -69,22 +67,22 @@ docker-run-simulated-api:
 		-e AZURE_OPENAI_DEPLOYMENT \
 		aoai-simulated-api
 
-test:
+test: ## Run PyTest (verbose)
 	pytest ./src/tests -v
 
-test-not-slow:
+test-not-slow: ## Run PyTest (verbose, skip slow tests)
 	pytest ./src/tests -v -m "not slow"
 
-test-watch:
+test-watch: ## Start PyTest Watch
 	ptw --clear ./src/tests
 
-lint:
+lint: ## Lint aoai-simulated-api source code
 	pylint ./src/aoai-simulated-api/
 
-deploy-aca: 
+deploy-aca: ## Run deployment script for Azure Container Apps
 	./scripts/deploy-aca.sh
 
-docker-build-load-test:
+docker-build-load-test: ## Build the AOAI Simulated API Load Test as a docker image
 	# TODO should set a tag!
 	cd src/loadtest && \
 	docker build -t aoai-simulated-api-load-test .
