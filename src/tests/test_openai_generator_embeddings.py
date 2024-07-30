@@ -129,9 +129,9 @@ async def test_limit_reached():
         assert len(response.choices[0].message.content) > 20
         assert response.choices[0].finish_reason == "length"
 
-        # The total token count for the request is roughly 60 tokens
         # "low_limit" deployment has a rate limit of 600 tokens per minute
-        # Which is 100 every 10s, so our second request should trigger the rate-limiting
+        # So we will trigger the limit based on the number of requests (not tokens)
+        # and it will reset in 10s
         try:
             aoai_client.chat.completions.create(model="low_limit", messages=messages, max_tokens=50)
             assert False, "Expect to be rate-limited"
@@ -139,7 +139,7 @@ async def test_limit_reached():
             assert e.status_code == 429
             assert (
                 e.message
-                == "Error code: 429 - {'error': {'code': '429', 'message': 'Requests to the OpenAI API Simulator have exceeded call rate limit. Please retry after 60 seconds.'}}"
+                == "Error code: 429 - {'error': {'code': '429', 'message': 'Requests to the OpenAI API Simulator have exceeded call rate limit. Please retry after 10 seconds.'}}"
             )
 
 
