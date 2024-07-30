@@ -6,6 +6,7 @@
   - [Rate Limiting](#rate-limiting)
   - [Large recordings](#large-recordings)
   - [Config API Endpoint](#config-api-endpoint)
+  - [Open Telemetry](#open-telemetry)
 
 There are a number of [environment variables](#environment-variables) that can be used to configure the simulator.
 Additionally, some configuration can be changed while the simulator is running using the [config endpoint](#config-endpoint).
@@ -126,3 +127,11 @@ For example, the following request will update the mean latency for OpenAI embed
 ```json
 {"latency": {"open_ai_embeddings": {"mean": 1000}}}
 ```
+## Open Telemetry
+
+The simulator supports a set of basic Open Telemetry configuration options. These are:
+
+| Variable| Description |
+| ------- | ----------- |
+| `OTEL_SERVICE_NAME`| Sets the value of the service name reported to Open Telemetry. Defaults to `aoai-simulated-api`|
+| `OTEL_METRIC_EXPORT_INTERVAL`| The time interval (in milliseconds) between the start of two export attempts..|
