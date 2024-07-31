@@ -28,6 +28,7 @@
 
 	// Use 'postCreateCommand' to run commands after the container is created.
 	"postCreateCommand": "bash -c .devcontainer/post-create.sh",
+    "postStartCommand": "git config --global --add safe.directory ${containerWorkspaceFolder}"
 
 	// Configure tool-specific properties.
 	// "customizations": {},
