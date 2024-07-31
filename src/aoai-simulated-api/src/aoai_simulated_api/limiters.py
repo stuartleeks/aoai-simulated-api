@@ -111,7 +111,7 @@ class SlidingWindow:
         self._requests = []
 
     def _purge(self, cut_off: float):
-        while len(self._requests) > 0 and self._requests[0].timestamp < cut_off:
+        while len(self._requests) > 0 and self._requests[0].timestamp <= cut_off:
             self._requests.pop(0)
 
     def _calculate_window_counts_for_request(self, token_cost: int, timestamp: float) -> tuple[int, int, float, float]:
@@ -131,24 +131,21 @@ class SlidingWindow:
         tokens_full_time = -math.inf
         for i in range(len(self._requests) - 1, -1, -1):
             request = self._requests[i]
-            if requests_count < self._requests_per_10_seconds:
+
+            if requests_count <= self._requests_per_10_seconds:
                 requests_count += 1
-                if requests_count >= self._requests_per_10_seconds:
-                    # we're full at the requests[i]
-                    # so have space once requestsp[i-1] expires
-                    if i > 0:
-                        requests_full_time = self._requests[i - 1].timestamp
 
-            if tokens_count < self._tokens_per_minute:
+            if tokens_count <= self._tokens_per_minute:
                 tokens_count += request.token_cost
-                if tokens_count >= self._tokens_per_minute:
-                    # we're full at the requests[i]
-                    # so have space once requestsp[i-1] expires
-                    if i > 0:
-                        tokens_full_time = self._requests[i - 1].timestamp
 
-            # if tokens_full_time > 0 and requests_full_time > 0:
-            # break
+            if requests_full_time == -math.inf and requests_count > self._requests_per_10_seconds:
+                # we're full at the last request
+                # so have space once this request expires
+                requests_full_time = self._requests[i].timestamp
+            if tokens_full_time == -math.inf and tokens_count > self._tokens_per_minute:
+                # we're full at the last request
+                # so have space once this request expires
+                tokens_full_time = self._requests[i].timestamp
 
             if request.timestamp > timestamp - 10:
                 request_count_in_10s += 1
@@ -182,7 +179,11 @@ class SlidingWindow:
             # Edge case where we've hit the max tokens and the current request is for max_tokens
             # but haven't hit the request limit
             # in this case, we wait until the last saved request is out of the window
-            if requests_full_time == -math.inf and tokens_full_time == -math.inf:
+            if (
+                token_cost == self._tokens_per_minute
+                and requests_full_time == -math.inf
+                and tokens_full_time == -math.inf
+            ):
                 tokens_full_time = self._requests[-1].timestamp
 
             # calculate the duration to have a full request count
@@ -196,9 +197,13 @@ class SlidingWindow:
             if time_to_reset_requests > time_to_reset_tokens:
                 reason = "requests"
                 retry_after = math.ceil(time_to_reset_requests)
+                if time_to_reset_requests <= 0:
+                    raise Exception("time_to_reset_requests should be greater than 0")
             else:
                 reason = "tokens"
                 retry_after = math.ceil(time_to_reset_tokens)
+                if time_to_reset_tokens <= 0:
+                    raise Exception("time_to_reset_tokens should be greater than 0")
 
             return WindowAddResult(
                 success=False,

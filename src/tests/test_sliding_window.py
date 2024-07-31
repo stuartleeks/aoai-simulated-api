@@ -10,9 +10,10 @@ def add_success_request(
     timestamp: float,
     expected_remaining_requests=None,
     expected_remaining_tokens=None,
+    msg: str = None,
 ):
     result = window.add_request(token_cost=token_count, timestamp=timestamp)
-    assert result.success
+    assert result.success, msg
     assert result.retry_reason is None
     assert result.retry_after is None
     if expected_remaining_requests is not None:
@@ -79,7 +80,7 @@ def test_block_when_too_many_requests():
     assert result.retry_after == 7
 
 
-def test_block_when_too_many_tokens():
+def test_block_when_too_many_tokens_exact():
 
     window = SlidingWindow(requests_per_10_seconds=10, tokens_per_minute=100)
 
@@ -113,7 +114,45 @@ def test_block_when_too_many_tokens():
     result = window.add_request(timestamp=50, token_cost=100)
     assert not result.success
     assert result.retry_reason == "tokens"
-    # at t=80, the t=100, all requests will be out of the sliding window
+    # at t=100, all requests will be out of the sliding window
+    assert result.retry_after == 50
+
+
+def test_block_when_too_many_tokens_overflow():
+
+    window = SlidingWindow(requests_per_10_seconds=10, tokens_per_minute=100)
+
+    add_success_request(window, timestamp=10, token_count=24)
+    add_success_request(window, timestamp=20, token_count=24)
+    add_success_request(window, timestamp=30, token_count=24)
+    add_success_request(window, timestamp=40, token_count=24)
+
+    # Time:               0    10    20     30     40     50     60    70     80     90
+    # Tokens:                  24    24     24     24
+    # 60s token window:   0    24    48     72     96     96     96    72     48
+
+    # The requests above used all the tokens for the 60s period
+    result = window.add_request(timestamp=50, token_cost=20)
+    assert not result.success
+    assert result.retry_reason == "tokens"
+    # At t=70, the t=10 request will be out of the sliding window
+    # leaving 72 tokens used in the window
+    # We're testing at t=50, so retry_after should be 70 - 50 = 20
+    assert result.retry_after == 20
+
+    # Check the calculation of remaining tokens for a larger request
+    result = window.add_request(timestamp=50, token_cost=40)
+    assert not result.success
+    assert result.retry_reason == "tokens"
+    # at t=80, the t=10 and t=20 requests will be out of the sliding window
+    # leaving 48 tokens used in the window
+    assert result.retry_after == 30
+
+    # Check the calculation of remaining tokens for a larger request
+    result = window.add_request(timestamp=50, token_cost=100)
+    assert not result.success
+    assert result.retry_reason == "tokens"
+    # at t=100, all requests will be out of the sliding window
     assert result.retry_after == 50
 
 
@@ -133,7 +172,7 @@ def test_block_second_request():
 
 
 @pytest.mark.slow
-def test_perf_successful_requests():
+def test_perf_successful_requests_SLOW():
     simulated_tpm = 1_000_000
     requests_per_10_seconds = simulated_tpm * 60 / 1000
 
@@ -178,9 +217,9 @@ def test_100k_token_limit():
     # should manage 100,000 / 200 = 500 requests successfully
     timestamp = time.time()
 
-    # Send through 50s of requests (should succed)
-    for _ in range(500):
-        add_success_request(window, timestamp=timestamp, token_count=200)
+    # Send through 50s of requests (should succeed)
+    for i in range(500):
+        add_success_request(window, timestamp=timestamp, token_count=200)  # , msg=f"test_part_1:{i}")
         timestamp += 0.100001
 
     # Check that we now are rate-limited
