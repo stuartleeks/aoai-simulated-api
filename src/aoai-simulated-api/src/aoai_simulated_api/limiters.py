@@ -198,12 +198,12 @@ class SlidingWindow:
                 reason = "requests"
                 retry_after = math.ceil(time_to_reset_requests)
                 if time_to_reset_requests <= 0:
-                    raise Exception("time_to_reset_requests should be greater than 0")
+                    raise ValueError("time_to_reset_requests should be greater than 0")
             else:
                 reason = "tokens"
                 retry_after = math.ceil(time_to_reset_tokens)
                 if time_to_reset_tokens <= 0:
-                    raise Exception("time_to_reset_tokens should be greater than 0")
+                    raise ValueError("time_to_reset_tokens should be greater than 0")
 
             return WindowAddResult(
                 success=False,
