@@ -289,10 +289,11 @@ class QueryProcessor:
         columns = table.columns
         return Table(columns=columns, rows=rows), None
 
-    def wait_for_non_zero_count(self, query, max_retries=10, wait_time_seconds=30):
+    def wait_for_non_zero_count(self, query, max_retries=10, wait_time_seconds=30, data_type_message=None):
         """
         Run a query until it returns a non-zero count.
         """
+        data_type_message = data_type_message or "metrics data"
         for _ in range(max_retries):
             r, _ = self.run_query(
                 query=query,
@@ -300,12 +301,35 @@ class QueryProcessor:
             )
             count = r.rows[0][0]
             if count > 0:
-                logging.info("✔️ Found metrics data")
+                logging.info("✔️ Found %s", data_type_message)
                 return
-            logging.info("⏳ Waiting for metrics data...")
+            logging.info("⏳ Waiting for %s...", data_type_message)
             time.sleep(wait_time_seconds)
 
-        raise Exception("❌ No metrics data found")
+        raise Exception(f"❌ No {data_type_message} found")
+
+    def wait_for_greater_than_or_equal(
+        self, query, value, max_retries=10, wait_time_seconds=30, data_type_message=None
+    ):
+        """
+        Run a query that returns a single value and wait until it is greater than or equal to the specified value.
+        """
+
+        data_type_message = data_type_message or "metrics data"
+        logging.info("Waiting for metrics data - checking for result >= %s", value)
+        for _ in range(max_retries):
+            r, _ = self.run_query(
+                query=query,
+                timespan=(datetime.now(UTC) - timedelta(days=1), datetime.now(UTC)),
+            )
+            query_value = r.rows[0][0]
+            if query_value >= value:
+                logging.info("✔️ Got %s", query_value)
+                return
+            logging.info("⏳ Waiting for %s... (last value: %s)", data_type_message, query_value)
+            time.sleep(wait_time_seconds)
+
+        raise Exception(f"❌ {data_type_message} did not reach {value}")
 
     def __output_table(self, query_result: Table):
         """
