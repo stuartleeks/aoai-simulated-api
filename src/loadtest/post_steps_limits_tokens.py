@@ -22,8 +22,8 @@ logging.getLogger("azure").setLevel(logging.WARNING)
 start_time_string = os.getenv("TEST_START_TIME")
 stop_time_string = os.getenv("TEST_STOP_TIME")
 
-test_start_time = datetime.strptime(start_time_string, "%Y-%m-%dT%H:%M:%SZ")
-test_stop_time = datetime.strptime(stop_time_string, "%Y-%m-%dT%H:%M:%SZ")
+test_start_time = datetime.strptime(start_time_string, "%Y-%m-%dT%H:%M:%SZ").astimezone(UTC)
+test_stop_time = datetime.strptime(stop_time_string, "%Y-%m-%dT%H:%M:%SZ").astimezone(UTC)
 
 print(f"test_start_time  : {test_start_time}")
 print(f"test_end_time    : {test_stop_time}")
@@ -41,16 +41,16 @@ query_processor = QueryProcessor(
 )
 
 print(f"metric_check_time: {metric_check_time}")
-check_results_query = f"""
+check_results_query = """
 AppMetrics
-| where TimeGenerated >= datetime({metric_check_time.strftime('%Y-%m-%dT%H:%M:%SZ')})
-    and TimeGenerated <= datetime({test_stop_time.strftime('%Y-%m-%dT%H:%M:%SZ')})
-	and Name == "locust.request_latency"
-| count
+| summarize max(TimeGenerated)
 """
-query_processor.wait_for_non_zero_count(check_results_query)
+
+query_processor.wait_for_greater_than_or_equal(check_results_query, metric_check_time)
 
 timespan = (datetime.now(UTC) - timedelta(days=1), datetime.now(UTC))
+
+time_vars = f"let startTime = datetime({test_start_time.strftime('%Y-%m-%dT%H:%M:%SZ')});\nlet endTime = datetime({test_stop_time.strftime('%Y-%m-%dT%H:%M:%SZ')});"
 
 
 ####################################################################
@@ -87,52 +87,76 @@ AppMetrics
 #
 
 
-def validate_mean_tokens_used_per_10s(table: Table):
-    # Check if the mean RPS is within the expected range
+def validate_mean_tokens_used_per_minute(table: Table):
+    # Check if the mean TPM is within the expected range
     # The deployment for the tests has 100,000 Tokens Per Minute (TPM) limit
-    # That equates to ~16,667 tokens per 10s period
-    mean_tokens_per_10s = int(table.rows[0][0])
-    low_value = 16600
-    high_value = 16700
-    if mean_tokens_per_10s > high_value:
-        return f"Mean tokens per 10s is too high: {mean_tokens_per_10s} (expected between {low_value} and {high_value})"
-    if mean_tokens_per_10s < low_value:
-        return f"Mean tokens per 10sis too low: {mean_tokens_per_10s} (expected between {low_value} and {high_value})"
+    mean_tokens_per_minute = int(table.rows[0][0])
+    low_value = 95_000
+    high_value = 105_000
+    if mean_tokens_per_minute > high_value:
+        return f"Mean tokens per minute is too high: {mean_tokens_per_minute} (expected between {low_value} and {high_value})"
+    if mean_tokens_per_minute < low_value:
+        return f"Mean tokens per minute is too low: {mean_tokens_per_minute} (expected between {low_value} and {high_value})"
     return None
 
 
 query_processor.add_query(
-    title="Mean Rate-Limiting Tokens Per 10s",
+    title="Mean Rate-Limiting Tokens Per Minute",
     query=f"""
-AppMetrics
-| where TimeGenerated >= datetime({test_start_time.strftime('%Y-%m-%dT%H:%M:%SZ')})
-    and TimeGenerated <= datetime({test_stop_time.strftime('%Y-%m-%dT%H:%M:%SZ')})
+let interval = 60s;
+{time_vars}
+let timeRange = range TimeStamp from startTime to endTime step interval
+| summarize count() by bin(TimeStamp, interval) | project TimeStamp; // align values to interval boundaries
+let query = AppMetrics
+| where TimeGenerated >= startTime
+    and TimeGenerated <= endTime
     and Name == "aoai-simulator.tokens.rate-limit"
 | extend deployment = tostring(Properties["deployment"])
-| summarize total_token_count = sum(Sum) by bin(TimeGenerated, 10s)
-| summarize avg_tokens_per_10s = avg(total_token_count)""".strip(),
+| summarize Sum=sum(Sum),  Count = sum(ItemCount), Max=max(Max) by bin(TimeGenerated, interval);
+let aggregateQuery =timeRange
+| join kind=leftouter query on $left.TimeStamp == $right.TimeGenerated
+| project TimeGenerated=TimeStamp, Sum=coalesce(Sum, 0.0), Count=coalesce(Count, 0), Max=coalesce(Max,0.0)
+| summarize total_token_count = sum(Sum) by bin(TimeGenerated, interval);
+let row_count = toscalar (aggregateQuery | count);
+aggregateQuery
+| order by TimeGenerated desc | take row_count - 1 // TODO - skip first result (potentially incomplete minute)
+| order by TimeGenerated asc | take row_count - 2 // TODO - skip last result (potentially incomplete minute)
+| summarize avg_tokens_per_minute = avg(total_token_count)
+""".strip(),
     timespan=timespan,
     show_query=True,
     include_link=True,
-    validation_func=validate_mean_tokens_used_per_10s,
+    validation_func=validate_mean_tokens_used_per_minute,
 )
 
 
 query_processor.add_query(
     title="Mean Consumption Tokens Per 10s (successful requests, billed tokens)",
     query=f"""
-AppMetrics
-| where TimeGenerated >= datetime({test_start_time.strftime('%Y-%m-%dT%H:%M:%SZ')})
-    and TimeGenerated <= datetime({test_stop_time.strftime('%Y-%m-%dT%H:%M:%SZ')})
+let interval = 60s;
+{time_vars}
+let timeRange = range TimeStamp from startTime to endTime step interval
+| summarize count() by bin(TimeStamp, interval) | project TimeStamp; // align values to interval boundaries
+let query = AppMetrics
+| where TimeGenerated >= startTime
+    and TimeGenerated <= endTime
     and Name == "aoai-simulator.tokens.used"
 | extend deployment = tostring(Properties["deployment"]), token_type=tostring(Properties["token_type"])
-| where token_type == "completion"
-| summarize total_token_count = sum(Sum) by bin(TimeGenerated, 10s)
-| summarize avg_tokens_per_10s = avg(total_token_count)""".strip(),
+| where token_type == "completion"| summarize Sum=sum(Sum),  Count = sum(ItemCount), Max=max(Max) by bin(TimeGenerated, interval);
+let aggregateQuery =timeRange
+| join kind=leftouter query on $left.TimeStamp == $right.TimeGenerated
+| project TimeGenerated=TimeStamp, Sum=coalesce(Sum, 0.0), Count=coalesce(Count, 0), Max=coalesce(Max,0.0)
+| summarize total_token_count = sum(Sum) by bin(TimeGenerated, interval);
+let row_count = toscalar (aggregateQuery | count);
+aggregateQuery
+| order by TimeGenerated desc | take row_count - 1 // TODO - skip first result (potentially incomplete minute)
+| order by TimeGenerated asc | take row_count - 2 // TODO - skip last result (potentially incomplete minute)
+| summarize avg_tokens_per_minute = avg(total_token_count)
+""".strip(),
     timespan=timespan,
     show_query=True,
     include_link=True,
-    validation_func=validate_mean_tokens_used_per_10s,
+    validation_func=validate_mean_tokens_used_per_minute,
 )
 
 
@@ -181,7 +205,7 @@ AppMetrics
 | extend deployment = tostring(Properties["deployment"])
 | summarize total_token_count = sum(Sum) by bin(TimeGenerated, 10s), Name
 | evaluate pivot(Name, sum(total_token_count))
-| render timechart
+| render timechart with (title="Tokens per 10s over time")
 """.strip(),
     is_chart=True,
     columns=["aoai-simulator.tokens.used", "aoai-simulator.tokens.requested"],
@@ -212,7 +236,7 @@ AppMetrics
     and Name == "aoai-simulator.latency.base"
 | summarize Sum=sum(Sum),  Count = sum(ItemCount), Max=max(Max) by bin(TimeGenerated, 10s)
 | project TimeGenerated, mean_latency_ms=1000*Sum/Count, max_latency_ms=1000*Max
-| render timechart
+| render timechart with (title="Latency (base) over time in ms")
 """.strip(),
     is_chart=True,
     columns=["mean_latency_ms", "max_latency_ms"],

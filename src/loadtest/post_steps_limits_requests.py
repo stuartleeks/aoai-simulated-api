@@ -22,14 +22,14 @@ logging.getLogger("azure").setLevel(logging.WARNING)
 start_time_string = os.getenv("TEST_START_TIME")
 stop_time_string = os.getenv("TEST_STOP_TIME")
 
-test_start_time = datetime.strptime(start_time_string, "%Y-%m-%dT%H:%M:%SZ")
-test_stop_time = datetime.strptime(stop_time_string, "%Y-%m-%dT%H:%M:%SZ")
+test_start_time = datetime.strptime(start_time_string, "%Y-%m-%dT%H:%M:%SZ").astimezone(UTC)
+test_stop_time = datetime.strptime(stop_time_string, "%Y-%m-%dT%H:%M:%SZ").astimezone(UTC)
 
 print(f"test_start_time  : {test_start_time}")
 print(f"test_end_time    : {test_stop_time}")
 
 
-metric_check_time = test_stop_time - timedelta(seconds=40)  # detecting the end of the test can take 30s, add 10s buffer
+metric_check_time = test_stop_time - timedelta(seconds=30)  # detecting the end of the test can take 20s, add 10s buffer
 
 query_processor = QueryProcessor(
     workspace_id=log_analytics_workspace_id,
@@ -41,16 +41,17 @@ query_processor = QueryProcessor(
 )
 
 print(f"metric_check_time: {metric_check_time}")
-check_results_query = f"""
+
+
+check_results_query = """
 AppMetrics
-| where TimeGenerated >= datetime({metric_check_time.strftime('%Y-%m-%dT%H:%M:%SZ')})
-    and TimeGenerated <= datetime({test_stop_time.strftime('%Y-%m-%dT%H:%M:%SZ')})
-	and Name == "locust.request_latency"
-| count
+| summarize max(TimeGenerated)
 """
-query_processor.wait_for_non_zero_count(check_results_query)
+
+query_processor.wait_for_greater_than_or_equal(check_results_query, metric_check_time)
 
 timespan = (datetime.now(UTC) - timedelta(days=1), datetime.now(UTC))
+time_vars = f"let startTime = datetime({test_start_time.strftime('%Y-%m-%dT%H:%M:%SZ')});\nlet endTime = datetime({test_stop_time.strftime('%Y-%m-%dT%H:%M:%SZ')});"
 
 
 ####################################################################
@@ -68,9 +69,10 @@ def validate_request_latency(table: Table):
 query_processor.add_query(
     title="Base Latency",
     query=f"""
+{time_vars}
 AppMetrics
-| where TimeGenerated >= datetime({test_start_time.strftime('%Y-%m-%dT%H:%M:%SZ')})
-    and TimeGenerated <= datetime({test_stop_time.strftime('%Y-%m-%dT%H:%M:%SZ')})
+| where TimeGenerated >= startTime
+    and TimeGenerated <= endTime
     and Name == "aoai-simulator.latency.base"
 | summarize Sum=sum(Sum),  Count = sum(ItemCount), Max=max(Max)
 | project mean_latency_ms=1000*Sum/Count, max_latency_ms=1000*Max
@@ -87,36 +89,49 @@ AppMetrics
 #
 
 
-def validate_mean_sucess_rps(table: Table):
+def validate_mean_sucess_rpm(table: Table):
     # Check if the mean RPS is within the expected range
     # The deployment for the tests has 100,000 Tokens Per Minute (TPM) limit
-    # That equates to 600 Requests Per Minute (RPM) or 10 Requests Per Second (RPS)
+    # That equates to 600 Requests Per Minute (RPM)
     mean_rps = int(table.rows[0][0])
-    low_value = 9
-    high_value = 11
+    low_value = 590
+    high_value = 600
     if mean_rps > high_value:
-        return f"Mean RPS is too high: {mean_rps} (expected between {low_value} and {high_value})"
+        return f"Mean RPM is too high: {mean_rps} (expected between {low_value} and {high_value})"
     if mean_rps < low_value:
-        return f"Mean RPS is too low: {mean_rps} (expected between {low_value} and {high_value})"
+        return f"Mean RPM is too low: {mean_rps} (expected between {low_value} and {high_value})"
     return None
 
 
 query_processor.add_query(
-    title="Mean RPS (successful requests)",
+    title="Mean RPM (successful requests)",
     query=f"""
-AppMetrics
-| where TimeGenerated >= datetime({test_start_time.strftime('%Y-%m-%dT%H:%M:%SZ')})
-    and TimeGenerated <= datetime({test_stop_time.strftime('%Y-%m-%dT%H:%M:%SZ')})
+{time_vars}
+let interval = 60s;
+let timeRange = range TimeStamp from startTime to endTime step interval
+| summarize count() by bin(TimeStamp, interval) | project TimeStamp; // align values to interval boundaries
+let query = AppMetrics
+| where TimeGenerated >= startTime
+    and TimeGenerated <= endTime
     and Name == "aoai-simulator.latency.base"
+| extend deployment = tostring(Properties["deployment"])
 | extend status_code = Properties["status_code"]
 | where status_code == 200
-| summarize RPS = sum(ItemCount)/60.0 by bin(TimeGenerated, 1m)
-| summarize avg(RPS)
+| summarize request_count = sum(ItemCount) by bin(TimeGenerated, interval);
+let aggregateQuery =timeRange
+| join kind=leftouter query on $left.TimeStamp == $right.TimeGenerated
+| project TimeGenerated=TimeStamp, request_count=coalesce(request_count, 0)
+| summarize request_count = sum(request_count) by bin(TimeGenerated, interval);
+let row_count = toscalar (aggregateQuery | count);
+aggregateQuery
+| order by TimeGenerated desc | take row_count - 1 // TODO - skip first result (potentially incomplete minute)
+| order by TimeGenerated asc | take row_count - 2 // TODO - skip last result (potentially incomplete minute)
+| summarize avg_requests_per_minute = avg(request_count)
 """.strip(),
     timespan=timespan,
     show_query=True,
     include_link=True,
-    validation_func=validate_mean_sucess_rps,
+    validation_func=validate_mean_sucess_rpm,
 )
 
 
