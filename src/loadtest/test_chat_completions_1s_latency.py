@@ -39,7 +39,7 @@ def on_locust_init(environment: Environment, **_):
 
 
 class ChatCompletionsNoLimitUser(HttpUser):
-    wait_time = constant(1)  # wait 1 second between requests
+    wait_time = constant(0)  # no wait between requests - the latency already adds that!
 
     @task
     def hello_world(self):

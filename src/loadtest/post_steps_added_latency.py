@@ -22,8 +22,8 @@ logging.getLogger("azure").setLevel(logging.WARNING)
 start_time_string = os.getenv("TEST_START_TIME")
 stop_time_string = os.getenv("TEST_STOP_TIME")
 
-test_start_time = datetime.strptime(start_time_string, "%Y-%m-%dT%H:%M:%SZ")
-test_stop_time = datetime.strptime(stop_time_string, "%Y-%m-%dT%H:%M:%SZ")
+test_start_time = datetime.strptime(start_time_string, "%Y-%m-%dT%H:%M:%SZ").astimezone(UTC)
+test_stop_time = datetime.strptime(stop_time_string, "%Y-%m-%dT%H:%M:%SZ").astimezone(UTC)
 
 print(f"test_start_time  : {test_start_time}")
 print(f"test_end_time    : {test_stop_time}")
@@ -41,14 +41,12 @@ query_processor = QueryProcessor(
 )
 
 print(f"metric_check_time: {metric_check_time}")
-check_results_query = f"""
+check_results_query = """
 AppMetrics
-| where TimeGenerated >= datetime({metric_check_time.strftime('%Y-%m-%dT%H:%M:%SZ')})
-    and TimeGenerated <= datetime({test_stop_time.strftime('%Y-%m-%dT%H:%M:%SZ')})
-	and Name == "locust.request_latency"
-| count
+| summarize max(TimeGenerated)
 """
-query_processor.wait_for_non_zero_count(check_results_query)
+
+query_processor.wait_for_greater_than_or_equal(check_results_query, metric_check_time)
 
 timespan = (datetime.now(UTC) - timedelta(days=1), datetime.now(UTC))
 
