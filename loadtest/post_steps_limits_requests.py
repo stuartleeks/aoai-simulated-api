@@ -45,6 +45,7 @@ print(f"metric_check_time: {metric_check_time}")
 
 check_results_query = """
 AppMetrics
+| where AppRoleName == "aoai-simulated-api" // only check the metrics for the simulated API
 | summarize max(TimeGenerated)
 """
 
