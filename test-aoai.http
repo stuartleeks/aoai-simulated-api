@@ -51,7 +51,7 @@ api-key: {{aoai_key}}
     "content": "What is the meaning of life?"
     }],
   "model": "gpt-5-turbo-1",
-  "max_tokens": 200
+  "max_tokens": 2000
 }
 
 

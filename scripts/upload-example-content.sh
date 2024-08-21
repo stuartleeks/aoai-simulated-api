@@ -35,4 +35,4 @@ fi
 
 storage_key=$(az storage account keys list --account-name "$storage_account_name" -o tsv --query '[0].value')
 
-az storage file upload-batch --destination "$file_share_name" --source "$script_dir/../src/examples" --account-name "$storage_account_name" --account-key "$storage_key"
+az storage file upload-batch --destination "$file_share_name" --source "$script_dir/../examples" --account-name "$storage_account_name" --account-key "$storage_key"

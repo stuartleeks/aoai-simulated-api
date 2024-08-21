@@ -1,13 +1,13 @@
 # Extending the simulator
 
 - [Extending the simulator](#extending-the-simulator)
-	- [Running with an extension](#running-with-an-extension)
-	- [Creating a custom forwarder extension](#creating-a-custom-forwarder-extension)
-		- [Creating a custom generator extension](#creating-a-custom-generator-extension)
-	- [Document Intelligence extensions](#document-intelligence-extensions)
-		- [Document Intelligence forwarder](#document-intelligence-forwarder)
-		- [Document Intelligence generator](#document-intelligence-generator)
-	- [Customising rate limiting](#customising-rate-limiting)
+  - [Running with an extension](#running-with-an-extension)
+  - [Creating a custom forwarder extension](#creating-a-custom-forwarder-extension)
+    - [Creating a custom generator extension](#creating-a-custom-generator-extension)
+  - [Document Intelligence extensions](#document-intelligence-extensions)
+    - [Document Intelligence forwarder](#document-intelligence-forwarder)
+    - [Document Intelligence generator](#document-intelligence-generator)
+  - [Customising rate limiting](#customising-rate-limiting)
 
 
 The simulator allows extending some aspects of the behavior without modifying the original source code.
@@ -154,12 +154,12 @@ The repo includes a couple of example extensions for Document Intelligence that 
 
 ### Document Intelligence forwarder
 
-The document intelligence forwarder extension is in the `src/examples/forwarder_doc_intelligence` folder.
+The document intelligence forwarder extension is in the `examples/forwarder_doc_intelligence` folder.
 This extension allows you to forward requests to the Document Intelligence service and record the responses for later replay. 
 
 ### Document Intelligence generator
 
-The document intelligence generator extension is in the `src/examples/generator_doc_intelligence` folder.
+The document intelligence generator extension is in the `examples/generator_doc_intelligence` folder.
 The extension includes a generator and custom rate-limiter.
 
 The generator will return the right shape of response using lorem ipsum text.
@@ -177,7 +177,7 @@ To control the rate-limiting, set the `DOC_INTELLIGENCE_RPS` environment variabl
 The rate limiting behaviour can be customised by extensions.
 This can be useful if you want to implement different rate limiting behaviour or if you want to add rate limiting to a custom forwarder/generator.
 
-An example of a custom generator can be found in the `src/examples/generator_doc_intelligence` folder.
+An example of a custom generator can be found in the `examples/generator_doc_intelligence` folder.
 
 The simulator configuration stores a dictionary of rate limiters.
 The `RequestContext` associated with a request contains a `values` dictionary used to store information about the request.
