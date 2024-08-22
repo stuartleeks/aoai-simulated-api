@@ -1,5 +1,7 @@
 # Azure OpenAI Simulated API
 
+***IMPORTANT: This repo is no longer maintained - please see [microsoft/aoai-api-simulator](https://github.com/microsoft/aoai-api-simulator/)***
+
 This repo is an exploration into creating a simulated API implementation for Azure OpenAI (AOAI). 
 
 WARNING: This is a work in progress!
@@ -11,6 +13,8 @@ WARNING: This is a work in progress!
   - [Overview](#overview)
     - [What is the OpenAI Simulated API?](#what-is-the-openai-simulated-api)
     - [Simulator Modes](#simulator-modes)
+      - [Record/Replay Mode](#recordreplay-mode)
+      - [Generator Mode](#generator-mode)
   - [Read More](#read-more)
   - [Changelog](#changelog)
 
